@@ -1,0 +1,76 @@
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.see-all {
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+  color: var(--color-text-secondary);
+}
+
+.see-all:hover {
+  color: var(--color-primary);
+}
+
+.activity {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.activity__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+
+.activity__item:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.activity__target {
+  flex: 1;
+  min-width: 0;
+  font-weight: var(--font-weight-medium);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activity__actor,
+.activity__when {
+  flex-shrink: 0;
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+  color: var(--color-text-secondary);
+}
+
+.activity__when {
+  min-width: 9rem;
+  text-align: end;
+}
+
+.activity__empty {
+  padding: var(--space-4) 0;
+  color: var(--color-text-muted);
+}
+
+// The row wraps rather than squeezing on a phone.
+@media (max-width: 639px) {
+  .activity__item {
+    flex-wrap: wrap;
+  }
+
+  .activity__target {
+    flex-basis: 100%;
+    order: -1;
+  }
+}

@@ -1,5 +1,6 @@
 /** Icons the nav knows how to draw. Extend by adding a path to the icon map. */
-export type StaffNavIcon = 'dashboard' | 'users' | 'calendar' | 'folder' | 'settings' | 'logout';
+export type StaffNavIcon =
+  'dashboard' | 'users' | 'calendar' | 'folder' | 'clipboard' | 'settings' | 'logout';
 
 export interface StaffNavItem {
   readonly id: string;

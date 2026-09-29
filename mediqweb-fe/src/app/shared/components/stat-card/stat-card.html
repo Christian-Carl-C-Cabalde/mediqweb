@@ -27,4 +27,13 @@
       }
     </p>
   }
+
+  <!--
+    Optional action, e.g. a link through to the list a card summarises.
+    Wrapped so the footer can be pushed to the bottom of the card, keeping the
+    four dashboard cards the same height regardless of hint length.
+  -->
+  <div class="stat__footer">
+    <ng-content select="[statFooter]" />
+  </div>
 </ui-card>
