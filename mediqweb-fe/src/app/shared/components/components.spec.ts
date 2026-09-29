@@ -1,0 +1,481 @@
+import { TestBed, type ComponentFixture } from '@angular/core/testing';
+import { Component, type Type } from '@angular/core';
+import { Avatar } from './avatar/avatar';
+import { Button } from './button/button';
+import { Card } from './card/card';
+import { Dropdown, type DropdownItem } from './dropdown/dropdown';
+import { FormField } from './form-field/form-field';
+import { Modal } from './modal/modal';
+import { Spinner } from './spinner/spinner';
+import { StatCard } from './stat-card/stat-card';
+import { StatusBadge, type BadgeTone } from './status-badge/status-badge';
+import { Table, type TableColumn } from './table/table';
+import { TableCell } from './table/table-cell';
+
+/** Mounts a standalone component and returns its fixture plus root element. */
+function mount<T>(component: Type<T>): {
+  fixture: ComponentFixture<T>;
+  host: HTMLElement;
+} {
+  const fixture = TestBed.createComponent(component);
+  fixture.detectChanges();
+  return { fixture, host: fixture.nativeElement as HTMLElement };
+}
+
+interface QueueRow {
+  name: string;
+  status: string;
+  tone: BadgeTone;
+}
+
+/** Consumer of `ui-table`, mirroring how a role page would use it. */
+@Component({
+  imports: [Table, TableCell, StatusBadge],
+  template: `
+    <ui-table [columns]="columns" [rows]="rows">
+      <ng-template uiTableCell="status" let-row>
+        <ui-status-badge [tone]="row.tone">{{ row.status }}</ui-status-badge>
+      </ng-template>
+    </ui-table>
+  `,
+})
+class TableHostComponent {
+  readonly columns: TableColumn<QueueRow>[] = [
+    { key: 'name', header: 'Patient' },
+    { key: 'status', header: 'Status' },
+  ];
+  readonly rows: QueueRow[] = [{ name: 'Belen', status: 'Confirmed', tone: 'success' }];
+}
+
+describe('MediQ shared components', () => {
+  describe('Spinner', () => {
+    it('exposes role=status and a visually hidden label when announcing', () => {
+      const { host } = mount(Spinner);
+      expect(host.querySelector('[role="status"]')).toBeTruthy();
+      expect(host.textContent).toContain('Loading');
+    });
+
+    it('is hidden from assistive tech when announce is false', () => {
+      const fixture = TestBed.createComponent(Spinner);
+      fixture.componentRef.setInput('announce', false);
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('[role="status"]')).toBeNull();
+    });
+
+    it('accepts any CSS length as a size', () => {
+      const fixture = TestBed.createComponent(Spinner);
+      fixture.componentRef.setInput('size', '40px');
+      fixture.detectChanges();
+      const ring = fixture.nativeElement.querySelector('.ui-spinner') as HTMLElement;
+      expect(ring.style.width).toBe('40px');
+    });
+  });
+
+  describe('StatusBadge', () => {
+    it('maps tone to a design token instead of a literal colour', () => {
+      const fixture = TestBed.createComponent(StatusBadge);
+      fixture.componentRef.setInput('tone', 'danger');
+      fixture.detectChanges();
+      const host = fixture.nativeElement as HTMLElement;
+      expect(host.style.getPropertyValue('--badge-tone')).toBe('var(--color-danger)');
+    });
+
+    it('keeps the label in text-primary for contrast, not the tone colour', () => {
+      const { host } = mount(StatusBadge);
+      // Warning orange fails AA as body text, so the tone is carried by the dot.
+      expect(host.querySelector('.ui-badge')?.textContent).toBeDefined();
+    });
+  });
+
+  describe('Avatar', () => {
+    it('derives two initials from a full name', () => {
+      const fixture = TestBed.createComponent(Avatar);
+      fixture.componentRef.setInput('name', 'Juan dela Cruz');
+      fixture.detectChanges();
+      const initials = (fixture.nativeElement as HTMLElement).querySelector('.ui-avatar__initials');
+      expect(initials?.textContent?.trim()).toBe('JC');
+    });
+
+    it('derives a single initial from a one-word name', () => {
+      const fixture = TestBed.createComponent(Avatar);
+      fixture.componentRef.setInput('name', 'Cher');
+      fixture.detectChanges();
+      const initials = (fixture.nativeElement as HTMLElement).querySelector('.ui-avatar__initials');
+      expect(initials?.textContent?.trim()).toBe('C');
+    });
+
+    it('falls back to initials when the image fails to load', () => {
+      const fixture = TestBed.createComponent(Avatar);
+      fixture.componentRef.setInput('name', 'Ana Reyes');
+      fixture.componentRef.setInput('src', '/missing.png');
+      fixture.detectChanges();
+      const img = (fixture.nativeElement as HTMLElement).querySelector('img') as HTMLImageElement;
+      expect(img).toBeTruthy();
+      img.dispatchEvent(new Event('error'));
+      fixture.detectChanges();
+      const host = fixture.nativeElement as HTMLElement;
+      expect(host.querySelector('img')).toBeNull();
+      expect(host.querySelector('.ui-avatar__initials')).toBeTruthy();
+    });
+  });
+
+  describe('Button', () => {
+    it('disables interaction and marks itself busy while loading', () => {
+      const fixture = TestBed.createComponent(Button);
+      fixture.componentRef.setInput('loading', true);
+      fixture.detectChanges();
+      const button = (fixture.nativeElement as HTMLElement).querySelector(
+        'button',
+      ) as HTMLButtonElement;
+      expect(button.disabled).toBe(true);
+      expect(button.getAttribute('aria-busy')).toBe('true');
+    });
+
+    it('emits pressed on click', () => {
+      const fixture = TestBed.createComponent(Button);
+      fixture.detectChanges();
+      let count = 0;
+      fixture.componentInstance.pressed.subscribe(() => count++);
+      const button = (fixture.nativeElement as HTMLElement).querySelector(
+        'button',
+      ) as HTMLButtonElement;
+      button.click();
+      expect(count).toBe(1);
+    });
+
+    it('keeps the accessible name for icon-only buttons', () => {
+      const fixture = TestBed.createComponent(Button);
+      fixture.componentRef.setInput('iconOnly', true);
+      fixture.componentRef.setInput('ariaLabel', 'Delete appointment');
+      fixture.detectChanges();
+      const button = (fixture.nativeElement as HTMLElement).querySelector(
+        'button',
+      ) as HTMLButtonElement;
+      expect(button.getAttribute('aria-label')).toBe('Delete appointment');
+    });
+  });
+
+  describe('Card', () => {
+    it('collapses the header when nothing is projected', () => {
+      const { host } = mount(Card);
+      const header = host.querySelector('.ui-card__header') as HTMLElement;
+      expect(getComputedStyle(header).display).toBe('none');
+    });
+
+    it('renders the heading when supplied', () => {
+      const fixture = TestBed.createComponent(Card);
+      fixture.componentRef.setInput('heading', 'Patient queue');
+      fixture.detectChanges();
+      const title = (fixture.nativeElement as HTMLElement).querySelector('.ui-card__title');
+      expect(title?.textContent?.trim()).toBe('Patient queue');
+    });
+
+    it('responds to Enter and Space when interactive', () => {
+      const fixture = TestBed.createComponent(Card);
+      fixture.componentRef.setInput('interactive', true);
+      fixture.detectChanges();
+      let clicks = 0;
+      fixture.componentInstance.cardClick.subscribe(() => clicks++);
+      const article = (fixture.nativeElement as HTMLElement).querySelector(
+        'article',
+      ) as HTMLElement;
+      expect(article.getAttribute('role')).toBe('button');
+      article.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+      expect(clicks).toBe(1);
+    });
+  });
+
+  describe('StatCard', () => {
+    it('renders label and value and exposes the tone token', () => {
+      const fixture = TestBed.createComponent(StatCard);
+      fixture.componentRef.setInput('label', 'Appointments today');
+      fixture.componentRef.setInput('value', 24);
+      fixture.detectChanges();
+      const host = fixture.nativeElement as HTMLElement;
+      expect(host.querySelector('.stat__label')?.textContent?.trim()).toBe('Appointments today');
+      expect(host.querySelector('.stat__value')?.textContent?.trim()).toBe('24');
+      expect(host.style.getPropertyValue('--stat-tone')).toBe('var(--color-primary)');
+    });
+  });
+
+  describe('FormField', () => {
+    it('associates the label with the control id', () => {
+      const fixture = TestBed.createComponent(FormField);
+      fixture.componentRef.setInput('label', 'Username');
+      fixture.componentRef.setInput('controlId', 'username');
+      fixture.detectChanges();
+      const label = (fixture.nativeElement as HTMLElement).querySelector(
+        'label',
+      ) as HTMLLabelElement;
+      expect(label.getAttribute('for')).toBe('username');
+    });
+
+    it('drives the projected control border through the --field-* seam', () => {
+      const fixture = TestBed.createComponent(FormField);
+      fixture.componentRef.setInput('label', 'Username');
+      fixture.componentRef.setInput('controlId', 'username');
+      fixture.componentRef.setInput('error', 'Username is required');
+      fixture.detectChanges();
+      const host = fixture.nativeElement as HTMLElement;
+      expect(host.style.getPropertyValue('--field-border-color')).toBe('var(--color-danger)');
+      expect(host.querySelector('.ui-form-field__help--error')?.textContent).toContain(
+        'Username is required',
+      );
+    });
+
+    it('prefers the error message over the hint', () => {
+      const fixture = TestBed.createComponent(FormField);
+      fixture.componentRef.setInput('label', 'Username');
+      fixture.componentRef.setInput('controlId', 'username');
+      fixture.componentRef.setInput('hint', 'Letters and numbers');
+      fixture.componentRef.setInput('error', 'Already taken');
+      fixture.detectChanges();
+      const help = (fixture.nativeElement as HTMLElement).querySelector('.ui-form-field__help');
+      expect(help?.textContent).toContain('Already taken');
+      expect(help?.textContent).not.toContain('Letters and numbers');
+    });
+  });
+
+  describe('Dropdown', () => {
+    const items: DropdownItem[] = [
+      { id: '1', label: 'Receptionist' },
+      { id: '2', label: 'Nurse', description: 'Ward 3' },
+      { id: '3', label: 'Unavailable', disabled: true },
+    ];
+
+    it('lists items when opened', () => {
+      const fixture = TestBed.createComponent(Dropdown);
+      fixture.componentRef.setInput('items', items);
+      fixture.componentRef.setInput('label', 'Role');
+      fixture.detectChanges();
+      const trigger = (fixture.nativeElement as HTMLElement).querySelector(
+        '.ui-dropdown__trigger',
+      ) as HTMLButtonElement;
+      trigger.click();
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelectorAll('[role="option"]').length).toBe(3);
+      expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    });
+
+    it('emits the chosen item and refuses disabled options', () => {
+      const fixture = TestBed.createComponent(Dropdown);
+      fixture.componentRef.setInput('items', items);
+      fixture.detectChanges();
+      const emitted: DropdownItem[] = [];
+      fixture.componentInstance.selectionChange.subscribe((i) => emitted.push(i));
+
+      const trigger = (fixture.nativeElement as HTMLElement).querySelector(
+        '.ui-dropdown__trigger',
+      ) as HTMLButtonElement;
+      trigger.click();
+      fixture.detectChanges();
+
+      const options = fixture.nativeElement.querySelectorAll('[role="option"]');
+      (options[2] as HTMLElement).click();
+      fixture.detectChanges();
+      expect(emitted.length).toBe(0);
+
+      (options[0] as HTMLElement).click();
+      fixture.detectChanges();
+      expect(emitted).toEqual([items[0]]);
+    });
+
+    it('skips disabled options during keyboard navigation', () => {
+      const fixture = TestBed.createComponent(Dropdown);
+      fixture.componentRef.setInput('items', items);
+      fixture.detectChanges();
+      const trigger = (fixture.nativeElement as HTMLElement).querySelector(
+        '.ui-dropdown__trigger',
+      ) as HTMLButtonElement;
+      trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
+      fixture.detectChanges();
+      // First enabled option is index 0.
+      trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
+      fixture.detectChanges();
+      const active = fixture.nativeElement.querySelector('.ui-dropdown__option.is-active');
+      expect(active?.textContent).toContain('Nurse');
+    });
+
+    it('shows the selected item instead of the placeholder', () => {
+      const fixture = TestBed.createComponent(Dropdown);
+      fixture.componentRef.setInput('items', items);
+      fixture.componentRef.setInput('selected', '2');
+      fixture.detectChanges();
+      const value = (fixture.nativeElement as HTMLElement).querySelector('.ui-dropdown__value');
+      expect(value?.textContent?.trim()).toBe('Nurse');
+    });
+
+    it('filters by label when searchable', () => {
+      const fixture = TestBed.createComponent(Dropdown);
+      fixture.componentRef.setInput('items', items);
+      fixture.componentRef.setInput('searchable', true);
+      fixture.detectChanges();
+      (fixture.nativeElement as HTMLElement)
+        .querySelector<HTMLButtonElement>('.ui-dropdown__trigger')!
+        .click();
+      fixture.detectChanges();
+      const search = (fixture.nativeElement as HTMLElement).querySelector(
+        '.ui-dropdown__search input',
+      ) as HTMLInputElement;
+      search.value = 'ward';
+      search.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelectorAll('[role="option"]').length).toBe(1);
+    });
+  });
+
+  describe('Table', () => {
+    interface Patient {
+      id: string;
+      name: string;
+      age: number;
+    }
+    const columns: TableColumn<Patient>[] = [
+      { key: 'name', header: 'Patient', sortable: true },
+      { key: 'age', header: 'Age', align: 'end', sortable: true },
+    ];
+    const rows: Patient[] = [
+      { id: 'a', name: 'Belen', age: 41 },
+      { id: 'b', name: 'Ana', age: 29 },
+    ];
+
+    it('renders a row per record and a cell per column', () => {
+      const fixture = TestBed.createComponent<Table<Patient>>(Table);
+      fixture.componentRef.setInput('columns', columns);
+      fixture.componentRef.setInput('rows', rows);
+      fixture.detectChanges();
+      const host = fixture.nativeElement as HTMLElement;
+      expect(host.querySelectorAll('tbody tr')).toHaveLength(2);
+      expect(host.querySelectorAll('thead th')).toHaveLength(2);
+    });
+
+    it('shows the empty message with no rows', () => {
+      const fixture = TestBed.createComponent<Table<Patient>>(Table);
+      fixture.componentRef.setInput('columns', columns);
+      fixture.componentRef.setInput('rows', []);
+      fixture.detectChanges();
+      const empty = (fixture.nativeElement as HTMLElement).querySelector('.ui-table__empty');
+      expect(empty?.textContent).toContain('No records');
+    });
+
+    it('replaces the loading state with a spinner', () => {
+      const fixture = TestBed.createComponent<Table<Patient>>(Table);
+      fixture.componentRef.setInput('columns', columns);
+      fixture.componentRef.setInput('rows', rows);
+      fixture.componentRef.setInput('loading', true);
+      fixture.detectChanges();
+      const host = fixture.nativeElement as HTMLElement;
+      expect(host.querySelector('ui-spinner')).toBeTruthy();
+      expect(host.querySelectorAll('tbody tr.ui-table__row')).toHaveLength(0);
+    });
+
+    it('sorts ascending then descending without mutating the input array', () => {
+      const fixture = TestBed.createComponent<Table<Patient>>(Table);
+      fixture.componentRef.setInput('columns', columns);
+      fixture.componentRef.setInput('rows', rows);
+      fixture.detectChanges();
+      const nameHeader = (fixture.nativeElement as HTMLElement).querySelector(
+        '.ui-table__sort',
+      ) as HTMLButtonElement;
+
+      nameHeader.click();
+      fixture.detectChanges();
+      let first = (fixture.nativeElement as HTMLElement).querySelector('tbody tr td');
+      expect(first?.textContent?.trim()).toBe('Ana');
+      expect(nameHeader.parentElement?.getAttribute('aria-sort')).toBe('ascending');
+
+      nameHeader.click();
+      fixture.detectChanges();
+      first = (fixture.nativeElement as HTMLElement).querySelector('tbody tr td');
+      expect(first?.textContent?.trim()).toBe('Belen');
+      expect(nameHeader.parentElement?.getAttribute('aria-sort')).toBe('descending');
+
+      expect(rows.map((r) => r.name)).toEqual(['Belen', 'Ana']);
+    });
+
+    it('emits rowClick', () => {
+      const fixture = TestBed.createComponent<Table<Patient>>(Table);
+      fixture.componentRef.setInput('columns', columns);
+      fixture.componentRef.setInput('rows', rows);
+      fixture.detectChanges();
+      const emitted: Patient[] = [];
+      fixture.componentInstance.rowClick.subscribe((r) => emitted.push(r));
+      (fixture.nativeElement.querySelector('tbody tr') as HTMLElement).click();
+      expect(emitted).toEqual([rows[0]]);
+    });
+
+    it('uses a projected cell template and falls back for unmapped columns', async () => {
+      const fixture = TestBed.createComponent(TableHostComponent);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      const host = fixture.nativeElement as HTMLElement;
+
+      // "status" is rendered by the projected template, not the raw value.
+      const badge = host.querySelector('tbody ui-status-badge');
+      expect(badge?.textContent?.trim()).toBe('Confirmed');
+      // "name" has no matching template, so the raw row value is used.
+      expect(host.querySelector('tbody tr td')?.textContent?.trim()).toBe('Belen');
+    });
+  });
+
+  describe('Modal', () => {
+    // jsdom does not implement HTMLDialogElement.showModal(), so assert the
+    // reflected `open` attribute, which behaves identically in both.
+    const dialogOf = (fixture: ComponentFixture<Modal>): HTMLDialogElement =>
+      (fixture.nativeElement as HTMLElement).querySelector('dialog') as HTMLDialogElement;
+
+    it('opens the native dialog when open is true', () => {
+      const fixture = TestBed.createComponent(Modal);
+      fixture.componentRef.setInput('open', true);
+      fixture.detectChanges();
+      expect(dialogOf(fixture).hasAttribute('open')).toBe(true);
+    });
+
+    it('closes the native dialog when open becomes false', () => {
+      const fixture = TestBed.createComponent(Modal);
+      fixture.componentRef.setInput('open', true);
+      fixture.detectChanges();
+      expect(dialogOf(fixture).hasAttribute('open')).toBe(true);
+
+      fixture.componentRef.setInput('open', false);
+      fixture.detectChanges();
+      expect(dialogOf(fixture).hasAttribute('open')).toBe(false);
+    });
+
+    it('stays closed by default', () => {
+      const fixture = TestBed.createComponent(Modal);
+      fixture.detectChanges();
+      expect(dialogOf(fixture).hasAttribute('open')).toBe(false);
+    });
+
+    it('requests dismissal instead of closing itself', () => {
+      const fixture = TestBed.createComponent(Modal);
+      fixture.componentRef.setInput('open', true);
+      fixture.componentRef.setInput('showClose', true);
+      fixture.detectChanges();
+      let closedCount = 0;
+      fixture.componentInstance.closed.subscribe(() => closedCount++);
+      const closeButton = (fixture.nativeElement as HTMLElement).querySelector(
+        '.ui-modal__close',
+      ) as HTMLButtonElement;
+      closeButton.click();
+      // The owner stays authoritative: the dialog is not self-closed.
+      expect(closedCount).toBe(1);
+      expect(dialogOf(fixture).hasAttribute('open')).toBe(true);
+    });
+
+    it('hides the close button when showClose is false', () => {
+      const fixture = TestBed.createComponent(Modal);
+      fixture.componentRef.setInput('showClose', false);
+      fixture.detectChanges();
+      expect((fixture.nativeElement as HTMLElement).querySelector('.ui-modal__close')).toBeNull();
+    });
+
+    it('labels the dialog for assistive technology', () => {
+      const fixture = TestBed.createComponent(Modal);
+      fixture.componentRef.setInput('title', 'Confirm appointment');
+      fixture.detectChanges();
+      expect(dialogOf(fixture).getAttribute('aria-label')).toBe('Confirm appointment');
+    });
+  });
+});

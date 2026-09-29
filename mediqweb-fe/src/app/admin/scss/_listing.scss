@@ -1,0 +1,58 @@
+// ============================================================================
+// Admin list page presentation
+// ----------------------------------------------------------------------------
+// Shared by the staff directory and the patients page: both render an identity
+// cell, a success message and a status filter of the same size.
+//
+// `@use` this into a component stylesheet rather than adding it to the global
+// sheet. The rules are re-emitted into that one component's scoped stylesheet,
+// so they stay component-local while having a single source of truth.
+// ============================================================================
+
+// Avatar + name in a table cell.
+.row-identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.row-identity__name {
+  font-weight: var(--font-weight-medium);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// Confirmation shown after a change. Uses the primary tint so it reads as
+// "done" rather than as a warning.
+.row-notice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  color: var(--color-text-secondary);
+  background-color: var(--color-primary-light);
+  border: var(--border-width) solid
+    color-mix(in srgb, var(--color-primary) 30%, var(--color-surface));
+  border-radius: var(--radius-md);
+}
+
+// Status filter sitting in the filter bar's second column.
+.row-filter {
+  min-width: 10rem;
+}
+
+// Explanatory line under a list, e.g. why a button is absent.
+.row-footnote {
+  margin-top: var(--space-3);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+  color: var(--color-text-muted);
+}
+
+// Body copy inside a confirmation dialog.
+.row-confirm {
+  color: var(--color-text-secondary);
+}
