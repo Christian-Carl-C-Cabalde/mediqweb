@@ -148,6 +148,10 @@ button:disabled {
   opacity: 0.55;
 }
 
+// `--field-border-color` / `--field-focus-*` are seams: `ui-form-field` sets
+// them on its host and the projected native control inherits them across
+// Angular's style encapsulation, so wrappers can drive input states without
+// ::ng-deep. Unset means "use the MediQ default".
 input,
 select,
 textarea {
@@ -156,11 +160,19 @@ textarea {
   min-height: var(--control-height-md);
   padding: var(--space-2) var(--space-3);
   background-color: var(--color-surface);
-  border: var(--border-width) solid var(--color-border);
+  border: var(--border-width) solid var(--field-border-color, var(--color-border));
   border-radius: var(--radius-md);
   transition:
     border-color var(--transition-fast),
     box-shadow var(--transition-fast);
+}
+
+input:disabled,
+select:disabled,
+textarea:disabled {
+  color: var(--color-text-muted);
+  background-color: var(--color-surface-light);
+  cursor: not-allowed;
 }
 
 textarea {
@@ -177,8 +189,25 @@ input:focus,
 select:focus,
 textarea:focus {
   outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 var(--focus-ring-width) var(--focus-ring-color);
+  border-color: var(--field-focus-border-color, var(--color-primary));
+  box-shadow: 0 0 0 var(--focus-ring-width) var(--field-focus-ring, var(--focus-ring-color));
+}
+
+// ---------------------------------------------------------------------------
+// Accessibility utility
+// Visible to screen readers, removed from the visual layout.
+// ---------------------------------------------------------------------------
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 // ---------------------------------------------------------------------------
