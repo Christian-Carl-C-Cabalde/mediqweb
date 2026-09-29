@@ -7,6 +7,7 @@
  */
 
 // Primitives
+export { Brand } from './brand/brand';
 export { Spinner } from './spinner/spinner';
 
 // Containers
