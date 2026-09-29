@@ -1,0 +1,10 @@
+<app-staff-layout
+  [user]="user"
+  [nav]="nav"
+  [profileMenu]="profileMenu"
+  [pageTitle]="pageTitle()"
+  [breadcrumbs]="breadcrumbs()"
+  (logout)="onLogout()"
+>
+  <router-outlet />
+</app-staff-layout>

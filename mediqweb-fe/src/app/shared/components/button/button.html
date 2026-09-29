@@ -3,6 +3,7 @@
   [class.ui-button--block]="fullWidth()"
   [class.ui-button--icon-only]="iconOnly()"
   [type]="type()"
+  [attr.form]="formId()"
   [disabled]="disabled() || loading()"
   [attr.aria-busy]="loading()"
   [attr.aria-label]="ariaLabel()"

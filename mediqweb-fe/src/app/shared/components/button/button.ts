@@ -18,6 +18,12 @@ export type ButtonSize = 'sm' | 'md' | 'lg';
  *   Save
  * </ui-button>
  * ```
+ *
+ * A `type="submit"` button that has to sit outside its `<form>` — in a dialog
+ * footer, for instance — must be given the form's id explicitly:
+ * ```html
+ * <ui-button type="submit" formId="add-doctor-form">Create</ui-button>
+ * ```
  */
 @Component({
   selector: 'ui-button',
@@ -41,6 +47,15 @@ export class Button {
   readonly iconOnly = input(false);
   /** Accessible name — required when `iconOnly` is used. */
   readonly ariaLabel = input<string | null>(null);
+  /**
+   * `id` of the form a `type="submit"` button belongs to.
+   *
+   * Set via an input rather than a bare `form="…"` attribute: an attribute on
+   * `<ui-button>` lands on the host element, not the inner `<button>`, so the
+   * browser never associates the two and pressing the button silently does
+   * nothing.
+   */
+  readonly formId = input<string | null>(null);
 
   readonly pressed = output<MouseEvent>();
 

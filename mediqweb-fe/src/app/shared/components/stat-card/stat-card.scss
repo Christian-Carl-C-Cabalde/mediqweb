@@ -70,3 +70,15 @@
 .stat__hint {
   color: var(--color-text-muted);
 }
+
+// Collapses when no footer is projected, so existing cards are unaffected.
+.stat__footer:empty {
+  display: none;
+}
+
+.stat__footer {
+  margin-top: auto;
+  padding-top: var(--space-1);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}

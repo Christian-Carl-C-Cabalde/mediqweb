@@ -7,7 +7,11 @@ export const routes: Routes = [
     loadComponent: () => import('./auth/pages/staff-login/staff-login').then((m) => m.StaffLogin),
   },
   { path: '', pathMatch: 'full', redirectTo: 'login' },
-  // Temporary: every unknown route lands on sign-in until the staff layout
-  // and the role dashboards exist. Replace with a real not-found page.
+  {
+    path: 'admin',
+    loadChildren: () => import('./admin/admin.routes').then((m) => m.ADMIN_ROUTES),
+  },
+  // Temporary: every unknown route lands on sign-in until the remaining role
+  // areas exist. Replace with a real not-found page.
   { path: '**', redirectTo: 'login' },
 ];

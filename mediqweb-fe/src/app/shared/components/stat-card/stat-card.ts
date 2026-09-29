@@ -17,6 +17,14 @@ const TREND_GLYPH: Record<StatTrend, string> = {
  * its accent from `--color-<tone>` so no colour is hardcoded. The trend
  * direction is exposed as text as well as an arrow glyph so it is not
  * conveyed by shape alone.
+ *
+ * Two optional projection slots, since anything else is silently discarded:
+ * ```html
+ * <ui-stat-card label="Doctors" [value]="24">
+ *   <svg statIcon>…</svg>
+ *   <a statFooter routerLink="/admin/accounts/doctors">Manage doctors</a>
+ * </ui-stat-card>
+ * ```
  */
 @Component({
   selector: 'ui-stat-card',
