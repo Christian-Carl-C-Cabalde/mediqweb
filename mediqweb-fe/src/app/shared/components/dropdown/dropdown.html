@@ -12,9 +12,11 @@
   (click)="toggle()"
   (keydown)="onKeydown($event)"
 >
-  <span class="ui-dropdown__value" [class.is-placeholder]="!selectedItem()">{{
-    triggerText()
-  }}</span>
+  <ng-content select="[uiDropdownTrigger]">
+    <span class="ui-dropdown__value" [class.is-placeholder]="!selectedItem()">{{
+      triggerText()
+    }}</span>
+  </ng-content>
   <svg class="ui-dropdown__caret" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
     <path
       d="M6 9l6 6 6-6"

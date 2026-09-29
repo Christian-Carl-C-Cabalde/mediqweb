@@ -1,6 +1,6 @@
 <dialog
   #dialog
-  [class]="'ui-modal ui-modal--' + size()"
+  [class]="'ui-modal ui-modal--' + size() + ' ui-modal--at-' + placement()"
   [attr.aria-label]="title()"
   (click)="onBackdropClick($event)"
   (cancel)="onCancel($event)"

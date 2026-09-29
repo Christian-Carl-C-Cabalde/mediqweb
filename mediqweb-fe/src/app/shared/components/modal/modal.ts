@@ -9,6 +9,7 @@ import {
 } from '@angular/core';
 
 export type ModalSize = 'sm' | 'md' | 'lg' | 'xl';
+export type ModalPlacement = 'center' | 'left' | 'right';
 
 /**
  * Modal dialog built on the native `<dialog>` element.
@@ -32,6 +33,12 @@ export class Modal {
   readonly open = input(false);
   readonly title = input<string | null>(null);
   readonly size = input<ModalSize>('md');
+  /**
+   * `left`/`right` render an edge-anchored drawer instead of a centred dialog.
+   * The drawer reuses this element so it inherits the platform focus trap,
+   * inert background and Escape handling rather than reimplementing them.
+   */
+  readonly placement = input<ModalPlacement>('center');
   /** Clicking the backdrop dismisses the dialog. */
   readonly closeOnBackdrop = input(true);
   /** Escape dismisses the dialog. */

@@ -31,6 +31,63 @@
   background-color: color-mix(in srgb, var(--color-text-primary) 45%, transparent);
 }
 
+// ---------------------------------------------------------------------------
+// Drawer placement
+// Full-height panel pinned to an edge. Used for off-canvas navigation on
+// small viewports, where a centred dialog would be the wrong shape.
+//
+// These rules deliberately follow the `--sm`…`--xl` width rules above and
+// share their specificity, so a drawer always wins on width and `size` has
+// no effect when `placement` names an edge. Do not move them above.
+// ---------------------------------------------------------------------------
+.ui-modal--at-left,
+.ui-modal--at-right {
+  height: 100dvh;
+  max-height: 100dvh;
+  margin: 0;
+  top: 0;
+}
+
+.ui-modal--at-left {
+  width: min(18rem, 84vw);
+  left: 0;
+  right: auto;
+}
+
+.ui-modal--at-right {
+  width: min(18rem, 84vw);
+  left: auto;
+  right: 0;
+}
+
+.ui-modal--at-left .ui-modal__panel,
+.ui-modal--at-right .ui-modal__panel {
+  height: 100%;
+  max-height: none;
+  border-radius: 0;
+  border-block: 0;
+}
+
+.ui-modal--at-left .ui-modal__panel {
+  border-left: 0;
+}
+
+.ui-modal--at-right .ui-modal__panel {
+  border-right: 0;
+}
+
+// The body owns the scrolling and lays its child out as a full-height column,
+// so drawer content can pin an action to the bottom edge.
+.ui-modal--at-left .ui-modal__body,
+.ui-modal--at-right .ui-modal__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  // Drawer content brings its own padding.
+  padding: 0;
+}
+
 .ui-modal__panel {
   display: flex;
   flex-direction: column;
