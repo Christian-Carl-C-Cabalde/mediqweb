@@ -31,4 +31,4 @@ export { Table, type TableColumn, type TableSort, type SortDirection } from './t
 export { TableCell } from './table/table-cell';
 
 // Overlays
-export { Modal, type ModalSize } from './modal/modal';
+export { Modal, type ModalPlacement, type ModalSize } from './modal/modal';
