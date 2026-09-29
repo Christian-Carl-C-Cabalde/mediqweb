@@ -1,6 +1,6 @@
-<admin-mock-notice />
+<ui-mock-notice area="The Admin area" />
 
-<admin-filter-bar
+<ui-filter-bar
   label="Search audit logs"
   placeholder="Who, what or which record"
   [value]="query()"
@@ -16,7 +16,7 @@
   />
 
   <ui-button [disabled]="true" title="Export is not connected yet">Export CSV</ui-button>
-</admin-filter-bar>
+</ui-filter-bar>
 
 <ui-card padding="none">
   <ui-table
@@ -31,7 +31,7 @@
     "
   >
     <ng-template uiTableCell="at" let-row>
-      <time [attr.datetime]="row.at">{{ row.at | date: 'MMM d, y · h:mm a' }}</time>
+      <time [attr.datetime]="row.at">{{ row.at | date: 'MMM d, y Â· h:mm a' }}</time>
     </ng-template>
 
     <ng-template uiTableCell="actor" let-row>

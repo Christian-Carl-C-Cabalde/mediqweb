@@ -358,6 +358,23 @@ describe('MediQ shared components', () => {
       expect(empty?.textContent).toContain('No records');
     });
 
+    it('announces the row count in the caption, agreeing in number', () => {
+      // The live region is read out by a screen reader on every filter change,
+      // so "1 rows" would be spoken as an error.
+      const fixture = TestBed.createComponent<Table<Patient>>(Table);
+      fixture.componentRef.setInput('columns', columns);
+      fixture.componentRef.setInput('rows', [rows[0]]);
+      fixture.componentRef.setInput('caption', 'Patients');
+      fixture.detectChanges();
+      const caption = (fixture.nativeElement as HTMLElement).querySelector('.ui-table__caption');
+      expect(caption?.textContent).toContain('1 row');
+      expect(caption?.textContent).not.toContain('1 rows');
+
+      fixture.componentRef.setInput('rows', rows);
+      fixture.detectChanges();
+      expect(caption?.textContent).toContain(`${rows.length} rows`);
+    });
+
     it('replaces the loading state with a spinner', () => {
       const fixture = TestBed.createComponent<Table<Patient>>(Table);
       fixture.componentRef.setInput('columns', columns);

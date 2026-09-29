@@ -1,0 +1,170 @@
+@use '../../../shared/scss/dashboard';
+
+// Two columns: the day's list is the point of the page, so it gets the width,
+// and the two context cards stack beside it. One column below the layout's
+// sidebar breakpoint, where a side column would leave neither enough room.
+.dash {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.dash__side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+@media (max-width: 1023px) {
+  .dash {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.agenda {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agenda__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+
+.agenda__item:last-child {
+  border-bottom: 0;
+}
+
+// Fixed-width so the times line up as a column, which is the whole point of a
+// day list.
+.agenda__time {
+  flex-shrink: 0;
+  width: 5.5rem;
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.agenda__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.agenda__patient {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+}
+
+.agenda__patient span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agenda__reason {
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agenda__meta {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--font-size-small);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.next__name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-text-primary);
+}
+
+.next__name span {
+  display: flex;
+  flex-direction: column;
+}
+
+.next__when {
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+  color: var(--color-text-secondary);
+}
+
+.next__reason {
+  margin: var(--space-3) 0;
+  color: var(--color-text-secondary);
+}
+
+.overview {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.overview__item + .overview__item {
+  border-top: var(--border-width) solid var(--color-border);
+}
+
+.overview__item a {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  color: var(--color-text-primary);
+}
+
+.overview__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.overview__when {
+  flex-shrink: 0;
+  font-size: var(--font-size-small);
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.empty {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+// The row wraps rather than squeezing on a phone.
+@media (max-width: 639px) {
+  .agenda__item {
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .agenda__body {
+    flex-basis: 100%;
+    order: 3;
+  }
+
+  .agenda__meta {
+    margin-left: auto;
+  }
+}

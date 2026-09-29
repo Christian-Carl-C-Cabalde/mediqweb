@@ -1,0 +1,130 @@
+// One row per weekday: the toggle, then the two time inputs. Below the layout's
+// sidebar breakpoint the row stacks, so the times never get squeezed into an
+// unusably narrow input.
+.days {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.day {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: var(--border-width) solid var(--color-border);
+  background-color: var(--color-surface);
+}
+
+.day:last-child {
+  border-bottom: 0;
+}
+
+.day__toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1;
+  min-width: 0;
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+}
+
+.day__toggle input {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+
+// A closed day dims its row so the pattern of the week is readable at a glance.
+.day--off {
+  color: var(--color-text-muted);
+}
+
+.day--off .day__toggle {
+  font-weight: var(--font-weight-body);
+}
+
+.day__hours {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.day__dash {
+  padding-top: var(--control-height-md);
+  font-size: var(--font-size-small);
+  color: var(--color-text-muted);
+}
+
+.published {
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+  color: var(--color-text-secondary);
+}
+
+.lede {
+  margin: 0 0 var(--space-4);
+  color: var(--color-text-secondary);
+}
+
+// Save-time confirmation, using the primary tint so it reads as "done".
+.notice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-4) 0 0;
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  color: var(--color-text-secondary);
+  background-color: var(--color-primary-light);
+  border: var(--border-width) solid
+    color-mix(in srgb, var(--color-primary) 30%, var(--color-surface));
+  border-radius: var(--radius-md);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.actions__summary {
+  margin: 0;
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+  color: var(--color-text-secondary);
+}
+
+.actions__buttons {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.footnote {
+  margin: var(--space-3) 0 0;
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+  color: var(--color-text-muted);
+}
+
+@media (max-width: 767px) {
+  .day {
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .day__hours {
+    width: 100%;
+  }
+
+  .day__hours ui-form-field {
+    flex: 1;
+  }
+}

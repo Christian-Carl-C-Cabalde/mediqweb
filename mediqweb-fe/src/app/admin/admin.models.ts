@@ -6,8 +6,17 @@
  * replaces the mock session store.
  */
 
-/** An account is either usable or not. Doctors and secretaries are never deleted here. */
-export type AccountStatus = 'active' | 'inactive';
+/**
+ * An account is either usable or not.
+ *
+ * Declared in `shared/domain` rather than here because staff and patient
+ * accounts carry the same status in every role area, and Admin has no business
+ * being the one place that says what an inactive account means. Re-exported so
+ * the existing `admin.models` import sites keep working unchanged.
+ */
+export type { AccountStatus } from '../shared/domain/account-status';
+
+import type { AccountStatus } from '../shared/domain/account-status';
 
 export interface StaffAccount {
   readonly id: string;

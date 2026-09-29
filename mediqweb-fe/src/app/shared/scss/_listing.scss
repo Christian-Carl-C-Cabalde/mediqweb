@@ -1,8 +1,9 @@
 // ============================================================================
-// Admin list page presentation
+// List page presentation
 // ----------------------------------------------------------------------------
-// Shared by the staff directory and the patients page: both render an identity
-// cell, a success message and a status filter of the same size.
+// Shared by every staff list screen: the Admin staff directory and patients
+// pages, and the Doctor appointments and patients pages all render an identity
+// cell, a success message and a filter control of the same size.
 //
 // `@use` this into a component stylesheet rather than adding it to the global
 // sheet. The rules are re-emitted into that one component's scoped stylesheet,

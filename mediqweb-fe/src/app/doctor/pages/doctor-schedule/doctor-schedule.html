@@ -1,0 +1,69 @@
+<ui-mock-notice area="The Doctor area" />
+
+<ui-card heading="Weekly availability" [headingLevel]="3" padding="lg">
+  <ng-container uiCardHeaderActions>
+    <span class="published">
+      Published now: <strong>{{ published() }}</strong>
+    </span>
+  </ng-container>
+
+  <p class="lede">
+    These are the hours a Secretary may book you into. Turning a day off hides it from booking
+    without touching appointments that are already there.
+  </p>
+
+  <form [formGroup]="form" (ngSubmit)="save()">
+    <ul class="days" formArrayName="days">
+      @for (day of dayNames; track day; let i = $index) {
+        <li class="day" [formGroupName]="i" [class.day--off]="!isOpen(i)">
+          <label class="day__toggle">
+            <input type="checkbox" formControlName="enabled" />
+            <span>{{ day }}</span>
+          </label>
+
+          <div class="day__hours">
+            <ui-form-field
+              label="Opens"
+              [controlId]="controlId(i, 'start')"
+              [disabled]="!isOpen(i)"
+              [error]="showTimeError(i) ? timeError() : null"
+            >
+              <input type="time" [id]="controlId(i, 'start')" formControlName="startTime" />
+            </ui-form-field>
+
+            <span class="day__dash" aria-hidden="true">to</span>
+
+            <ui-form-field
+              label="Closes"
+              [controlId]="controlId(i, 'end')"
+              [disabled]="!isOpen(i)"
+              [error]="showTimeError(i) ? timeError() : null"
+            >
+              <input type="time" [id]="controlId(i, 'end')" formControlName="endTime" />
+            </ui-form-field>
+          </div>
+        </li>
+      }
+    </ul>
+
+    @if (notice(); as message) {
+      <p class="notice" role="status">
+        {{ message }}
+        <ui-button variant="ghost" size="sm" (click)="notice.set(null)">Dismiss</ui-button>
+      </p>
+    }
+
+    <div class="actions">
+      <p class="actions__summary">This week would be {{ draftSummary() }}.</p>
+      <div class="actions__buttons">
+        <ui-button variant="ghost" type="button" (click)="reset()">Reset</ui-button>
+        <ui-button type="submit">Save hours</ui-button>
+      </div>
+    </div>
+  </form>
+</ui-card>
+
+<p class="footnote">
+  Moving a day does not move the appointments already booked in it. Ask a Secretary to reschedule
+  those, and keep in mind the API's rules for what happens to a booking outside published hours.
+</p>

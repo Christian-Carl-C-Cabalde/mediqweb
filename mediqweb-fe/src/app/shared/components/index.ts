@@ -24,6 +24,11 @@ export {
   type DropdownSize,
 } from './dropdown/dropdown';
 
+// Listing chrome. Shared because every area that shows a filtered list needs
+// the same search-and-filter bar, and because keeping one copy is what stops
+// the areas' filter behaviour from drifting apart.
+export { FilterBar } from './filter-bar/filter-bar';
+
 // Data display
 export { Avatar, type AvatarSize, type AvatarStatus } from './avatar/avatar';
 export { StatusBadge, type BadgeSize, type BadgeTone } from './status-badge/status-badge';
@@ -32,3 +37,9 @@ export { TableCell } from './table/table-cell';
 
 // Overlays
 export { Modal, type ModalPlacement, type ModalSize } from './modal/modal';
+
+/**
+ * Shared by every area because every area is currently backed by mock data.
+ * The `area` input names the area so the wording does not drift.
+ */
+export { MockNotice } from './mock-notice/mock-notice';

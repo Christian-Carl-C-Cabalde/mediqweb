@@ -1,6 +1,6 @@
-<admin-mock-notice />
+<ui-mock-notice area="The Admin area" />
 
-<admin-filter-bar
+<ui-filter-bar
   label="Search patients"
   placeholder="Name, email or contact number"
   [value]="query()"
@@ -14,7 +14,7 @@
     label="Filter by status"
     (selectionChange)="onStatusFilterChange($event)"
   />
-</admin-filter-bar>
+</ui-filter-bar>
 
 @if (notice(); as message) {
   <p class="row-notice" role="status">
