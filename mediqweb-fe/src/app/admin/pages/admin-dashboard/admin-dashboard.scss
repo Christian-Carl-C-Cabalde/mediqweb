@@ -1,19 +1,6 @@
-.stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
-  gap: var(--space-4);
-  margin-bottom: var(--space-6);
-}
-
-.see-all {
-  font-size: var(--font-size-small);
-  line-height: var(--line-height-small);
-  color: var(--color-text-secondary);
-}
-
-.see-all:hover {
-  color: var(--color-primary);
-}
+// The stat card row and the "see all" link are shared with the Doctor
+// dashboard, so they come from one source rather than being copied here.
+@use '../../../shared/scss/dashboard';
 
 .activity {
   display: flex;

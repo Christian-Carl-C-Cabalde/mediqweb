@@ -4,6 +4,8 @@ import {
   Button,
   Card,
   Dropdown,
+  FilterBar,
+  MockNotice,
   StatusBadge,
   Table,
   TableCell,
@@ -11,8 +13,6 @@ import {
   type DropdownItem,
   type TableColumn,
 } from '../../../shared/components';
-import { FilterBar } from '../../components/filter-bar/filter-bar';
-import { MockNotice } from '../../components/mock-notice/mock-notice';
 import { AdminSession } from '../../admin-session';
 import type { AuditEntry, AuditSeverity } from '../../admin.models';
 

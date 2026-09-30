@@ -24,11 +24,28 @@ export {
   type DropdownSize,
 } from './dropdown/dropdown';
 
+// Listing chrome. Shared because every area that shows a filtered list needs
+// the same search-and-filter bar, and because keeping one copy is what stops
+// the areas' filter behaviour from drifting apart.
+export { FilterBar } from './filter-bar/filter-bar';
+
 // Data display
 export { Avatar, type AvatarSize, type AvatarStatus } from './avatar/avatar';
 export { StatusBadge, type BadgeSize, type BadgeTone } from './status-badge/status-badge';
 export { Table, type TableColumn, type TableSort, type SortDirection } from './table/table';
 export { TableCell } from './table/table-cell';
 
+// Shared by every staff area that reads a staff or patient record: the same
+// fact/value grid, and one place that decides how an appointment status looks,
+// so a `no-show` cannot be a different colour depending on which area you are in.
+export { AppointmentStatusBadge } from './appointment-status/appointment-status';
+export { DetailList } from './detail-list/detail-list';
+
 // Overlays
 export { Modal, type ModalPlacement, type ModalSize } from './modal/modal';
+
+/**
+ * Shared by every area because every area is currently backed by mock data.
+ * The `area` input names the area so the wording does not drift.
+ */
+export { MockNotice } from './mock-notice/mock-notice';

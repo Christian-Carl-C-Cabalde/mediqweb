@@ -1,8 +1,13 @@
 import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { Card, StatCard, StatusBadge, type BadgeTone } from '../../../shared/components';
-import { MockNotice } from '../../components/mock-notice/mock-notice';
+import {
+  Card,
+  MockNotice,
+  StatCard,
+  StatusBadge,
+  type BadgeTone,
+} from '../../../shared/components';
 import { AdminSession } from '../../admin-session';
 import type { AuditSeverity } from '../../admin.models';
 

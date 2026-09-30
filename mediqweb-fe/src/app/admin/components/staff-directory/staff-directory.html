@@ -1,6 +1,6 @@
-<admin-mock-notice />
+<ui-mock-notice area="The Admin area" />
 
-<admin-filter-bar
+<ui-filter-bar
   [label]="'Search ' + plural()"
   placeholder="Name, email or license"
   [value]="query()"
@@ -14,7 +14,7 @@
     [label]="'Filter by status'"
     (selectionChange)="onStatusFilterChange($event)"
   />
-</admin-filter-bar>
+</ui-filter-bar>
 
 <div class="actions">
   <ui-button variant="primary" (click)="openCreate()">Add {{ singular() }}</ui-button>
@@ -57,7 +57,7 @@
     }}</ng-template>
 
     <ng-template uiTableCell="licenseNumber" let-row>
-      {{ row.licenseNumber ?? '—' }}
+      {{ row.licenseNumber ?? 'â€”' }}
     </ng-template>
 
     <ng-template uiTableCell="actions" let-row>

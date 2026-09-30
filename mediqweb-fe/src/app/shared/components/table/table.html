@@ -9,7 +9,9 @@
         {{
           caption()
         }}
-        <span class="visually-hidden" aria-live="polite">{{ rowCount() }} rows</span>
+        <span class="visually-hidden" aria-live="polite"
+          >{{ rowCount() }} {{ rowCount() === 1 ? 'row' : 'rows' }}</span
+        >
       </caption>
     }
 

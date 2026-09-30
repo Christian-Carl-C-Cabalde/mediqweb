@@ -1,8 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Button, Card, FormField, Modal } from '../../../shared/components';
-import { FilterBar } from '../../components/filter-bar/filter-bar';
-import { MockNotice } from '../../components/mock-notice/mock-notice';
+import { Button, Card, FilterBar, FormField, Modal, MockNotice } from '../../../shared/components';
 import { AdminSession } from '../../admin-session';
 import type { Specialization } from '../../admin.models';
 

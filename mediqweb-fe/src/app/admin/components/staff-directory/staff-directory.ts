@@ -7,7 +7,9 @@ import {
   Card,
   Dropdown,
   FormField,
+  FilterBar,
   Modal,
+  MockNotice,
   StatusBadge,
   Table,
   TableCell,
@@ -16,8 +18,6 @@ import {
   type TableColumn,
 } from '../../../shared/components';
 import { AdminSession, type StaffKind } from '../../admin-session';
-import { FilterBar } from '../filter-bar/filter-bar';
-import { MockNotice } from '../mock-notice/mock-notice';
 import type { AccountStatus, StaffAccount } from '../../admin.models';
 
 type StatusFilter = 'all' | AccountStatus;

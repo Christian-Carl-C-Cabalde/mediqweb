@@ -11,6 +11,14 @@ export const routes: Routes = [
     path: 'admin',
     loadChildren: () => import('./admin/admin.routes').then((m) => m.ADMIN_ROUTES),
   },
+  {
+    path: 'doctor',
+    loadChildren: () => import('./doctor/doctor.routes').then((m) => m.DOCTOR_ROUTES),
+  },
+  {
+    path: 'secretary',
+    loadChildren: () => import('./secretary/secretary.routes').then((m) => m.SECRETARY_ROUTES),
+  },
   // Temporary: every unknown route lands on sign-in until the remaining role
   // areas exist. Replace with a real not-found page.
   { path: '**', redirectTo: 'login' },
