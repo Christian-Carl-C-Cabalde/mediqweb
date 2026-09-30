@@ -207,6 +207,37 @@ describe('SecretaryAppointments', () => {
     expect(text()).toContain('is booked with');
   });
 
+  it('takes the appointment length as a number when the select is used', () => {
+    // Driven through the rendered `<select>` on purpose. Setting the control
+    // directly bypasses the value accessor, which is where a string sneaks in:
+    // `540 + "15"` is far past closing time, so a length picked by hand made every
+    // booking look impossible.
+    const select = (fixture.nativeElement as HTMLElement).querySelector<HTMLSelectElement>(
+      '#book-duration',
+    )!;
+    const slot = futureSlot();
+    form().setValue({
+      patientId: 'pat-201',
+      doctorId: 'doc-003',
+      ...slot,
+      duration: 30,
+      reason: 'Routine check-up',
+    });
+
+    // With `[ngValue]` an option's `value` is an accessor-generated id, so the
+    // option is chosen the way a person does — by what it says.
+    const option = [...select.options].find((o) => o.textContent?.trim().startsWith('15 '))!;
+    option.selected = true;
+    select.value = option.value;
+    select.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    expect(form().getRawValue().duration).toBe(15);
+    expect(typeof form().getRawValue().duration).toBe('number');
+    expect(page().bookingProblem()).toBeNull();
+    expect(page().canSubmitBooking()).toBe(true);
+  });
+
   it('books a new appointment as "booked" rather than confirmed', () => {
     fillValidBooking();
     page().submitBooking();
@@ -342,6 +373,41 @@ describe('SecretaryAppointments', () => {
     const moved = session.appointments().find((a) => a.id === live.id)!;
     expect(moved.startsAt.startsWith(slot.date)).toBe(true);
     expect(text()).toContain('is moved to the new time');
+  });
+
+  it('confirms a move with the new time, not the one it came from', () => {
+    // The store replaces the appointment with a new object, so a confirmation
+    // built from the pre-move one reads "moved to the new time" beside the old
+    // time. Pin the timestamp in the notice.
+    const live = session
+      .appointments()
+      .find((a) => a.status === 'booked' && a.doctorId === 'doc-003')!;
+    const slot = futureSlot(21);
+
+    page().openReschedule(live);
+    page().rescheduleForm.setValue(slot);
+    fixture.detectChanges();
+    page().submitReschedule();
+    fixture.detectChanges();
+
+    const notice = (fixture.nativeElement as HTMLElement).querySelector('.row-notice')!;
+    const when = notice.querySelector('.row-notice__when')!.textContent!.trim();
+    const moved = session.appointments().find((a) => a.id === live.id)!;
+    const at = new Date(moved.startsAt);
+
+    // Same shape the template renders: `MMM d · h:mm a`.
+    const expected = [
+      at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      at.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+    ].join(' · ');
+    expect(when).toBe(expected);
+    // And it is not the time the appointment came from.
+    expect(when).not.toBe(
+      [
+        new Date(live.startsAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        new Date(live.startsAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+      ].join(' · '),
+    );
   });
 
   it('explains a reschedule into a busy slot instead of moving it', () => {

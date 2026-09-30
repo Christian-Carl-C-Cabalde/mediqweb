@@ -330,9 +330,14 @@ export class SecretaryAppointments {
     }
 
     this.closeReschedule();
+    // Announce the appointment read back from the store rather than the one held
+    // here: the move replaces it with a new object, so the copy in hand still
+    // carries the old time and the confirmation would read "moved to the new
+    // time" beside the time it came from.
+    const updated = this.session.appointments().find((a) => a.id === appointment.id);
     this.announce(
       `${this.session.patientName(appointment.patientId)} is moved to the new time.`,
-      appointment,
+      updated ?? appointment,
     );
   }
 
@@ -359,7 +364,10 @@ export class SecretaryAppointments {
       patientId: value.patientId,
       doctorId: value.doctorId,
       startsAt: this.combine(value),
-      durationMinutes: value.duration,
+      // Coerced rather than passed through: the store adds this to a start time,
+      // where a string would concatenate instead of add. The control is declared
+      // `number`, so anything else here is a lie the type checker cannot catch.
+      durationMinutes: Number(value.duration),
       reason: value.reason,
     };
   }
