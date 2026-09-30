@@ -1,31 +1,39 @@
 import type { AccountStatus } from '../shared/domain/account-status';
 
 /**
- * Doctor area domain shapes.
+ * Secretary area domain shapes.
  *
- * These describe what the Doctor screens display. They carry no persistence or
+ * These describe what the Secretary screens display. They carry no persistence or
  * business rules — every screen is static until a real service replaces
- * `DoctorSession`.
+ * `SecretarySession`.
  *
- * Deliberately absent: diagnoses, clinical notes, prescriptions and vitals.
- * Patient records are a separate milestone with their own access rules, and
- * inventing clinical content here would look like it had been reviewed.
+ * The Secretary manages appointments for all doctors and sees all patients.
+ * Unlike the Doctor area, there is no scoping to a single provider.
  */
 
 /**
  * Where an appointment is in its lifecycle.
  *
- * A doctor moves an appointment forward; a Secretary creates it. There is no
- * `booked` -> `cancelled` rule enforced here beyond what the buttons offer,
- * because the API's rules are not written yet.
+ * A Secretary creates and manages appointments; doctors move them forward.
+ * The Secretary can book, reschedule, and cancel — but not confirm/complete/no-show,
+ * which are clinical decisions the doctor owns.
  *
- * Re-exported from `shared/domain` rather than declared here, because the
- * Secretary area works with the same lifecycle and the shared
- * `ui-appointment-status` renders both. Existing imports keep working.
+ * Re-exported from `shared/domain` rather than declared here, because the Doctor
+ * area works with the same lifecycle and the shared `ui-appointment-status`
+ * renders both. Existing imports keep working.
  */
 export type { AppointmentStatus } from '../shared/domain/appointment-status';
 
 import type { AppointmentStatus } from '../shared/domain/appointment-status';
+
+/**
+ * Statuses a Secretary is allowed to move an appointment into.
+ *
+ * The Secretary books (creates as 'booked') and can cancel.
+ * Rescheduling keeps the status; moving to confirmed/completed/no-show
+ * is the doctor's action.
+ */
+export type SecretaryAppointmentAction = 'book' | 'reschedule' | 'cancel';
 
 export interface Appointment {
   readonly id: string;
@@ -45,10 +53,6 @@ export interface Appointment {
   readonly reason: string;
 }
 
-/**
- * A patient as the Doctor area sees them: enough to identify and contact the
- * person, and nothing about their health.
- */
 export interface Patient {
   readonly id: string;
   readonly name: string;
@@ -65,15 +69,12 @@ export interface Patient {
 /** A patient plus the visit figures the list and dashboard need. */
 export interface PatientSummary {
   readonly patient: Patient;
-  /** Most recent past appointment with the signed-in doctor, cancelled included. */
   readonly lastVisit: Appointment | null;
-  /** Next appointment that has not been cancelled, ignoring `no-show`. */
   readonly nextVisit: Appointment | null;
-  /** Appointments that reached a consultation, i.e. `completed` or `no-show`. */
   readonly visitCount: number;
 }
 
-export interface DoctorProfile {
+export interface Doctor {
   readonly id: string;
   readonly name: string;
   readonly email: string;
@@ -83,8 +84,14 @@ export interface DoctorProfile {
   readonly licenseNumber: string;
   /** ISO date. */
   readonly joinedOn: string;
-  /** Short introduction shown to patients when they book. */
-  readonly bio: string;
+  readonly status: AccountStatus;
+}
+
+/** A doctor plus availability summary for the list view. */
+export interface DoctorSummary {
+  readonly doctor: Doctor;
+  readonly weeklyHours: string;
+  readonly nextAvailable: string | null;
 }
 
 /** One day of the repeating weekly availability a doctor publishes. */
@@ -97,5 +104,14 @@ export interface ScheduleDay {
   readonly endTime: string;
 }
 
+export interface SecretaryProfile {
+  readonly id: string;
+  readonly name: string;
+  readonly email: string;
+  readonly phone: string;
+  /** ISO date. */
+  readonly joinedOn: string;
+}
+
 /** Fields the Profile page is allowed to change. */
-export type ProfileDraft = Pick<DoctorProfile, 'name' | 'email' | 'phone' | 'bio'>;
+export type ProfileDraft = Pick<SecretaryProfile, 'name' | 'email' | 'phone'>;

@@ -2,43 +2,43 @@ import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Button, Card, DetailList, FormField, MockNotice } from '../../../shared/components';
-import { DoctorSession } from '../../doctor-session';
+import { SecretarySession } from '../../secretary-session';
 
 /**
- * The doctor's own profile.
+ * The Secretary's own profile.
  *
- * Split into a read-only summary of the fields the Admin owns — specialization
- * and licence number — and an editable set the doctor controls. A doctor who
- * could edit their own licence number could also edit their own credentials,
- * so those two fields are not on the form and are not marked disabled: they are
- * simply not there.
+ * Three editable fields and nothing else. A Secretary's role, and the clinic they
+ * belong to, are not theirs to set, so there is nothing to disable — the fields
+ * simply are not on the page.
  *
- * Saving writes to the mock store, which the header reads, so the name in the
- * top right updates. Nothing is persisted, and the notice says so.
+ * Saving writes to the mock store, which the header reads, so the name in the top
+ * right updates. Nothing is persisted, and the notice says so.
  */
 @Component({
-  selector: 'app-doctor-profile',
+  selector: 'app-secretary-profile',
   imports: [DatePipe, ReactiveFormsModule, Button, Card, FormField, MockNotice, DetailList],
-  templateUrl: './doctor-profile.html',
-  styleUrl: './doctor-profile.scss',
+  templateUrl: './secretary-profile.html',
+  styleUrl: './secretary-profile.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class DoctorProfilePage {
-  private readonly session = inject(DoctorSession);
+export class SecretaryProfilePage {
+  private readonly session = inject(SecretarySession);
   private readonly fb = inject(FormBuilder).nonNullable;
 
   protected readonly notice = signal<string | null>(null);
 
   protected readonly profile = this.session.profile;
 
-  /** How many patients the header should imply the doctor looks after. */
+  /** How many patients the desk looks after, for the summary beside the form. */
   protected readonly patientCount = computed(() => this.session.patients().length);
+
+  /** How many doctors the desk books for. */
+  protected readonly doctorCount = computed(() => this.session.activeDoctorCount());
 
   protected readonly form = this.fb.group({
     name: this.fb.control('', [Validators.required, Validators.minLength(2)]),
     email: this.fb.control('', [Validators.required, Validators.email]),
     phone: this.fb.control('', [Validators.required]),
-    bio: this.fb.control('', [Validators.maxLength(280)]),
   });
 
   constructor() {
@@ -57,8 +57,8 @@ export class DoctorProfilePage {
   }
 
   protected resetForm(): void {
-    const { name, email, phone, bio } = this.session.profile();
-    this.form.setValue({ name, email, phone, bio });
+    const { name, email, phone } = this.session.profile();
+    this.form.setValue({ name, email, phone });
     this.form.markAsPristine();
     this.form.markAsUntouched();
     this.notice.set(null);
@@ -67,7 +67,7 @@ export class DoctorProfilePage {
   protected nameError(): string | null {
     const control = this.form.controls.name;
     if (!control.touched) return null;
-    if (control.hasError('required')) return 'Enter the name patients should see.';
+    if (control.hasError('required')) return 'Enter the name colleagues should see.';
     if (control.hasError('minlength')) return 'Use at least 2 characters.';
     return null;
   }
@@ -83,12 +83,5 @@ export class DoctorProfilePage {
   protected phoneError(): string | null {
     const control = this.form.controls.phone;
     return control.touched && control.hasError('required') ? 'Enter a contact number.' : null;
-  }
-
-  protected bioError(): string | null {
-    const control = this.form.controls.bio;
-    return control.touched && control.hasError('maxlength')
-      ? `Keep the introduction to 280 characters or fewer (${control.value.length} now).`
-      : null;
   }
 }

@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
-import { StatusBadge, type BadgeTone } from '../../../shared/components';
-import type { AppointmentStatus } from '../../doctor.models';
+import type { AppointmentStatus } from '../../domain/appointment-status';
+import { StatusBadge, type BadgeTone } from '../status-badge/status-badge';
 
 /**
  * Status -> badge tone, as a `Record` rather than an object literal so a new
@@ -20,13 +20,18 @@ const STATUS_TONE: Record<AppointmentStatus, BadgeTone> = {
 /**
  * One place that decides how an appointment status looks.
  *
- * The dashboard, the appointments table and the patient history all show the
- * same statuses, so the tone map lives here rather than being restated per
- * page. Without it, a `no-show` would quietly be a different colour on each
- * screen.
+ * Both staff areas show the same five statuses — the Secretary's appointment
+ * list, the Doctor's agenda, the Doctor's history — so the tone map lives here
+ * rather than being restated per area. Without it, a `no-show` would quietly be a
+ * different colour depending on which area you were looking at, which is worse
+ * than having no colour at all.
+ *
+ * Shared rather than duplicated: the two staff areas agree on the lifecycle and
+ * differ only in who may act on it, so giving each its own copy of the type
+ * would create exactly the drift this prevents.
  */
 @Component({
-  selector: 'doctor-appointment-status',
+  selector: 'ui-appointment-status',
   imports: [StatusBadge],
   template: `
     <ui-status-badge [tone]="tone()" [dot]="true" size="sm">{{ status() }}</ui-status-badge>

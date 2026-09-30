@@ -35,6 +35,12 @@ export { StatusBadge, type BadgeSize, type BadgeTone } from './status-badge/stat
 export { Table, type TableColumn, type TableSort, type SortDirection } from './table/table';
 export { TableCell } from './table/table-cell';
 
+// Shared by every staff area that reads a staff or patient record: the same
+// fact/value grid, and one place that decides how an appointment status looks,
+// so a `no-show` cannot be a different colour depending on which area you are in.
+export { AppointmentStatusBadge } from './appointment-status/appointment-status';
+export { DetailList } from './detail-list/detail-list';
+
 // Overlays
 export { Modal, type ModalPlacement, type ModalSize } from './modal/modal';
 

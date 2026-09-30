@@ -16,6 +16,11 @@ const ICON_PATHS: Record<StaffNavIcon, string> = {
     'M9 4H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2M9 4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1 1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1M9 12h6M9 16h4',
   settings: 'M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6',
   logout: 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9',
+  // Distinct from `users` on purpose: the Secretary nav lists Patients and
+  // Doctors side by side, and two icons of the same person shape would make
+  // them hard to tell apart at a glance.
+  stethoscope:
+    'M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 1.7 6.5 6.5 0 0 0 6.5 6.5 6.5 6.5 0 0 0 6.5-6.5A2 2 0 0 0 13 1h-1a.2.2 0 1 0 .3.3M8 15v1a6 6 0 0 0 6 6v3M16 21v-3a6 6 0 0 0-6-6M20 8a2 2 0 1 0-4 0 2 2 0 0 0 4 0M18 8v2a4 4 0 0 1-4 4h-1',
 };
 
 /**

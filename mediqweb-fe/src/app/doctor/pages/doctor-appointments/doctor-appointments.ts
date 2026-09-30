@@ -2,6 +2,7 @@ import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
+  AppointmentStatusBadge,
   Avatar,
   Button,
   Card,
@@ -14,7 +15,6 @@ import {
   type DropdownItem,
   type TableColumn,
 } from '../../../shared/components';
-import { AppointmentStatusBadge } from '../../components/appointment-status/appointment-status';
 import { formatDuration } from '../../doctor.dates';
 import { DoctorSession } from '../../doctor-session';
 import type { Appointment, AppointmentStatus } from '../../doctor.models';

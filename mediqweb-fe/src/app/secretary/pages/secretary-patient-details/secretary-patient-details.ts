@@ -16,42 +16,43 @@ import {
   type TableColumn,
 } from '../../../shared/components';
 import type { AccountStatus } from '../../../shared/domain/account-status';
-import { ageFrom, formatDuration } from '../../doctor.dates';
-import { DoctorSession } from '../../doctor-session';
-import type { Appointment } from '../../doctor.models';
+import { ageFrom, formatDuration } from '../../secretary.dates';
+import { SecretarySession } from '../../secretary-session';
+import type { Appointment } from '../../secretary.models';
 
 /**
- * A patient's file as this doctor sees them: who they are, how to reach them,
- * and every appointment they have had.
+ * A patient's file as the desk sees them: who they are, how to reach them, and
+ * every appointment they have had with any of the clinic's doctors.
  *
  * The route parameter is read as a signal rather than from a snapshot, so the
  * page updates when the router reuses this component for a different id instead
  * of showing the previous patient.
  *
- * A patient record — diagnoses, notes, prescriptions — is deliberately not
- * here. That is a separate milestone with its own access rules, and showing an
- * empty "Medical history" panel would imply a feature that does not exist.
+ * A patient record — diagnoses, notes, prescriptions — is deliberately not here.
+ * That is a separate milestone with its own access rules, and showing an empty
+ * "Medical history" panel would imply a feature that does not exist. A secretary
+ * needs the administrative history to answer the phone, which is what this shows.
  */
 @Component({
-  selector: 'app-doctor-patient-details',
+  selector: 'app-secretary-patient-details',
   imports: [
     DatePipe,
     RouterLink,
+    AppointmentStatusBadge,
     Avatar,
     Card,
+    DetailList,
     MockNotice,
     StatusBadge,
     Table,
     TableCell,
-    AppointmentStatusBadge,
-    DetailList,
   ],
-  templateUrl: './doctor-patient-details.html',
-  styleUrl: './doctor-patient-details.scss',
+  templateUrl: './secretary-patient-details.html',
+  styleUrl: './secretary-patient-details.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class DoctorPatientDetails {
-  private readonly session = inject(DoctorSession);
+export class SecretaryPatientDetails {
+  private readonly session = inject(SecretarySession);
   private readonly route = inject(ActivatedRoute);
 
   private readonly patientId = toSignal(
@@ -64,7 +65,7 @@ export class DoctorPatientDetails {
   /** `null` for an id that matches nobody, which the template renders as a 404. */
   protected readonly patient = computed(() => {
     const id = this.patientId();
-    return id ? this.session.patientForDoctor(id) : null;
+    return id ? this.session.patientById(id) : null;
   });
 
   protected readonly history = computed<Appointment[]>(() => {
@@ -77,6 +78,7 @@ export class DoctorPatientDetails {
 
   protected readonly columns: TableColumn<Appointment>[] = [
     { key: 'startsAt', header: 'When', sortable: true },
+    { key: 'doctorId', header: 'Doctor' },
     { key: 'reason', header: 'Reason' },
     { key: 'durationMinutes', header: 'Length', hideBelow: 'md' },
     { key: 'status', header: 'Status', sortable: true },
@@ -87,6 +89,10 @@ export class DoctorPatientDetails {
   protected age(): number {
     const patient = this.patient();
     return patient ? ageFrom(patient.dateOfBirth, this.now()) : 0;
+  }
+
+  protected doctorName(appointment: Appointment): string {
+    return this.session.doctorName(appointment.doctorId);
   }
 
   protected length(appointment: Appointment): string {

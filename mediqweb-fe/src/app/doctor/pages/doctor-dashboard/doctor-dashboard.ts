@@ -1,8 +1,13 @@
 import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { Avatar, Card, MockNotice, StatCard } from '../../../shared/components';
-import { AppointmentStatusBadge } from '../../components/appointment-status/appointment-status';
+import {
+  AppointmentStatusBadge,
+  Avatar,
+  Card,
+  MockNotice,
+  StatCard,
+} from '../../../shared/components';
 import { DoctorSession } from '../../doctor-session';
 import type { Appointment, PatientSummary } from '../../doctor.models';
 
