@@ -18,7 +18,18 @@
 }
 
 html {
-  font-size: 16%;
+  // 100%, not 16px, and never a percentage of anything else.
+  //
+  // Every `rem` in the app resolves against this. It was `16%` — a `%` typed
+  // where `px` was meant — which silently shrank the root to ~2.56px and
+  // rendered all 21 rem-based rules at a sixth of their intended size: dialogs
+  // 82px wide with clipped labels, dropdowns capped at 56px, grid tracks
+  // collapsing to 35px. The design tokens are all in `px`, which is why nothing
+  // else looked wrong and the bug survived a full test suite and a browser pass.
+  //
+  // `100%` rather than `16px` so a user who raises their browser's default font
+  // size still gets scaling — which is the reason to reach for `rem` at all.
+  font-size: 100%;
   -webkit-text-size-adjust: 100%;
 }
 
