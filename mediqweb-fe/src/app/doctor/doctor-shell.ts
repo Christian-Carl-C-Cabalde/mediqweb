@@ -2,7 +2,6 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { type ActivatedRouteSnapshot, NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
-import { type DropdownItem } from '../shared/components';
 import {
   StaffLayout,
   type StaffCrumb,
@@ -24,11 +23,6 @@ const DOCTOR_NAV: readonly StaffNavEntry[] = [
   { id: 'patients', label: 'Patients', icon: 'users', route: '/doctor/patients' },
   { id: 'schedule', label: 'Schedule', icon: 'clipboard', route: '/doctor/schedule' },
   { id: 'profile', label: 'Profile', icon: 'settings', route: '/doctor/profile' },
-];
-
-const DOCTOR_PROFILE_MENU: DropdownItem[] = [
-  { id: 'profile', label: 'My profile' },
-  { id: 'password', label: 'Change password' },
 ];
 
 /**
@@ -64,7 +58,6 @@ export class DoctorShell {
   }));
 
   protected readonly nav = DOCTOR_NAV;
-  protected readonly profileMenu = DOCTOR_PROFILE_MENU;
 
   /**
    * Navigation counter, bumped after every completed navigation.

@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, input, output, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { Avatar, Brand, Dropdown, Modal, type DropdownItem } from '../../components';
+import { Avatar, Brand, Modal } from '../../components';
 import { StaffNav } from '../staff-nav/staff-nav';
 import { StaffNavEntry, StaffNavItem } from '../staff-nav/staff-nav.types';
 import { StaffCrumb, StaffProfile } from './staff-layout.types';
@@ -19,7 +19,7 @@ let nextId = 0;
  */
 @Component({
   selector: 'app-staff-layout',
-  imports: [RouterLink, Avatar, Brand, Dropdown, Modal, StaffNav],
+  imports: [RouterLink, Avatar, Brand, Modal, StaffNav],
   templateUrl: './staff-layout.html',
   styleUrl: './staff-layout.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -32,15 +32,12 @@ export class StaffLayout {
   readonly activeItemId = input<string | null>(null);
   readonly pageTitle = input<string | null>(null);
   readonly breadcrumbs = input<readonly StaffCrumb[]>([]);
-  /** Entries for the profile dropdown, e.g. "Profile" and "Change password". */
-  readonly profileMenu = input<DropdownItem[]>([]);
   /** Destination for the brand mark. */
   readonly brandLink = input('/');
   readonly showLogout = input(true);
 
   readonly logout = output<void>();
   readonly navSelected = output<StaffNavItem>();
-  readonly profileAction = output<DropdownItem>();
 
   protected readonly navOpen = signal(false);
   protected readonly mainId = `staff-main-${++nextId}`;

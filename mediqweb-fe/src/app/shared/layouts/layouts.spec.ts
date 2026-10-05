@@ -219,14 +219,27 @@ describe('MediQ shared layouts', () => {
     const drawer = (fixture: ComponentFixture<StaffLayout>) =>
       host(fixture).querySelector('dialog')!;
 
-    it('shows the signed-in member in the header', () => {
+    it('shows the signed-in member in the header as plain text', () => {
       const fixture = build();
-      const profile = host(fixture).querySelector('.shell__profile-trigger')!;
+      const profile = host(fixture).querySelector('.shell__profile')!;
 
       expect(profile.textContent).toContain('Juan dela Cruz');
       expect(profile.textContent).toContain('Doctor');
-      // The dropdown trigger is projected, not a plain value string.
       expect(profile.querySelector('ui-avatar')).toBeTruthy();
+    });
+
+    it('offers no profile menu, so the identity is not a control', () => {
+      // A header that looks actionable but opens nothing costs a tab stop and
+      // announces a button that does nothing. The Profile page is in the sidebar.
+      const fixture = build();
+      const header = host(fixture).querySelector('.shell__header')!;
+      const profile = host(fixture).querySelector('.shell__profile')!;
+
+      expect(header.querySelector('ui-dropdown')).toBeNull();
+      expect(profile.querySelector('button')).toBeNull();
+      expect(profile.getAttribute('tabindex')).toBeNull();
+      expect(profile.textContent).not.toContain('My profile');
+      expect(profile.textContent).not.toContain('Change password');
     });
 
     it('renders the same role menu in the sidebar and the mobile drawer', () => {

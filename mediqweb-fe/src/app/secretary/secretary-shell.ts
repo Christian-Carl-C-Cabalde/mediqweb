@@ -2,7 +2,6 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { type ActivatedRouteSnapshot, NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
-import { type DropdownItem } from '../shared/components';
 import {
   StaffLayout,
   type StaffCrumb,
@@ -30,11 +29,6 @@ const SECRETARY_NAV: readonly StaffNavEntry[] = [
   { id: 'doctors', label: 'Doctors', icon: 'stethoscope', route: '/secretary/doctors' },
   { id: 'schedules', label: 'Schedules', icon: 'clipboard', route: '/secretary/schedules' },
   { id: 'profile', label: 'Profile', icon: 'settings', route: '/secretary/profile' },
-];
-
-const SECRETARY_PROFILE_MENU: DropdownItem[] = [
-  { id: 'profile', label: 'My profile' },
-  { id: 'password', label: 'Change password' },
 ];
 
 /**
@@ -70,7 +64,6 @@ export class SecretaryShell {
   }));
 
   protected readonly nav = SECRETARY_NAV;
-  protected readonly profileMenu = SECRETARY_PROFILE_MENU;
 
   /**
    * Navigation counter, bumped after every completed navigation.
