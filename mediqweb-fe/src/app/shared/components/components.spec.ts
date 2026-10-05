@@ -48,6 +48,20 @@ class TableHostComponent {
   readonly rows: QueueRow[] = [{ name: 'Belen', status: 'Confirmed', tone: 'success' }];
 }
 
+/** Consumer of `ui-stat-card` that uses both optional slots, as a page would. */
+@Component({
+  imports: [StatCard],
+  template: `
+    <ui-stat-card label="Doctors" [value]="4" hint="Active accounts">
+      <svg statIcon viewBox="0 0 24 24" width="16" height="16" fill="none" aria-hidden="true">
+        <path d="M4 2v6a4 4 0 0 0 8 0V2" stroke="currentColor" stroke-width="2" />
+      </svg>
+      <a statFooter href="/admin/accounts/doctors">Manage doctors</a>
+    </ui-stat-card>
+  `,
+})
+class StatCardHost {}
+
 describe('MediQ shared components', () => {
   describe('Spinner', () => {
     it('exposes role=status and a visually hidden label when announcing', () => {
@@ -196,6 +210,32 @@ describe('MediQ shared components', () => {
       expect(host.querySelector('.stat__label')?.textContent?.trim()).toBe('Appointments today');
       expect(host.querySelector('.stat__value')?.textContent?.trim()).toBe('24');
       expect(host.style.getPropertyValue('--stat-tone')).toBe('var(--color-primary)');
+    });
+
+    it('leaves no chip behind when the optional icon is not projected', () => {
+      // The chip paints a 32x32 tone background, so an untagged card used to
+      // carry a blank coloured square that read as a broken image. `.stat__icon`
+      // is hidden with `:empty`, so the chip must have no child nodes at all for
+      // that to work — whitespace is not captured by `select="[statIcon]"`, which
+      // is what makes the rule safe rather than lucky.
+      const fixture = TestBed.createComponent(StatCard);
+      fixture.componentRef.setInput('label', 'Doctors');
+      fixture.detectChanges();
+      const chip = (fixture.nativeElement as HTMLElement).querySelector('.stat__icon')!;
+
+      expect(chip).toBeTruthy();
+      expect(chip.childElementCount).toBe(0);
+      expect(chip.childNodes.length).toBe(0);
+    });
+
+    it('keeps the chip when an icon is projected into it', () => {
+      const fixture = TestBed.createComponent(StatCardHost);
+      fixture.detectChanges();
+      const chip = (fixture.nativeElement as HTMLElement).querySelector('.stat__icon')!;
+
+      // The guard above must not swallow a real icon.
+      expect(chip.querySelector('svg')).toBeTruthy();
+      expect(chip.childElementCount).toBe(1);
     });
   });
 

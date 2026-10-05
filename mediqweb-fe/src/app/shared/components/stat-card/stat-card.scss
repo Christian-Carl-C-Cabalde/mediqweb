@@ -36,6 +36,19 @@
   border-radius: var(--radius-md);
 }
 
+// The icon slot is optional, so an omitted icon must leave nothing behind.
+// Without this the chip still painted its 32x32 tone background and the card
+// carried a blank coloured square in the corner, which read as a broken image
+// rather than as an absent one.
+//
+// `:empty` is reliable here rather than a coincidence: the slot is captured by
+// `select="[statIcon]"`, so the only nodes that can ever land inside are elements
+// a consumer explicitly tagged. Whitespace between projected elements is not
+// captured, so an untagged card leaves the chip with no child nodes at all.
+.stat__icon:empty {
+  display: none;
+}
+
 .stat__value {
   font-size: var(--font-size-page-title);
   line-height: var(--line-height-page-title);
