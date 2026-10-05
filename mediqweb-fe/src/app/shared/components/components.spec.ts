@@ -6,6 +6,7 @@ import { Card } from './card/card';
 import { Dropdown, type DropdownItem } from './dropdown/dropdown';
 import { FormField } from './form-field/form-field';
 import { Modal } from './modal/modal';
+import { SampleAccounts, type SampleAccount } from './sample-accounts/sample-accounts';
 import { Spinner } from './spinner/spinner';
 import { StatCard } from './stat-card/stat-card';
 import { StatusBadge, type BadgeTone } from './status-badge/status-badge';
@@ -493,6 +494,63 @@ describe('MediQ shared components', () => {
       fixture.componentRef.setInput('title', 'Confirm appointment');
       fixture.detectChanges();
       expect(dialogOf(fixture).getAttribute('aria-label')).toBe('Confirm appointment');
+    });
+  });
+
+  describe('SampleAccounts', () => {
+    const accounts: readonly SampleAccount[] = [
+      { identifier: 'admin', password: '123123', role: 'admin' },
+      { identifier: 'secretary', password: '123123', role: 'secretary' },
+    ];
+
+    const render = (list: readonly SampleAccount[] = accounts) => {
+      const fixture = TestBed.createComponent(SampleAccounts);
+      fixture.componentRef.setInput('accounts', list);
+      fixture.detectChanges();
+      return fixture.nativeElement as HTMLElement;
+    };
+
+    it('prints one row per account, in the order given', () => {
+      const host = render();
+      const rows = Array.from(host.querySelectorAll('.samples__item'));
+      expect(rows).toHaveLength(2);
+      expect(rows[0].querySelector('.samples__id')?.textContent).toBe('admin');
+      expect(rows[1].querySelector('.samples__id')?.textContent).toBe('secretary');
+    });
+
+    it('prints the password and the workspace it reaches', () => {
+      const host = render();
+      const row = host.querySelector('.samples__item') as HTMLElement;
+      expect(row.querySelector('.samples__secret')?.textContent).toBe('123123');
+      expect(row.querySelector('.samples__role')?.textContent).toBe('admin');
+    });
+
+    it('says the accounts are scaffolding, so they cannot be mistaken for real', () => {
+      const host = render();
+      expect(host.textContent).toContain('Sample accounts');
+      expect(host.textContent).toContain('No API is connected');
+      expect(host.textContent).toContain('scaffolding');
+    });
+
+    it('names the region by its heading', () => {
+      const host = render();
+      const heading = host.querySelector('.samples__heading') as HTMLHeadingElement;
+      expect(host.querySelector('section')?.getAttribute('aria-labelledby')).toBe(heading.id);
+      expect(heading.id).not.toBe('');
+    });
+
+    it('gives each instance a distinct heading id', () => {
+      // A hardcoded id would collide the moment a second one is rendered, and
+      // duplicate ids silently break the aria-labelledby link.
+      const first = render().querySelector('.samples__heading') as HTMLHeadingElement;
+      const second = render().querySelector('.samples__heading') as HTMLHeadingElement;
+      expect(first.id).not.toBe(second.id);
+    });
+
+    it('hides the slash from assistive technology', () => {
+      // Read as a separator it would make the credential read "admin slash 123123".
+      const sep = render().querySelector('.samples__sep') as HTMLElement;
+      expect(sep.getAttribute('aria-hidden')).toBe('true');
     });
   });
 });
