@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter, Router } from '@angular/router';
 import { StaffLogin } from './staff-login';
-import { AUTH_GATEWAY, AuthGateway, StaffCredentials } from './auth.gateway';
+import { AUTH_GATEWAY, AuthGateway, StaffCredentials, StaffRole } from './auth.gateway';
 import { emailOrUsername } from './staff-login.validators';
 
 describe('emailOrUsername', () => {
@@ -29,8 +30,9 @@ describe('emailOrUsername', () => {
 
 describe('StaffLogin', () => {
   let fixture: ComponentFixture<StaffLogin>;
+  let router: Router;
   let submitted: StaffCredentials[];
-  let resolveSignIn: (() => void) | null;
+  let resolveSignIn: ((role: StaffRole) => void) | null;
   let rejectSignIn: ((error: Error) => void) | null;
 
   const host = () => fixture.nativeElement as HTMLElement;
@@ -44,19 +46,24 @@ describe('StaffLogin', () => {
     const gateway: AuthGateway = {
       signIn: (credentials) => {
         submitted.push(credentials);
-        return new Promise<void>((resolve, reject) => {
+        return new Promise<StaffRole>((resolve, reject) => {
           resolveSignIn = resolve;
           rejectSignIn = reject;
         });
       },
     };
 
-    await TestBed.configureTestingModule({ imports: [StaffLogin] })
+    await TestBed.configureTestingModule({
+      imports: [StaffLogin],
+      // A router has to exist because a successful sign-in navigates.
+      providers: [provideRouter([])],
+    })
       .overrideComponent(StaffLogin, {
         set: { providers: [{ provide: AUTH_GATEWAY, useValue: gateway }] },
       })
       .compileComponents();
 
+    router = TestBed.inject(Router);
     fixture = TestBed.createComponent(StaffLogin);
     fixture.detectChanges();
   });
@@ -189,5 +196,48 @@ describe('StaffLogin', () => {
     expect(query<HTMLInputElement>('#staff-password').getAttribute('autocomplete')).toBe(
       'current-password',
     );
+  });
+
+  it('sends a signed-in user to the dashboard for the role returned', async () => {
+    // The gateway decides who you are, not where you land; routing on the role
+    // is this page's job.
+    const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+    type('identifier', 'secretary');
+    type('password', '123123');
+    await submit();
+    resolveSignIn!('secretary');
+    await fixture.whenStable();
+
+    expect(navigate).toHaveBeenCalledWith(['/', 'secretary', 'dashboard']);
+  });
+
+  it('does not navigate when the credentials are rejected', async () => {
+    const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+    type('identifier', 'admin');
+    type('password', 'wrong');
+    await submit();
+    rejectSignIn!(new Error('Email or password is incorrect.'));
+    await fixture.whenStable();
+
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it('prints the sample accounts, labelled as scaffolding', () => {
+    // A credential nobody can discover is worse than none, and an unlabelled
+    // one looks like a real account.
+    const text = host().textContent ?? '';
+    expect(text).toContain('Sample accounts');
+    expect(text).toContain('admin');
+    expect(text).toContain('doctor');
+    expect(text).toContain('secretary');
+    expect(text).toContain('123123');
+    expect(text).toContain('scaffolding');
+  });
+
+  it('labels the sample block as a heading, so it is reachable by screen reader', () => {
+    const section = query('.samples');
+    const heading = query<HTMLHeadingElement>('.samples__heading');
+    expect(heading.tagName).toBe('H2');
+    expect(section.getAttribute('aria-labelledby')).toBe(heading.id);
   });
 });

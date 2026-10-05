@@ -49,3 +49,11 @@ export { Modal, type ModalPlacement, type ModalSize } from './modal/modal';
  * The `area` input names the area so the wording does not drift.
  */
 export { MockNotice } from './mock-notice/mock-notice';
+
+/**
+ * Prints the sample sign-ins on the login screen. Beside `MockNotice` rather
+ * than part of it: that one says an area's data is sample data, this one says
+ * which credentials that sample data accepts. Both are temporary and both go
+ * when the API lands.
+ */
+export { SampleAccounts, type SampleAccount } from './sample-accounts/sample-accounts';
