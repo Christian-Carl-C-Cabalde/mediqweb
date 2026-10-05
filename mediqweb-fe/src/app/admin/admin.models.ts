@@ -22,6 +22,8 @@ export interface StaffAccount {
   readonly id: string;
   readonly name: string;
   readonly email: string;
+  /** What they type at sign-in, alongside their email. */
+  readonly username: string;
   readonly status: AccountStatus;
   /** Doctors only. */
   readonly specializationId: string | null;
@@ -67,11 +69,20 @@ export interface AuditEntry {
   readonly severity: AuditSeverity;
 }
 
-/** Role-specific extras collected by the create-account form. */
+/**
+ * Role-specific extras collected by the create-account form.
+ *
+ * Deliberately carries no password. The form collects a temporary one so the
+ * flow can be demonstrated end to end, but a credential has no business being
+ * modelled, let alone held in a mock store, so it is validated and dropped at
+ * the edge. When the API branch lands this is where the hash would be produced
+ * and sent, never stored here.
+ */
 export interface StaffDraft {
-  readonly firstName: string;
-  readonly lastName: string;
+  readonly name: string;
   readonly email: string;
+  readonly username: string;
+  readonly status: AccountStatus;
   /** Doctors only. */
   readonly specializationId?: string | null;
   /** Doctors only. */

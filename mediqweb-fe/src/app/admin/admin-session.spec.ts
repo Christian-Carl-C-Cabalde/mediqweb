@@ -46,15 +46,17 @@ describe('AdminSession', () => {
     it('creates an active doctor and records the action', () => {
       const before = session.doctors().length;
       const created = session.addStaffAccount('doctor', {
-        firstName: 'Ana',
-        lastName: 'Reyes',
+        name: 'Ana Reyes',
         email: 'ana.reyes@mediq.ph',
+        username: 'areyes',
+        status: 'active',
         specializationId: 'spec-cardio',
         licenseNumber: 'PRC-999',
       });
 
       expect(session.doctors().length).toBe(before + 1);
       expect(created.name).toBe('Ana Reyes');
+      expect(created.username).toBe('areyes');
       expect(created.status).toBe('active');
       expect(created.licenseNumber).toBe('PRC-999');
       // A brand new account has never signed in.
@@ -62,11 +64,25 @@ describe('AdminSession', () => {
       expect(session.auditEntries()[0].action).toBe('Created doctor account');
     });
 
+    it('creates the account with the status the form asked for', () => {
+      // A new hire can be created already disabled, so the status cannot be
+      // hardcoded to active the way it was.
+      const created = session.addStaffAccount('secretary', {
+        name: 'Bea Cruz',
+        email: 'bea.cruz@mediq.ph',
+        username: 'bcruz',
+        status: 'inactive',
+      });
+
+      expect(created.status).toBe('inactive');
+    });
+
     it('ignores doctor-only fields for a secretary', () => {
       const created = session.addStaffAccount('secretary', {
-        firstName: 'Bea',
-        lastName: 'Cruz',
+        name: 'Bea Cruz',
         email: 'bea.cruz@mediq.ph',
+        username: 'bcruz',
+        status: 'active',
         specializationId: 'spec-cardio',
         licenseNumber: 'PRC-123',
       });
@@ -77,23 +93,27 @@ describe('AdminSession', () => {
 
     it('trims whitespace from the name', () => {
       const created = session.addStaffAccount('secretary', {
-        firstName: '  Mae  ',
-        lastName: '  Lim ',
+        name: '  Mae Lim  ',
         email: 'mae.lim@mediq.ph',
+        username: '  mlim ',
+        status: 'active',
       });
       expect(created.name).toBe('Mae Lim');
+      expect(created.username).toBe('mlim');
     });
 
     it('gives each new account a distinct id', () => {
       const a = session.addStaffAccount('secretary', {
-        firstName: 'One',
-        lastName: 'A',
+        name: 'One A',
         email: 'one@mediq.ph',
+        username: 'onea',
+        status: 'active',
       });
       const b = session.addStaffAccount('secretary', {
-        firstName: 'Two',
-        lastName: 'B',
+        name: 'Two B',
         email: 'two@mediq.ph',
+        username: 'twob',
+        status: 'active',
       });
       expect(a.id).not.toBe(b.id);
     });
@@ -116,9 +136,10 @@ describe('AdminSession', () => {
         added.push(session.addSpecialization(`Spec ${i}`, 'x').id);
         added.push(
           session.addStaffAccount('secretary', {
-            firstName: 'A',
-            lastName: String(i),
+            name: `A ${i}`,
             email: `a${i}@mediq.ph`,
+            username: `a${i}`,
+            status: 'active',
           }).id,
         );
       }
@@ -222,9 +243,10 @@ describe('AdminSession', () => {
 
   it('treats a role and its lists independently', () => {
     const doctor = session.addStaffAccount('doctor', {
-      firstName: 'Solo',
-      lastName: 'Doctor',
+      name: 'Solo Doctor',
       email: 'solo@mediq.ph',
+      username: 'solo',
+      status: 'active',
     });
     const kinds: StaffKind[] = ['doctor', 'secretary'];
     expect(kinds.map((k) => session.staffOf(k).some((a) => a.id === doctor.id))).toEqual([

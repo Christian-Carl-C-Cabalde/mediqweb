@@ -79,6 +79,10 @@ export class StaffDirectory {
   protected readonly plural = computed(() =>
     this.kind() === 'doctor' ? 'Doctors' : 'Secretaries',
   );
+  /** Capitalised, for the dialog title and the create button's label. */
+  protected readonly roleLabel = computed(() =>
+    this.kind() === 'doctor' ? 'Doctor' : 'Secretary',
+  );
   protected readonly statusOptions = STATUS_FILTER_ITEMS;
 
   protected readonly columns = computed<TableColumn<StaffAccount>[]>(() => {
@@ -130,10 +134,22 @@ export class StaffDirectory {
   // ---------------------------------------------------------------------------
   // Create form
   // ---------------------------------------------------------------------------
+  /**
+   * `name` is one field rather than first and last: the account is displayed by
+   * full name everywhere, and splitting the input only to rejoin it on save
+   * invited the two halves to disagree with what the table shows.
+   *
+   * The two password controls exist so the flow can be demonstrated end to end.
+   * Nothing keeps the value -- see `StaffDraft`, which deliberately models no
+   * credential -- so this is validated and then dropped.
+   */
   protected readonly form = this.fb.nonNullable.group({
-    firstName: ['', [Validators.required]],
-    lastName: ['', [Validators.required]],
+    name: ['', [Validators.required]],
     email: ['', [Validators.required, Validators.email]],
+    username: ['', [Validators.required]],
+    temporaryPassword: ['', [Validators.required, Validators.minLength(8)]],
+    confirmPassword: ['', [Validators.required]],
+    status: ['active' as AccountStatus],
     // Both of these are doctor-only fields, so they carry no static validator:
     // a `required` on a control that is hidden for secretaries would make the
     // form unsaveable for them. `submit` checks them by role instead.
@@ -145,11 +161,34 @@ export class StaffDirectory {
     this.session.specializationOptions().map((o) => ({ id: o.id, label: o.label })),
   );
 
-  protected errorFor(control: 'firstName' | 'lastName' | 'email'): string | null {
+  /** Status is chosen here rather than left implicit, so a new hire can start disabled. */
+  protected readonly accountStatusItems: DropdownItem[] = [
+    { id: 'active', label: 'Active' },
+    { id: 'inactive', label: 'Inactive' },
+  ];
+
+  protected errorFor(control: 'name' | 'email' | 'username' | 'temporaryPassword'): string | null {
     const field = this.form.controls[control];
     if (!field.touched) return null;
     if (field.hasError('required')) return 'This field is required.';
     if (field.hasError('email')) return 'Enter a valid email address.';
+    if (field.hasError('minlength')) return 'Use at least 8 characters.';
+    return null;
+  }
+
+  /**
+   * Reports a confirmation that does not match the password above it.
+   *
+   * A method rather than a group validator for the same reason as
+   * `specializationError`: it reads `touched`, which `markAllAsTouched()` mutates
+   * without notifying a signal.
+   */
+  protected confirmPasswordError(): string | null {
+    const field = this.form.controls.confirmPassword;
+    if (!field.touched) return null;
+    if (field.hasError('required')) return 'This field is required.';
+    if (field.value !== this.form.controls.temporaryPassword.value)
+      return 'Passwords do not match.';
     return null;
   }
 
@@ -165,6 +204,14 @@ export class StaffDirectory {
     const field = this.form.controls.specializationId;
     if (!field.touched) return null;
     return field.value ? null : 'Choose a specialization.';
+  }
+
+  /** Doctor-only, and the reference form marks it required. */
+  protected licenseError(): string | null {
+    if (this.kind() !== 'doctor') return null;
+    const field = this.form.controls.licenseNumber;
+    if (!field.touched) return null;
+    return field.value.trim() ? null : 'This field is required.';
   }
 
   // ---------------------------------------------------------------------------
@@ -192,24 +239,34 @@ export class StaffDirectory {
     this.form.controls.specializationId.markAsTouched();
   }
 
+  protected onStatusChange(item: DropdownItem): void {
+    this.form.controls.status.setValue(item.id as AccountStatus);
+    this.form.controls.status.markAsTouched();
+  }
+
   protected submit(): void {
     const missingSpecialization =
       this.kind() === 'doctor' && !this.form.controls.specializationId.value;
-    if (this.form.invalid || missingSpecialization) {
+    const missingLicense =
+      this.kind() === 'doctor' && !this.form.controls.licenseNumber.value.trim();
+    const mismatched =
+      this.form.controls.confirmPassword.value !== this.form.controls.temporaryPassword.value;
+
+    if (this.form.invalid || missingSpecialization || missingLicense || mismatched) {
       this.form.markAllAsTouched();
-      // The dropdown is not a real form control, so `markAllAsTouched` already
-      // covers it — this only documents that the check is deliberate.
       return;
     }
 
     this.saving.set(true);
-    const { firstName, lastName, email, specializationId, licenseNumber } = this.form.getRawValue();
+    const { name, email, username, status, specializationId, licenseNumber } =
+      this.form.getRawValue();
 
     const created = this.session.addStaffAccount(this.kind(), {
-      firstName,
-      lastName,
+      name,
       email,
-      // Secretaries have no specialization, so ignore the hidden field for them.
+      username,
+      status,
+      // Secretaries have no specialization, so ignore the hidden fields for them.
       specializationId: this.kind() === 'doctor' ? specializationId : null,
       licenseNumber: this.kind() === 'doctor' ? licenseNumber : null,
     });

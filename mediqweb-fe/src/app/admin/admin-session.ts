@@ -105,12 +105,12 @@ export class AdminSession {
   // Mutations — mock only
   // ---------------------------------------------------------------------------
   addStaffAccount(kind: StaffKind, draft: StaffDraft): StaffAccount {
-    const name = `${draft.firstName.trim()} ${draft.lastName.trim()}`;
     const account: StaffAccount = {
       id: nextId(kind === 'doctor' ? 'doc' : 'sec'),
-      name,
+      name: draft.name.trim(),
       email: draft.email.trim(),
-      status: 'active',
+      username: draft.username.trim(),
+      status: draft.status,
       specializationId: kind === 'doctor' ? (draft.specializationId ?? null) : null,
       licenseNumber: kind === 'doctor' ? draft.licenseNumber?.trim() || null : null,
       joinedOn: today(),
@@ -119,7 +119,7 @@ export class AdminSession {
 
     const target = kind === 'doctor' ? this.doctorsState : this.secretariesState;
     target.update((list) => [account, ...list]);
-    this.record(`Created ${kind} account`, name, 'info');
+    this.record(`Created ${kind} account`, account.name, 'info');
     return account;
   }
 

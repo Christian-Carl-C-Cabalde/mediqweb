@@ -1,8 +1,57 @@
 @use '../../../shared/scss/listing';
 
-// Two columns for the paired name fields, one column when space is tight.
+// Two columns for the paired fields, one column when space is tight.
+//
+// An explicit two tracks rather than `auto-fit` + `minmax`: the dialog is a
+// fixed `lg`, and `auto-fit` would fit three 12rem columns into it, which is not
+// what a sign-in form should look like.
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-4);
+}
+
+@media (max-width: 640px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+// Section heading. Green and letterspaced so the form reads as two labelled
+// groups rather than one long list, and `h3` because the dialog title is the
+// `h2` above it. Sentence case in the markup, uppercased here, so a screen
+// reader is not spelled a set of capitals.
+.form-section {
+  margin: var(--space-6) 0 var(--space-3);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-primary-dark);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.form-section:first-child {
+  margin-top: 0;
+}
+
+// Icon inside a field. The wrapper is the positioning context so the icon can
+// sit inside the control's left edge while the input keeps its full width and
+// simply starts further right.
+.affix {
+  position: relative;
+  display: block;
+}
+
+.affix__icon {
+  position: absolute;
+  top: 50%;
+  left: var(--space-3);
+  transform: translateY(-50%);
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+.affix input {
+  padding-left: calc(var(--space-3) + 16px + var(--space-2));
 }

@@ -73,73 +73,218 @@
 </ui-card>
 
 <!-- Create account. The real account, including any invitation email, is the
-     API's job; this form only demonstrates the flow. -->
-<ui-modal [open]="createOpen()" size="md" [title]="'Add ' + singular()" (closed)="closeCreate()">
+     API's job; this form only demonstrates the flow. The password controls are
+     collected so the flow can be walked end to end and then discarded — nothing
+     stores them. -->
+<ui-modal
+  [open]="createOpen()"
+  size="lg"
+  [title]="'Add ' + roleLabel()"
+  description="Create a secure staff account. Required fields are marked with an asterisk."
+  (closed)="closeCreate()"
+>
   <form [formGroup]="form" (ngSubmit)="submit()" id="add-staff-form">
+    <h3 class="form-section">Account information</h3>
+
     <div class="grid">
       <ui-form-field
-        label="First name"
-        controlId="add-first-name"
+        #nameField
+        label="Full name"
+        controlId="add-name"
         [required]="true"
-        [error]="errorFor('firstName')"
+        [error]="errorFor('name')"
       >
-        <input id="add-first-name" type="text" formControlName="firstName" autocomplete="off" />
-      </ui-form-field>
-
-      <ui-form-field
-        label="Last name"
-        controlId="add-last-name"
-        [required]="true"
-        [error]="errorFor('lastName')"
-      >
-        <input id="add-last-name" type="text" formControlName="lastName" autocomplete="off" />
-      </ui-form-field>
-    </div>
-
-    <ui-form-field
-      label="Email address"
-      controlId="add-email"
-      [required]="true"
-      hint="Used to sign in. Must be unique."
-      [error]="errorFor('email')"
-    >
-      <input id="add-email" type="email" formControlName="email" autocomplete="off" />
-    </ui-form-field>
-
-    @if (kind() === 'doctor') {
-      <ui-form-field
-        label="Specialization"
-        controlId="add-specialization"
-        [required]="true"
-        [error]="specializationError()"
-      >
-        <!--
-          `ui-dropdown` is not a form control, so the selection is read back out
-          of the control to keep the trigger text in step with it.
-        -->
-        <ui-dropdown
-          id="add-specialization"
-          [items]="specializationItems()"
-          [selected]="form.controls.specializationId.value"
-          placeholder="Select a specialization"
-          (selectionChange)="onSpecializationChange($event)"
+        <input
+          id="add-name"
+          type="text"
+          formControlName="name"
+          autocomplete="off"
+          [attr.aria-invalid]="nameField.hasError() ? true : null"
+          [attr.aria-describedby]="nameField.hasError() ? nameField.helpId() : null"
         />
       </ui-form-field>
 
       <ui-form-field
-        label="License number"
-        controlId="add-license"
-        hint="Optional for now. As recorded with the PRC."
+        #emailField
+        label="Email"
+        controlId="add-email"
+        [required]="true"
+        hint="Used to sign in. Must be unique."
+        [error]="errorFor('email')"
       >
-        <input id="add-license" type="text" formControlName="licenseNumber" autocomplete="off" />
+        <!--
+          The icon lives in a wrapper this page owns rather than in a slot on
+          `ui-form-field`, which is used by every form in the app and has no
+          affix support to add without touching all of them.
+        -->
+        <span class="affix">
+          <svg
+            class="affix__icon"
+            viewBox="0 0 24 24"
+            width="16"
+            height="16"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
+            <path d="m22 6-10 7L2 6" />
+          </svg>
+          <input
+            id="add-email"
+            type="email"
+            formControlName="email"
+            autocomplete="off"
+            [attr.aria-invalid]="emailField.hasError() ? true : null"
+            [attr.aria-describedby]="emailField.hasError() ? emailField.helpId() : null"
+          />
+        </span>
       </ui-form-field>
+
+      <ui-form-field
+        #usernameField
+        label="Username"
+        controlId="add-username"
+        [required]="true"
+        [error]="errorFor('username')"
+      >
+        <input
+          id="add-username"
+          type="text"
+          formControlName="username"
+          autocomplete="off"
+          spellcheck="false"
+          [attr.aria-invalid]="usernameField.hasError() ? true : null"
+          [attr.aria-describedby]="usernameField.hasError() ? usernameField.helpId() : null"
+        />
+      </ui-form-field>
+
+      <ui-form-field
+        #passwordField
+        label="Temporary password"
+        controlId="add-password"
+        [required]="true"
+        hint="At least 8 characters. They can change it after signing in."
+        [error]="errorFor('temporaryPassword')"
+      >
+        <span class="affix">
+          <svg
+            class="affix__icon"
+            viewBox="0 0 24 24"
+            width="16"
+            height="16"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <rect x="3" y="11" width="18" height="11" rx="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          </svg>
+          <input
+            id="add-password"
+            type="password"
+            formControlName="temporaryPassword"
+            autocomplete="new-password"
+            [attr.aria-invalid]="passwordField.hasError() ? true : null"
+            [attr.aria-describedby]="passwordField.hasError() ? passwordField.helpId() : null"
+          />
+        </span>
+      </ui-form-field>
+    </div>
+
+    <ui-form-field
+      #confirmField
+      label="Confirm password"
+      controlId="add-confirm-password"
+      [required]="true"
+      [error]="confirmPasswordError()"
+    >
+      <input
+        id="add-confirm-password"
+        type="password"
+        formControlName="confirmPassword"
+        autocomplete="new-password"
+        [attr.aria-invalid]="confirmField.hasError() ? true : null"
+        [attr.aria-describedby]="confirmField.hasError() ? confirmField.helpId() : null"
+      />
+    </ui-form-field>
+
+    <ui-form-field
+      label="Account status"
+      controlId="add-status"
+      hint="New accounts are active by default."
+    >
+      <ui-dropdown
+        id="add-status"
+        [items]="accountStatusItems"
+        [selected]="form.controls.status.value"
+        (selectionChange)="onStatusChange($event)"
+      />
+    </ui-form-field>
+
+    @if (kind() === 'doctor') {
+      <h3 class="form-section">Doctor details</h3>
+
+      <div class="grid">
+        <ui-form-field
+          label="Specialty"
+          controlId="add-specialization"
+          [required]="true"
+          [error]="specializationError()"
+        >
+          <!--
+            `ui-dropdown` is not a form control, so the selection is read back out
+            of the control to keep the trigger text in step with it.
+          -->
+          <ui-dropdown
+            id="add-specialization"
+            [items]="specializationItems()"
+            [selected]="form.controls.specializationId.value"
+            placeholder="Select specialty"
+            (selectionChange)="onSpecializationChange($event)"
+          />
+        </ui-form-field>
+
+        <ui-form-field
+          label="License number"
+          controlId="add-license"
+          [required]="true"
+          hint="As recorded with the PRC."
+          [error]="licenseError()"
+        >
+          <input id="add-license" type="text" formControlName="licenseNumber" autocomplete="off" />
+        </ui-form-field>
+      </div>
     }
   </form>
 
   <ng-container modalFooter>
     <ui-button (click)="closeCreate()">Cancel</ui-button>
     <ui-button variant="primary" type="submit" formId="add-staff-form" [loading]="saving()">
-      Create account
+      <svg
+        uiButtonIconStart
+        viewBox="0 0 24 24"
+        width="16"
+        height="16"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2.5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+        focusable="false"
+      >
+        <path d="M20 6 9 17l-5-5" />
+      </svg>
+      Create {{ roleLabel() }} Account
     </ui-button>
   </ng-container>
 </ui-modal>
