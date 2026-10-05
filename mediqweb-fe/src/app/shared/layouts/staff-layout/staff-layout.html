@@ -54,7 +54,7 @@
         [activeId]="activeItemId()"
         [showLogout]="showLogout()"
         (itemSelected)="onNavSelected($event)"
-        (logout)="logout.emit()"
+        (logout)="requestLogout()"
       />
     </aside>
 
@@ -95,6 +95,20 @@
     [activeId]="activeItemId()"
     [showLogout]="showLogout()"
     (itemSelected)="onNavSelected($event)"
-    (logout)="logout.emit()"
+    (logout)="requestLogout()"
   />
+</ui-modal>
+
+<!--
+  Signing out is confirmed rather than done on one click. The layout still only
+  emits `logout`; clearing the session and routing to sign-in stay with the
+  shell, so this stays a question and not an answer.
+-->
+<ui-modal [open]="logoutConfirmOpen()" size="sm" title="Log out" (closed)="cancelLogout()">
+  <p>Are you sure you want to log out? You will need to sign in again to reach your workspace.</p>
+
+  <ng-container modalFooter>
+    <ui-button (click)="cancelLogout()">Cancel</ui-button>
+    <ui-button variant="danger" (click)="confirmLogout()">Log out</ui-button>
+  </ng-container>
 </ui-modal>
