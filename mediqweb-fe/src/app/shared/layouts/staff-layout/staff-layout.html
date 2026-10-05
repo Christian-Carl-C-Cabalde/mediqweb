@@ -31,22 +31,19 @@
     </div>
 
     <div class="shell__end">
-      <ui-dropdown
-        class="shell__profile"
-        placement="bottom-end"
-        [items]="profileMenu()"
-        [label]="user().name"
-        [disabled]="!profileMenu().length"
-        (selectionChange)="profileAction.emit($event)"
-      >
-        <span class="shell__profile-trigger" uiDropdownTrigger>
-          <ui-avatar [name]="user().name" [src]="user().avatarUrl ?? null" size="sm" />
-          <span class="shell__profile-text">
-            <span class="shell__profile-name">{{ user().name }}</span>
-            <span class="shell__profile-role">{{ user().role }}</span>
-          </span>
+      <!--
+        Static identity, not a menu. There is no profile page behind it yet, and
+        a control that opens nothing is worse than no control: it looks
+        actionable, takes a tab stop, and announces a button to a screen reader
+        that then does nothing. The Profile page is reached from the sidebar.
+      -->
+      <div class="shell__profile">
+        <ui-avatar [name]="user().name" [src]="user().avatarUrl ?? null" size="sm" />
+        <span class="shell__profile-text">
+          <span class="shell__profile-name">{{ user().name }}</span>
+          <span class="shell__profile-role">{{ user().role }}</span>
         </span>
-      </ui-dropdown>
+      </div>
     </div>
   </header>
 

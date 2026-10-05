@@ -2,7 +2,6 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { type ActivatedRouteSnapshot, NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
-import type { DropdownItem } from '../shared/components';
 import {
   StaffLayout,
   type StaffCrumb,
@@ -61,11 +60,6 @@ const ADMIN_NAV: readonly StaffNavEntry[] = [
   },
 ];
 
-const ADMIN_PROFILE_MENU: DropdownItem[] = [
-  { id: 'profile', label: 'My profile' },
-  { id: 'password', label: 'Change password' },
-];
-
 /**
  * Route shell for the Admin area.
  *
@@ -93,7 +87,6 @@ export class AdminShell {
 
   protected readonly user = ADMIN;
   protected readonly nav = ADMIN_NAV;
-  protected readonly profileMenu = ADMIN_PROFILE_MENU;
 
   /**
    * Navigation counter, bumped after every completed navigation.

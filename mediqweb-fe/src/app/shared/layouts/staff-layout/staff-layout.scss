@@ -88,11 +88,10 @@ $sidebar-breakpoint: 1024px;
 // ---------------------------------------------------------------------------
 // User profile
 // ---------------------------------------------------------------------------
+// The signed-in member, shown as plain text. It used to be a dropdown trigger,
+// which meant this rule also had to carry the button reset; there is no control
+// here now, so it is only the layout.
 .shell__profile {
-  min-width: 0;
-}
-
-.shell__profile-trigger {
   display: inline-flex;
   align-items: center;
   gap: var(--space-3);
