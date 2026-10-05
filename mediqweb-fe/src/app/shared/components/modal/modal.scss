@@ -101,11 +101,17 @@
 
 .ui-modal__header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-4);
   padding: var(--space-5) var(--space-6);
   border-bottom: var(--border-width) solid var(--color-border);
+}
+
+// The title and its description are stacked so the close button can sit opposite
+// the pair rather than drifting to the baseline of a two-line block.
+.ui-modal__heading {
+  min-width: 0;
 }
 
 .ui-modal__title {
@@ -113,6 +119,13 @@
   line-height: var(--line-height-section-title);
   font-weight: var(--font-weight-section-title);
   color: var(--color-text-primary);
+}
+
+.ui-modal__description {
+  margin-top: var(--space-1);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+  color: var(--color-text-secondary);
 }
 
 .ui-modal__close {

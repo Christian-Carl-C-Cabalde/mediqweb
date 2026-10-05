@@ -85,9 +85,12 @@ describe('StaffDirectory', () => {
     it('does not require a specialization, so a secretary can be created', () => {
       const dir = fixture.componentInstance as any;
       dir['form'].setValue({
-        firstName: 'New',
-        lastName: 'Hire',
+        name: 'New Hire',
         email: 'new.hire@mediq.ph',
+        username: 'newhire',
+        temporaryPassword: 'longenough1',
+        confirmPassword: 'longenough1',
+        status: 'active',
         specializationId: '',
         licenseNumber: '',
       });
@@ -98,6 +101,18 @@ describe('StaffDirectory', () => {
   });
 
   describe('create account', () => {
+    /** A complete, valid doctor draft. Tests override one field at a time. */
+    const validDoctor = {
+      name: 'Ana Reyes',
+      email: 'ana.reyes@mediq.ph',
+      username: 'areyes',
+      temporaryPassword: 'longenough1',
+      confirmPassword: 'longenough1',
+      status: 'active',
+      specializationId: 'spec-cardio',
+      licenseNumber: 'PRC-1',
+    };
+
     beforeEach(async () => {
       await render('doctor');
     });
@@ -108,52 +123,138 @@ describe('StaffDirectory', () => {
       dir['submit']();
       fixture.detectChanges();
       expect(session.doctors().length).toBe(before);
-      expect(dir['errorFor']('firstName')).toBe('This field is required.');
+      expect(dir['errorFor']('name')).toBe('This field is required.');
     });
 
     it('rejects a malformed email', () => {
       const dir = fixture.componentInstance as any;
-      dir['form'].patchValue({ firstName: 'A', lastName: 'B', email: 'not-an-email' });
+      dir['form'].patchValue({ ...validDoctor, email: 'not-an-email' });
       dir['submit']();
       fixture.detectChanges();
       expect(dir['errorFor']('email')).toBe('Enter a valid email address.');
     });
 
-    it('requires a specialization for a doctor', () => {
+    it('requires a username, since staff sign in with one', () => {
+      const dir = fixture.componentInstance as any;
+      dir['form'].patchValue({ ...validDoctor, username: '' });
+      dir['submit']();
+      fixture.detectChanges();
+      expect(dir['errorFor']('username')).toBe('This field is required.');
+      expect(session.doctors().some((d) => d.email === 'ana.reyes@mediq.ph')).toBe(false);
+    });
+
+    it('requires a temporary password of at least eight characters', () => {
       const dir = fixture.componentInstance as any;
       dir['form'].patchValue({
-        firstName: 'Ana',
-        lastName: 'Reyes',
-        email: 'ana.reyes@mediq.ph',
-        specializationId: '',
+        ...validDoctor,
+        temporaryPassword: 'short',
+        confirmPassword: 'short',
       });
+      dir['submit']();
+      fixture.detectChanges();
+      expect(dir['errorFor']('temporaryPassword')).toBe('Use at least 8 characters.');
+    });
+
+    it('refuses a confirmation that does not match', () => {
+      const dir = fixture.componentInstance as any;
+      dir['form'].patchValue({ ...validDoctor, confirmPassword: 'somethingelse' });
+      dir['submit']();
+      fixture.detectChanges();
+      expect(dir['confirmPasswordError']()).toBe('Passwords do not match.');
+      expect(session.doctors().some((d) => d.email === 'ana.reyes@mediq.ph')).toBe(false);
+    });
+
+    it('keeps no copy of the password once the account exists', () => {
+      // The form collects one so the flow can be walked, but a credential must
+      // not survive into the mock store.
+      const dir = fixture.componentInstance as any;
+      dir['form'].patchValue(validDoctor);
+      dir['submit']();
+      fixture.detectChanges();
+      const created = session.doctors().find((d) => d.email === 'ana.reyes@mediq.ph');
+      expect(created).toBeTruthy();
+      expect(JSON.stringify(created)).not.toContain('longenough1');
+      expect(Object.keys(created ?? {})).not.toContain('password');
+    });
+
+    it('requires a specialization for a doctor', () => {
+      const dir = fixture.componentInstance as any;
+      dir['form'].patchValue({ ...validDoctor, specializationId: '' });
       dir['submit']();
       fixture.detectChanges();
       expect(dir['specializationError']()).toBe('Choose a specialization.');
       expect(session.doctors().some((d) => d.email === 'ana.reyes@mediq.ph')).toBe(false);
     });
 
-    it('creates the account and announces it', () => {
+    it('requires a license number for a doctor', () => {
       const dir = fixture.componentInstance as any;
-      dir['form'].patchValue({
-        firstName: 'Ana',
-        lastName: 'Reyes',
-        email: 'ana.reyes@mediq.ph',
-        specializationId: 'spec-cardio',
-        licenseNumber: 'PRC-1',
-      });
+      dir['form'].patchValue({ ...validDoctor, licenseNumber: '  ' });
       dir['submit']();
       fixture.detectChanges();
+      expect(dir['licenseError']()).toBe('This field is required.');
+      expect(session.doctors().some((d) => d.email === 'ana.reyes@mediq.ph')).toBe(false);
+    });
+
+    it('creates the account with the status chosen, and announces it', () => {
+      const dir = fixture.componentInstance as any;
+      dir['form'].patchValue({ ...validDoctor, status: 'inactive' });
+      dir['submit']();
+      fixture.detectChanges();
+      const created = session.doctors().find((d) => d.email === 'ana.reyes@mediq.ph');
+      expect(created?.status).toBe('inactive');
+      expect(created?.username).toBe('areyes');
       expect(dir['notice']()).toContain('Ana Reyes');
       expect(dir['createOpen']()).toBe(false);
     });
 
-    it('opens the dialog with a clean form', () => {
+    it('opens the dialog with a clean form, defaulting to active', () => {
       const dir = fixture.componentInstance as any;
-      dir['form'].patchValue({ firstName: 'Stale' });
+      dir['form'].patchValue({ name: 'Stale', status: 'inactive' });
       dir['openCreate']();
       expect(dir['createOpen']()).toBe(true);
-      expect(dir['form'].getRawValue().firstName).toBe('');
+      expect(dir['form'].getRawValue().name).toBe('');
+      expect(dir['form'].getRawValue().status).toBe('active');
+    });
+
+    it('drops the password when the dialog is reopened', () => {
+      const dir = fixture.componentInstance as any;
+      dir['form'].patchValue({ temporaryPassword: 'longenough1', confirmPassword: 'longenough1' });
+      dir['openCreate']();
+      expect(dir['form'].getRawValue().temporaryPassword).toBe('');
+      expect(dir['form'].getRawValue().confirmPassword).toBe('');
+    });
+
+    it('labels the form in two sections, with the role detail one only for doctors', () => {
+      const dir = fixture.componentInstance as any;
+      dir['openCreate']();
+      fixture.detectChanges();
+      const sections = Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>('.form-section'),
+      ).map((h) => h.textContent?.trim());
+      expect(sections).toEqual(['Account information', 'Doctor details']);
+      expect(dir['roleLabel']()).toBe('Doctor');
+    });
+
+    it('omits the doctor detail section for a secretary', async () => {
+      // A doctor's specialty and licence have no secretary equivalent, so an
+      // empty section heading would be worse than none.
+      await render('secretary');
+      const dir = fixture.componentInstance as any;
+      dir['openCreate']();
+      fixture.detectChanges();
+      const sections = Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>('.form-section'),
+      ).map((h) => h.textContent?.trim());
+      expect(sections).toEqual(['Account information']);
+      expect(dir['roleLabel']()).toBe('Secretary');
+    });
+
+    it('names the create button after the role', () => {
+      const dir = fixture.componentInstance as any;
+      dir['openCreate']();
+      fixture.detectChanges();
+      const footer = fixture.nativeElement.querySelector('dialog footer, [role="dialog"] footer');
+      expect(footer?.textContent).toContain('Create Doctor Account');
     });
   });
 

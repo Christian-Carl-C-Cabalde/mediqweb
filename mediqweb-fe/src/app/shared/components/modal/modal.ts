@@ -8,6 +8,8 @@ import {
   viewChild,
 } from '@angular/core';
 
+let nextId = 0;
+
 export type ModalSize = 'sm' | 'md' | 'lg' | 'xl';
 export type ModalPlacement = 'center' | 'left' | 'right';
 
@@ -32,6 +34,12 @@ export type ModalPlacement = 'center' | 'left' | 'right';
 export class Modal {
   readonly open = input(false);
   readonly title = input<string | null>(null);
+  /**
+   * One line under the title explaining what the dialog is for or what will
+   * happen. Kept separate from the projected body so it stays put when the body
+   * scrolls, and so it can be wired to `aria-describedby` for context.
+   */
+  readonly description = input<string | null>(null);
   readonly size = input<ModalSize>('md');
   /**
    * `left`/`right` render an edge-anchored drawer instead of a centred dialog.
@@ -81,6 +89,9 @@ export class Modal {
   close(): void {
     this.closed.emit();
   }
+
+  /** Id for the description, so the dialog can point `aria-describedby` at it. */
+  protected readonly descriptionId = `ui-modal-description-${++nextId}`;
 
   protected onBackdropClick(event: MouseEvent): void {
     // Clicks on the panel bubble here too; only the <dialog> itself is backdrop.
