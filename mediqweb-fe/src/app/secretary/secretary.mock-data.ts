@@ -314,35 +314,67 @@ export const MOCK_SCHEDULES: Readonly<Record<string, readonly ScheduleDay[]>> = 
 };
 
 /**
- * The first date on or after `daysFromToday` on which `doctorId` is working.
+ * The doctor's `daysFromToday`-th working day, counting from today.
  *
- * Bounded to a fortnight, which is longer than any gap in the schedules above —
- * a doctor whose every day was closed would run off the end of the month and
- * produce a nonsensical timestamp, so this stops and returns the date it reached
- * rather than looping forever.
+ * `daysFromToday` counts **working days, not calendar days**, and that is the
+ * whole point. Anchoring on "today" and then skipping forward over closed days
+ * looked equivalent but was not: when today is a day off, `0` and `1` both
+ * resolve to the next working day and two appointments land on top of each
+ * other. The collision only appears on the weekdays that doctor does not work,
+ * which is why the suite passed for weeks and then failed the day the date
+ * rolled over to a Monday.
+ *
+ * Counting working days makes distinct offsets produce distinct days by
+ * construction, whatever weekday the fixtures happen to be generated on:
+ *
+ * - `0` is today when the doctor works today, otherwise their next working day.
+ * - `-1` is their most recent working day, skipping any days off between.
+ * - `1`, `3`, `4` step forward over days off.
+ *
+ * Each search is bounded to a fortnight, so a doctor whose every day is closed
+ * runs out of road and returns the date it reached rather than looping forever.
+ * That doctor has no appointments to place anyway — the inactive one is only
+ * ever used to be shown as not taking bookings.
  */
 function openDayOn(doctorId: string, daysFromToday: number): Date {
-  const date = new Date();
-  date.setHours(0, 0, 0, 0);
-  date.setDate(date.getDate() + daysFromToday);
+  const works = (date: Date): boolean => MOCK_SCHEDULES[doctorId][date.getDay()].enabled;
 
-  for (let skip = 0; skip < 14; skip += 1) {
-    if (MOCK_SCHEDULES[doctorId][date.getDay()].enabled) return date;
+  const nextWorkingDay = (from: Date, direction: 1 | -1): Date => {
+    const date = new Date(from);
+    for (let skip = 0; skip < 14; skip += 1) {
+      date.setDate(date.getDate() + direction);
+      if (works(date)) return date;
+    }
+    return date;
+  };
+
+  // Anchor on the first day the doctor works, today included.
+  let date = new Date();
+  date.setHours(0, 0, 0, 0);
+  for (let skip = 0; skip < 14 && !works(date); skip += 1) {
     date.setDate(date.getDate() + 1);
   }
+
+  // Then walk the offset in working days, in whichever direction it points.
+  const direction = daysFromToday < 0 ? -1 : 1;
+  for (let step = 0; step < Math.abs(daysFromToday); step += 1) {
+    date = nextWorkingDay(date, direction);
+  }
+
   return date;
 }
 
 /**
- * A timestamp inside a doctor's published hours, `daysFromToday` days out.
+ * A timestamp inside a doctor's published hours, `daysFromToday` working days out.
  *
  * Two things this does that writing the date out by hand cannot:
  *
- * - It skips forward to a day the doctor actually works. `daysFromToday: 1` is a
- *   different weekday depending on when this module is imported, so a hand-written
- *   date would put appointments outside published hours on some days and inside
- *   them on others — and the booking rules would then be refusing the clinic's
- *   own sample data, which is the worst possible first impression of the form.
+ * - It only ever lands on a day the doctor actually works, counting working days
+ *   from today (see `openDayOn`). `daysFromToday: 1` is a different weekday
+ *   depending on when this module is imported, so a hand-written date would put
+ *   appointments outside published hours on some days and inside them on others
+ *   — and the booking rules would then be refusing the clinic's own sample data,
+ *   which is the worst possible first impression of the form.
  * - It places the time relative to that day's opening time rather than as a fixed
  *   hour, so a doctor who works afternoons gets afternoon appointments.
  *
