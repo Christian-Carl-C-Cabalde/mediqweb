@@ -8,17 +8,19 @@
 >
   <ui-dropdown
     class="row-filter"
-    size="sm"
     [items]="statusOptions"
     [selected]="statusFilter()"
     [label]="'Filter by status'"
     (selectionChange)="onStatusFilterChange($event)"
   />
+  <!--
+    The create action lives in the bar beside the filter rather than on a row of
+    its own. It belongs to the same toolbar, and a second right-aligned row below
+    the search made the page taller for the sake of one button. Both controls sit
+    at the `md` control height so the bar's bottom alignment holds.
+  -->
+  <ui-button variant="primary" (click)="openCreate()"> Add {{ singular() }} </ui-button>
 </ui-filter-bar>
-
-<div class="actions">
-  <ui-button variant="primary" (click)="openCreate()">Add {{ singular() }}</ui-button>
-</div>
 
 @if (notice(); as message) {
   <p class="row-notice" role="status">

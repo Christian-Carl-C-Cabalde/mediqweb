@@ -8,7 +8,6 @@
 >
   <ui-dropdown
     class="row-filter"
-    size="sm"
     [items]="severityItems"
     [selected]="severity()"
     label="Filter by severity"
@@ -31,7 +30,7 @@
     "
   >
     <ng-template uiTableCell="at" let-row>
-      <time [attr.datetime]="row.at">{{ row.at | date: 'MMM d, y Â· h:mm a' }}</time>
+      <time [attr.datetime]="row.at">{{ row.at | date: 'MMM d, y · h:mm a' }}</time>
     </ng-template>
 
     <ng-template uiTableCell="actor" let-row>

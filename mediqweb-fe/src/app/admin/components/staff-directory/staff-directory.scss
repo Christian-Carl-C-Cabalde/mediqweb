@@ -1,11 +1,5 @@
 @use '../../../shared/scss/listing';
 
-.actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: var(--space-4);
-}
-
 // Two columns for the paired name fields, one column when space is tight.
 .grid {
   display: grid;
