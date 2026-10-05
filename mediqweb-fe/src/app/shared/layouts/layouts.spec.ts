@@ -218,6 +218,16 @@ describe('MediQ shared layouts', () => {
       host(fixture).querySelector('.shell__sidebar app-staff-nav')!;
     const drawer = (fixture: ComponentFixture<StaffLayout>) =>
       host(fixture).querySelector('dialog')!;
+    /** The logout prompt. The drawer is the first dialog in the DOM. */
+    const confirmDialog = (fixture: ComponentFixture<StaffLayout>) =>
+      host(fixture).querySelectorAll('dialog')[1] as HTMLDialogElement;
+    /** A footer action of the logout prompt, by its visible label. */
+    const footerButton = (fixture: ComponentFixture<StaffLayout>, label: string) =>
+      Array.from(confirmDialog(fixture).querySelectorAll<HTMLButtonElement>('button')).find(
+        (button) => button.textContent?.trim() === label,
+      )!;
+    const confirmLogout = (fixture: ComponentFixture<StaffLayout>) =>
+      footerButton(fixture, 'Log out');
 
     it('shows the signed-in member in the header as plain text', () => {
       const fixture = build();
@@ -316,8 +326,79 @@ describe('MediQ shared layouts', () => {
       fixture.componentInstance.logout.subscribe(() => logouts++);
 
       sidebarNav(fixture).querySelector<HTMLButtonElement>('.nav__link--logout')!.click();
+      fixture.detectChanges();
+      confirmLogout(fixture).click();
+      fixture.detectChanges();
 
       expect(logouts).toBe(1);
+    });
+
+    it('asks before logging out instead of signing out on the first click', () => {
+      // One click to ask, one to confirm. Signing out discards whatever is in
+      // the form on screen, and the nav item is easy to hit by muscle memory.
+      const fixture = build();
+      let logouts = 0;
+      fixture.componentInstance.logout.subscribe(() => logouts++);
+
+      expect(confirmDialog(fixture).hasAttribute('open')).toBe(false);
+
+      sidebarNav(fixture).querySelector<HTMLButtonElement>('.nav__link--logout')!.click();
+      fixture.detectChanges();
+
+      expect(logouts).toBe(0);
+      expect(confirmDialog(fixture).hasAttribute('open')).toBe(true);
+    });
+
+    it('keeps the user signed in when the prompt is dismissed', () => {
+      // Both routes out of the dialog that are not the danger button: the
+      // Cancel button, and Escape or a backdrop click, which emit `closed`.
+      for (const dismiss of ['cancel', 'escape', 'backdrop'] as const) {
+        const fixture = build();
+        let logouts = 0;
+        fixture.componentInstance.logout.subscribe(() => logouts++);
+        sidebarNav(fixture).querySelector<HTMLButtonElement>('.nav__link--logout')!.click();
+        fixture.detectChanges();
+
+        if (dismiss === 'cancel') {
+          footerButton(fixture, 'Cancel').click();
+        } else if (dismiss === 'escape') {
+          confirmDialog(fixture).dispatchEvent(new Event('cancel'));
+        } else {
+          confirmDialog(fixture).click();
+        }
+        fixture.detectChanges();
+
+        expect(logouts, dismiss).toBe(0);
+        expect(confirmDialog(fixture).hasAttribute('open'), dismiss).toBe(false);
+      }
+    });
+
+    it('asks the question the way the user would put it', () => {
+      const fixture = build();
+      sidebarNav(fixture).querySelector<HTMLButtonElement>('.nav__link--logout')!.click();
+      fixture.detectChanges();
+
+      const dialog = confirmDialog(fixture);
+      expect(dialog.querySelector('.ui-modal__title')?.textContent?.trim()).toBe('Log out');
+      expect(dialog.textContent).toContain('Are you sure you want to log out?');
+    });
+
+    it('closes the nav drawer before asking, rather than stacking two dialogs', () => {
+      // Logout is reached through the drawer on small screens, and two open
+      // dialogs in the top layer at once is a mess to dismiss.
+      const fixture = build();
+      fixture.componentInstance['navOpen'].set(true);
+      fixture.detectChanges();
+      expect(drawer(fixture).hasAttribute('open')).toBe(true);
+
+      drawer(fixture)
+        .querySelector('app-staff-nav')!
+        .querySelector<HTMLButtonElement>('.nav__link--logout')!
+        .click();
+      fixture.detectChanges();
+
+      expect(drawer(fixture).hasAttribute('open')).toBe(false);
+      expect(confirmDialog(fixture).hasAttribute('open')).toBe(true);
     });
 
     it('renders the page title as the only h1', () => {
