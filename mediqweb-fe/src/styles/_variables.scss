@@ -70,6 +70,13 @@
   --line-height-page-title: 28px;
   --font-weight-page-title: 700;
 
+  // Dashboard metric — 30 / 34 / 700. The headline number on a stat card. Set
+  // above the page title because a row of these is read at a glance, where an
+  // h1 is read as part of the page.
+  --font-size-metric: 30px;
+  --line-height-metric: 34px;
+  --font-weight-metric: 700;
+
   // Section title — 16 / 20 / 600
   --font-size-section-title: 16px;
   --line-height-section-title: 20px;
