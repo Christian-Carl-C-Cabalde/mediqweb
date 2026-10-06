@@ -3,6 +3,20 @@
   max-width: 100%;
 }
 
+// A stretched host is not enough on its own: the pill is a child and would keep
+// its own content width, leaving the gap this is meant to close.
+:host(.ui-badge-host--block) {
+  display: flex;
+  width: 100%;
+}
+
+.ui-badge--block {
+  width: 100%;
+  // Explicit because the label must sit against the column edge, not float in
+  // the middle of the stretched pill.
+  justify-content: flex-start;
+}
+
 .ui-badge {
   display: inline-flex;
   align-items: center;

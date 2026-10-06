@@ -100,6 +100,25 @@ describe('MediQ shared components', () => {
       // Warning orange fails AA as body text, so the tone is carried by the dot.
       expect(host.querySelector('.ui-badge')?.textContent).toBeDefined();
     });
+
+    it('sizes to its label by default, so a badge in a sentence stays compact', () => {
+      const { host } = mount(StatusBadge);
+      expect(host.classList.contains('ui-badge-host--block')).toBe(false);
+      expect(host.querySelector('.ui-badge')?.classList.contains('ui-badge--block')).toBe(false);
+    });
+
+    it('stretches the pill to fill its container when fullWidth is set', () => {
+      // For a badge used as a column in a list. Stretching the host alone is not
+      // enough -- the pill is a child and would keep its own content width, which
+      // is what left the gap this exists to close.
+      const fixture = TestBed.createComponent(StatusBadge);
+      fixture.componentRef.setInput('fullWidth', true);
+      fixture.detectChanges();
+      const host = fixture.nativeElement as HTMLElement;
+
+      expect(host.classList.contains('ui-badge-host--block')).toBe(true);
+      expect(host.querySelector('.ui-badge')?.classList.contains('ui-badge--block')).toBe(true);
+    });
   });
 
   describe('Avatar', () => {

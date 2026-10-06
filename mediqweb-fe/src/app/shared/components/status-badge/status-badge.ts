@@ -28,6 +28,7 @@ const TONE_TOKEN: Record<BadgeTone, string> = {
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     '[style.--badge-tone]': 'toneToken()',
+    '[class.ui-badge-host--block]': 'fullWidth()',
   },
 })
 export class StatusBadge {
@@ -37,6 +38,14 @@ export class StatusBadge {
   readonly dot = input(false);
   /** Announced prefix, e.g. "Status: Confirmed". */
   readonly ariaLabel = input<string | null>(null);
+  /**
+   * Stretch the pill to fill its container, keeping the label left-aligned.
+   *
+   * For a badge acting as a column in a list, where the label is left to size
+   * itself every row starts its text at a different offset from the column edge,
+   * and a fixed-width pill with the text against one side reads as a column.
+   */
+  readonly fullWidth = input(false);
 
   protected readonly toneToken = computed(() => TONE_TOKEN[this.tone()]);
 }

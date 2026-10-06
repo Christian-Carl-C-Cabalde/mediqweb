@@ -32,15 +32,14 @@
   padding-bottom: 0;
 }
 
-// Sized to its own text rather than stretched across the track. The track is
-// what aligns the subjects, so the chip gains nothing by filling it — and
-// "Added specialization" should not be as wide a pill as the longest label.
+// The pill fills its track, with its label held against the left edge.
 //
-// `start` also means every chip begins at the same x, so the raggedness is
-// confined to the chip's right edge where a pill is expected to vary.
+// Sizing it to its own text instead left a hole between the shorter labels and
+// the subject — the worst of both, since the subjects stayed aligned only because
+// the track was fixed while the pill sat at the far end of it. Filling it closes
+// that gap, and every label still starts at the same x.
 .activity__action {
   min-width: 0;
-  justify-self: start;
   max-width: 100%;
   overflow: hidden;
 }
