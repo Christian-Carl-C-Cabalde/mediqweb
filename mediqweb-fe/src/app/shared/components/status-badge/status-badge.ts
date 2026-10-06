@@ -3,8 +3,14 @@ import { ChangeDetectionStrategy, Component, computed, input } from '@angular/co
 export type BadgeTone = 'neutral' | 'primary' | 'success' | 'warning' | 'danger' | 'info';
 export type BadgeSize = 'sm' | 'md';
 
-/** Tone name -> design-token reference. Keeps colour out of the stylesheet. */
-const TONE_TOKEN: Record<BadgeTone, string> = {
+/**
+ * Tone name -> design-token reference. Keeps colour out of the stylesheet.
+ *
+ * Exported so anything that needs to paint by tone — a bare severity dot, say —
+ * resolves the same token the badge would, instead of keeping a second copy of
+ * this table.
+ */
+export const BADGE_TONE_TOKEN: Record<BadgeTone, string> = {
   neutral: 'var(--color-text-secondary)',
   primary: 'var(--color-primary)',
   success: 'var(--color-success)',
@@ -38,5 +44,5 @@ export class StatusBadge {
   /** Announced prefix, e.g. "Status: Confirmed". */
   readonly ariaLabel = input<string | null>(null);
 
-  protected readonly toneToken = computed(() => TONE_TOKEN[this.tone()]);
+  protected readonly toneToken = computed(() => BADGE_TONE_TOKEN[this.tone()]);
 }

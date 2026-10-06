@@ -31,7 +31,12 @@ export { FilterBar } from './filter-bar/filter-bar';
 
 // Data display
 export { Avatar, type AvatarSize, type AvatarStatus } from './avatar/avatar';
-export { StatusBadge, type BadgeSize, type BadgeTone } from './status-badge/status-badge';
+export {
+  StatusBadge,
+  BADGE_TONE_TOKEN,
+  type BadgeSize,
+  type BadgeTone,
+} from './status-badge/status-badge';
 export { Table, type TableColumn, type TableSort, type SortDirection } from './table/table';
 export { TableCell } from './table/table-cell';
 

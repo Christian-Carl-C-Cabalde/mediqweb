@@ -9,7 +9,7 @@ import { Modal } from './modal/modal';
 import { SampleAccounts, type SampleAccount } from './sample-accounts/sample-accounts';
 import { Spinner } from './spinner/spinner';
 import { StatCard } from './stat-card/stat-card';
-import { StatusBadge, type BadgeTone } from './status-badge/status-badge';
+import { StatusBadge, BADGE_TONE_TOKEN, type BadgeTone } from './status-badge/status-badge';
 import { Table, type TableColumn } from './table/table';
 import { TableCell } from './table/table-cell';
 
@@ -99,6 +99,14 @@ describe('MediQ shared components', () => {
       const { host } = mount(StatusBadge);
       // Warning orange fails AA as body text, so the tone is carried by the dot.
       expect(host.querySelector('.ui-badge')?.textContent).toBeDefined();
+    });
+
+    it('exposes its tone table so other components colour by the same token', () => {
+      // Anything painting by tone -- a bare severity dot, say -- should resolve
+      // through this rather than keeping a second copy of the mapping.
+      expect(BADGE_TONE_TOKEN.danger).toBe('var(--color-danger)');
+      const { fixture } = mount(StatusBadge);
+      expect(BADGE_TONE_TOKEN[fixture.componentInstance.tone()]).toMatch(/^var\(--color-/);
     });
   });
 
