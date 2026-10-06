@@ -52,10 +52,11 @@ export class AdminDashboard {
   /**
    * The colour for the severity dot.
    *
-   * Goes through the badge's own tone table rather than mapping severity to a
-   * colour here, so a dot and a badge of the same severity cannot drift apart.
+   * Goes through `severityTone` and then the badge's own tone table, rather than
+   * mapping severity to a colour here, so there is one path from severity to
+   * colour and a dot cannot drift away from a badge of the same severity.
    */
   protected severityToken(severity: AuditSeverity): string {
-    return BADGE_TONE_TOKEN[SEVERITY_TONE[severity]];
+    return BADGE_TONE_TOKEN[this.severityTone(severity)];
   }
 }
