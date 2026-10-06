@@ -12,9 +12,11 @@
 
 .ui-badge--block {
   width: 100%;
-  // Explicit because the label must sit against the column edge, not float in
-  // the middle of the stretched pill.
-  justify-content: flex-start;
+  // The label is centred in the stretched pill rather than pinned to one edge,
+  // which is what a fixed-width pill wants: an equal box with the text optically
+  // centred reads as a column of chips, where text hung off one side reads as
+  // boxes with something missing from them.
+  justify-content: center;
 }
 
 .ui-badge {
