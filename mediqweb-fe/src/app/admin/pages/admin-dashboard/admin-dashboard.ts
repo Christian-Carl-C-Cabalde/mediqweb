@@ -5,7 +5,7 @@ import {
   Card,
   MockNotice,
   StatCard,
-  StatusBadge,
+  BADGE_TONE_TOKEN,
   type BadgeTone,
 } from '../../../shared/components';
 import { AdminSession } from '../../admin-session';
@@ -30,7 +30,7 @@ const SEVERITY_TONE: Record<AuditSeverity, BadgeTone> = {
  */
 @Component({
   selector: 'app-admin-dashboard',
-  imports: [DatePipe, RouterLink, Card, StatCard, StatusBadge, MockNotice],
+  imports: [DatePipe, RouterLink, Card, StatCard, MockNotice],
   templateUrl: './admin-dashboard.html',
   styleUrl: './admin-dashboard.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -47,5 +47,16 @@ export class AdminDashboard {
 
   protected severityTone(severity: AuditSeverity): BadgeTone {
     return SEVERITY_TONE[severity];
+  }
+
+  /**
+   * The colour for the severity dot.
+   *
+   * Goes through `severityTone` and then the badge's own tone table, rather than
+   * mapping severity to a colour here, so there is one path from severity to
+   * colour and a dot cannot drift away from a badge of the same severity.
+   */
+  protected severityToken(severity: AuditSeverity): string {
+    return BADGE_TONE_TOKEN[this.severityTone(severity)];
   }
 }
