@@ -17,6 +17,14 @@
   }
 }
 
+// Confirm password and Account status are direct children of the form rather than
+// cells in a `.grid`, and the form is a plain block -- so they had no gap at all
+// and "Account status" sat flush against the input above it, closer to that input
+// than to its own. Same 16px the grid already uses between its own cells.
+.account-form > ui-form-field {
+  margin-top: var(--space-4);
+}
+
 // Section heading. Green and letterspaced so the form reads as two labelled
 // groups rather than one long list, and `h3` because the dialog title is the
 // `h2` above it. Sentence case in the markup, uppercased here, so a screen

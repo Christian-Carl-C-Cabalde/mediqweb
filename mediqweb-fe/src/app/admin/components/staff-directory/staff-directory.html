@@ -83,7 +83,7 @@
   description="Create a secure staff account. Required fields are marked with an asterisk."
   (closed)="closeCreate()"
 >
-  <form [formGroup]="form" (ngSubmit)="submit()" id="add-staff-form">
+  <form class="account-form" [formGroup]="form" (ngSubmit)="submit()" id="add-staff-form">
     <h3 class="form-section">Account information</h3>
 
     <div class="grid">
@@ -109,7 +109,6 @@
         label="Email"
         controlId="add-email"
         [required]="true"
-        hint="Used to sign in. Must be unique."
         [error]="errorFor('email')"
       >
         <!--
