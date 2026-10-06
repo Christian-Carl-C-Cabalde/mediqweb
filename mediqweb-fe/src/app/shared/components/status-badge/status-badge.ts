@@ -3,8 +3,14 @@ import { ChangeDetectionStrategy, Component, computed, input } from '@angular/co
 export type BadgeTone = 'neutral' | 'primary' | 'success' | 'warning' | 'danger' | 'info';
 export type BadgeSize = 'sm' | 'md';
 
-/** Tone name -> design-token reference. Keeps colour out of the stylesheet. */
-const TONE_TOKEN: Record<BadgeTone, string> = {
+/**
+ * Tone name -> design-token reference. Keeps colour out of the stylesheet.
+ *
+ * Exported so anything that needs to paint by tone — a bare severity dot, say —
+ * resolves the same token the badge would, instead of keeping a second copy of
+ * this table.
+ */
+export const BADGE_TONE_TOKEN: Record<BadgeTone, string> = {
   neutral: 'var(--color-text-secondary)',
   primary: 'var(--color-primary)',
   success: 'var(--color-success)',
@@ -28,7 +34,6 @@ const TONE_TOKEN: Record<BadgeTone, string> = {
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     '[style.--badge-tone]': 'toneToken()',
-    '[class.ui-badge-host--block]': 'fullWidth()',
   },
 })
 export class StatusBadge {
@@ -38,14 +43,6 @@ export class StatusBadge {
   readonly dot = input(false);
   /** Announced prefix, e.g. "Status: Confirmed". */
   readonly ariaLabel = input<string | null>(null);
-  /**
-   * Stretch the pill to fill its container, keeping the label left-aligned.
-   *
-   * For a badge acting as a column in a list, where the label is left to size
-   * itself every row starts its text at a different offset from the column edge,
-   * and a fixed-width pill with the text against one side reads as a column.
-   */
-  readonly fullWidth = input(false);
 
-  protected readonly toneToken = computed(() => TONE_TOKEN[this.tone()]);
+  protected readonly toneToken = computed(() => BADGE_TONE_TOKEN[this.tone()]);
 }

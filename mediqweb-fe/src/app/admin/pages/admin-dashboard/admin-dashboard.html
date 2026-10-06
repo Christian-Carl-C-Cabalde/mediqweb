@@ -31,15 +31,18 @@
   <ul class="activity">
     @for (entry of activity(); track entry.id) {
       <li class="activity__item">
-        <ui-status-badge
-          class="activity__action"
-          [tone]="severityTone(entry.severity)"
-          size="sm"
-          [fullWidth]="true"
-        >
-          {{ entry.action }}
-        </ui-status-badge>
-        <span class="activity__target">{{ entry.target }}</span>
+        <!--
+          Severity is a dot, not a filled pill. Six tinted pills stacked down the
+          side of a dashboard read as banners and made the action -- secondary
+          information -- louder than the subject it was describing.
+        -->
+        <span
+          class="activity__dot"
+          [style.background-color]="severityToken(entry.severity)"
+          aria-hidden="true"
+        ></span>
+        <span class="activity__action">{{ entry.action }}</span>
+        <span class="activity__subject">{{ entry.target }}</span>
         <span class="activity__actor">{{ entry.actor }}</span>
         <time class="activity__when" [attr.datetime]="entry.at">
           {{ entry.at | date: 'MMM d, h:mm a' }}

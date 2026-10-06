@@ -9,7 +9,7 @@ import { Modal } from './modal/modal';
 import { SampleAccounts, type SampleAccount } from './sample-accounts/sample-accounts';
 import { Spinner } from './spinner/spinner';
 import { StatCard } from './stat-card/stat-card';
-import { StatusBadge, type BadgeTone } from './status-badge/status-badge';
+import { StatusBadge, BADGE_TONE_TOKEN, type BadgeTone } from './status-badge/status-badge';
 import { Table, type TableColumn } from './table/table';
 import { TableCell } from './table/table-cell';
 
@@ -101,23 +101,12 @@ describe('MediQ shared components', () => {
       expect(host.querySelector('.ui-badge')?.textContent).toBeDefined();
     });
 
-    it('sizes to its label by default, so a badge in a sentence stays compact', () => {
-      const { host } = mount(StatusBadge);
-      expect(host.classList.contains('ui-badge-host--block')).toBe(false);
-      expect(host.querySelector('.ui-badge')?.classList.contains('ui-badge--block')).toBe(false);
-    });
-
-    it('stretches the pill to fill its container when fullWidth is set', () => {
-      // For a badge used as a column in a list. Stretching the host alone is not
-      // enough -- the pill is a child and would keep its own content width, which
-      // is what left the gap this exists to close.
-      const fixture = TestBed.createComponent(StatusBadge);
-      fixture.componentRef.setInput('fullWidth', true);
-      fixture.detectChanges();
-      const host = fixture.nativeElement as HTMLElement;
-
-      expect(host.classList.contains('ui-badge-host--block')).toBe(true);
-      expect(host.querySelector('.ui-badge')?.classList.contains('ui-badge--block')).toBe(true);
+    it('exposes its tone table so other components colour by the same token', () => {
+      // Anything painting by tone -- a bare severity dot, say -- should resolve
+      // through this rather than keeping a second copy of the mapping.
+      expect(BADGE_TONE_TOKEN.danger).toBe('var(--color-danger)');
+      const { fixture } = mount(StatusBadge);
+      expect(BADGE_TONE_TOKEN[fixture.componentInstance.tone()]).toMatch(/^var\(--color-/);
     });
   });
 
