@@ -27,6 +27,15 @@
   border-bottom: var(--border-width) solid var(--color-border);
 }
 
+// The first and last rows give up their own padding and sit against the card's,
+// which puts the divider 21px above the first row instead of 33px -- the 12px
+// here sat on top of the card body's 20px and made the list look detached from
+// its own header. It also makes the space above the list match the space below,
+// which the last-child rule was already giving.
+.activity__item:first-child {
+  padding-top: 0;
+}
+
 .activity__item:last-child {
   border-bottom: 0;
   padding-bottom: 0;
