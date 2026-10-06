@@ -7,7 +7,8 @@ export type StaffNavIcon =
   | 'clipboard'
   | 'settings'
   | 'logout'
-  | 'stethoscope';
+  | 'stethoscope'
+  | 'messages';
 
 export interface StaffNavItem {
   readonly id: string;

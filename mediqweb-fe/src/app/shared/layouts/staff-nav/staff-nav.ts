@@ -21,6 +21,10 @@ const ICON_PATHS: Record<StaffNavIcon, string> = {
   // them hard to tell apart at a glance.
   stethoscope:
     'M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 1.7 6.5 6.5 0 0 0 6.5 6.5 6.5 6.5 0 0 0 6.5-6.5A2 2 0 0 0 13 1h-1a.2.2 0 1 0 .3.3M8 15v1a6 6 0 0 0 6 6v3M16 21v-3a6 6 0 0 0-6-6M20 8a2 2 0 1 0-4 0 2 2 0 0 0 4 0M18 8v2a4 4 0 0 1-4 4h-1',
+  // An envelope, not a speech bubble: the two read as "messages" and "feedback"
+  // at a glance, and only one of them is a queue somebody works through.
+  messages:
+    'M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM22 6l-10 7L2 6',
 };
 
 /**

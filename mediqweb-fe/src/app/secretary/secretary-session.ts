@@ -1,8 +1,10 @@
 import { Injectable, computed, signal } from '@angular/core';
-import { isSameDay, minutesOfDay, startOfDay } from './secretary.dates';
+import { isSameDay, localIso, minutesOfDay, shortDate, startOfDay } from './secretary.dates';
 import {
   MOCK_APPOINTMENTS,
+  MOCK_CONVERSATIONS,
   MOCK_DOCTORS,
+  MOCK_MESSAGES,
   MOCK_PATIENTS,
   MOCK_SCHEDULES,
   MOCK_SECRETARY_PROFILE,
@@ -11,6 +13,9 @@ import {
 import type {
   Appointment,
   AppointmentStatus,
+  Conversation,
+  ConversationMessage,
+  ConversationSummary,
   Doctor,
   DoctorSummary,
   Patient,
@@ -82,6 +87,12 @@ export class SecretarySession {
     ),
   );
   private readonly profileState = signal<SecretaryProfile>({ ...MOCK_SECRETARY_PROFILE });
+  private readonly conversationState = signal<Conversation[]>(
+    MOCK_CONVERSATIONS.map((conversation) => ({ ...conversation })),
+  );
+  private readonly messageState = signal<ConversationMessage[]>(
+    MOCK_MESSAGES.map((message) => ({ ...message })),
+  );
 
   /**
    * The area's single clock.
@@ -207,6 +218,171 @@ export class SecretarySession {
       ]),
     ),
   );
+
+  // -------------------------------------------------------------------------
+  // Messaging
+  // -------------------------------------------------------------------------
+
+  /**
+   * Every thread, most recently active first.
+   *
+   * Sorted here rather than in the page so the nav badge and the list are
+   * counting and ordering the same set — two independent orderings is how a
+   * badge ends up promising a conversation that is not at the top.
+   *
+   * An empty thread sorts last because its `lastSentAt` is `''`, which is also
+   * what the list row renders as "No messages yet". The fixtures all have
+   * messages; the shape has to survive one that does not.
+   */
+  readonly conversations = computed<ConversationSummary[]>(() => {
+    const messages = this.messageState();
+
+    return this.conversationState()
+      .map((conversation): ConversationSummary => {
+        const thread = messages
+          .filter((message) => message.conversationId === conversation.id)
+          .sort((a, b) => a.sentAt.localeCompare(b.sentAt));
+        const newest = thread[thread.length - 1];
+
+        return {
+          conversation,
+          name: this.partyName(conversation),
+          messages: thread,
+          unreadCount: thread.filter((m) => !m.fromSecretary && m.readAt === null).length,
+          lastSentAt: newest?.sentAt ?? '',
+          preview: newest ? oneline(newest.body) : '',
+          lastFromSecretary: newest?.fromSecretary ?? true,
+        };
+      })
+      .sort((a, b) => b.lastSentAt.localeCompare(a.lastSentAt));
+  });
+
+  /** Messages waiting to be read, across every thread. */
+  readonly unreadMessageCount = computed(() =>
+    this.conversations().reduce((total, summary) => total + summary.unreadCount, 0),
+  );
+
+  /** How many threads still owe the clinic something. */
+  readonly awaitingActionCount = computed(
+    () => this.conversationState().filter((conversation) => conversation.awaitingAction).length,
+  );
+
+  /**
+   * One thread, or `null` for an id that matches none.
+   *
+   * Tolerating a bad id rather than throwing is the same contract as
+   * `patientById`: the screen asks for a conversation and renders what it got,
+   * rather than an unreachable id blanking the page.
+   */
+  conversationById(id: string): ConversationSummary | null {
+    return this.conversations().find((summary) => summary.conversation.id === id) ?? null;
+  }
+
+  /**
+   * The line under a name in the thread header.
+   *
+   * Answers "who am I actually talking to" from data the clinic already holds
+   * rather than from a label typed into the thread — a doctor's specialty, or how
+   * many times a patient has actually been seen.
+   */
+  conversationSubtitle(conversation: Conversation): string {
+    if (conversation.party === 'doctor') {
+      const doctor = this.doctorById(conversation.partyId);
+      return doctor ? `Doctor · ${doctor.specialization}` : 'Doctor';
+    }
+
+    const summary = this.patients().find((entry) => entry.patient.id === conversation.partyId);
+    if (!summary) return 'Patient';
+
+    // A booking first, because "has this person been in before?" is the wrong
+    // question for somebody who is already on the schedule — and `visitCount`
+    // counts only completed and missed appointments, so a patient with a confirmed
+    // appointment for next week reads as "New patient", which is both wrong and
+    // the kind of thing that gets said out loud to them.
+    if (summary.nextVisit) {
+      return `Patient · Next visit ${shortDate(new Date(summary.nextVisit.startsAt))}`;
+    }
+    return summary.visitCount
+      ? `Patient · ${summary.visitCount} visit${summary.visitCount === 1 ? '' : 's'}`
+      : 'Patient · Not yet seen';
+  }
+
+  /**
+   * Marks everything the other party sent in a thread as read.
+   *
+   * Only their messages: a reply you sent yourself is never unread, and marking
+   * it so would inflate the count back on the next read. Returns whether anything
+   * changed, so the caller can tell a real transition from a no-op.
+   */
+  markConversationRead(conversationId: string): boolean {
+    const at = localIso(this.now());
+    let changed = false;
+
+    this.messageState.update((messages) =>
+      messages.map((message) => {
+        if (message.conversationId !== conversationId) return message;
+        if (message.fromSecretary || message.readAt !== null) return message;
+        changed = true;
+        return { ...message, readAt: at };
+      }),
+    );
+
+    return changed;
+  }
+
+  /**
+   * Appends a reply from the signed-in Secretary.
+   *
+   * Returns the new message, or `null` for an empty body or an unknown thread —
+   * so the composer can clear itself only when something was actually sent,
+   * instead of silently eating what somebody typed.
+   */
+  sendMessage(conversationId: string, body: string): ConversationMessage | null {
+    const text = body.trim();
+    if (!text) return null;
+    if (!this.conversationState().some((c) => c.id === conversationId)) return null;
+
+    const message: ConversationMessage = {
+      id: this.nextMessageId(),
+      conversationId,
+      sentAt: localIso(this.now()),
+      body: text,
+      fromSecretary: true,
+      // Read by definition: you wrote it.
+      readAt: localIso(this.now()),
+    };
+
+    this.messageState.update((messages) => [...messages, message]);
+    return message;
+  }
+
+  /**
+   * An id no fixture has taken.
+   *
+   * Checked against the live list rather than the fixtures, for the same reason
+   * as `nextAppointmentId`: two replies in a session must not collide.
+   */
+  private nextMessageId(): string {
+    const used = this.messageState().map((message) => message.id);
+    let highest = 0;
+    for (const id of used) {
+      const parsed = Number(id.replace('msg-', ''));
+      if (Number.isFinite(parsed) && parsed > highest) highest = parsed;
+    }
+    return `msg-${String(highest + 1).padStart(4, '0')}`;
+  }
+
+  /**
+   * A conversation's name, from the patient or doctor fixtures.
+   *
+   * A thread can only name somebody the clinic actually has, so an unknown id
+   * says so in the same words as `patientName` rather than rendering blank.
+   */
+  private partyName(conversation: Conversation): string {
+    return conversation.party === 'doctor'
+      ? (this.doctorById(conversation.partyId)?.name ?? 'Unknown doctor')
+      : (this.patientById(conversation.partyId)?.name ?? 'Unknown patient');
+  }
 
   /** Patient lookup that tolerates a bad route param instead of throwing. */
   patientById(id: string): Patient | null {
@@ -412,4 +588,18 @@ function formatWeekHours(minutes: number): string {
   const mins = minutes % 60;
   if (!hours) return `${mins}m a week`;
   return mins ? `${hours}h ${mins}m a week` : `${hours}h a week`;
+}
+
+/**
+ * A message body flattened to one line and clipped, for a list row preview.
+ *
+ * Bodies are written as single lines here but a reply typed into the composer can
+ * contain newlines, and a list row is one line tall — so the newline is collapsed
+ * here rather than left to CSS `line-clamp`, which would need a height the row
+ * does not have. Clipped at a character count rather than a pixel count so the
+ * same string previews the same everywhere.
+ */
+function oneline(body: string, limit = 110): string {
+  const flat = body.replace(/\s+/g, ' ').trim();
+  return flat.length > limit ? `${flat.slice(0, limit - 1).trimEnd()}…` : flat;
 }

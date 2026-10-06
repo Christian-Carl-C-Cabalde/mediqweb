@@ -113,5 +113,74 @@ export interface SecretaryProfile {
   readonly joinedOn: string;
 }
 
+// ---------------------------------------------------------------------------
+// Messaging
+// ---------------------------------------------------------------------------
+
+/**
+ * Who a conversation is with.
+ *
+ * A Secretary's messages are with patients and with doctors, and the two want
+ * different subtitles and different follow-up, so the party is tagged rather
+ * than resolved by looking an id up in two lists where one id could match both.
+ */
+export type MessageParty = 'patient' | 'doctor';
+
+/** One message in a thread. */
+export interface ConversationMessage {
+  readonly id: string;
+  readonly conversationId: string;
+  /** Zone-less local timestamp, as `Appointment.startsAt`. */
+  readonly sentAt: string;
+  readonly body: string;
+  /**
+   * Whether the signed-in Secretary wrote it.
+   *
+   * Part of the message rather than a comparison against the session's id, so a
+   * thread still reads correctly when it is handed to somebody else — a real API
+   * would send an author role per message and the screen would not change.
+   */
+  readonly fromSecretary: boolean;
+  /**
+   * When the thread was opened, or `null` while the message is still unread.
+   *
+   * A timestamp rather than a boolean so a real API can return a server-side
+   * read receipt without this shape changing, and so "unread since" is available
+   * for free if the list ever needs to say it.
+   */
+  readonly readAt: string | null;
+}
+
+/** A thread with one patient or one doctor. */
+export interface Conversation {
+  readonly id: string;
+  readonly party: MessageParty;
+  /** The `Patient.id` or `Doctor.id` this thread is with. */
+  readonly partyId: string;
+  /**
+   * Whether the desk still owes something on this thread.
+   *
+   * Deliberately independent of the unread count: a thread can be read to the
+   * last word and still need the Secretary to go and do the thing that was
+   * asked for. Deriving one from the other would quietly lose that case.
+   */
+  readonly awaitingAction: boolean;
+}
+
+/** A conversation plus what the list row and the thread header need. */
+export interface ConversationSummary {
+  readonly conversation: Conversation;
+  /** Resolved from `partyId`, so a person's name exists in exactly one fixture. */
+  readonly name: string;
+  readonly messages: readonly ConversationMessage[];
+  readonly unreadCount: number;
+  /** `sentAt` of the newest message. Also the list's sort key. */
+  readonly lastSentAt: string;
+  /** The newest message's text, trimmed onto one line for the list row. */
+  readonly preview: string;
+  /** The newest message's writer, so the row can say who spoke last. */
+  readonly lastFromSecretary: boolean;
+}
+
 /** Fields the Profile page is allowed to change. */
 export type ProfileDraft = Pick<SecretaryProfile, 'name' | 'email' | 'phone'>;

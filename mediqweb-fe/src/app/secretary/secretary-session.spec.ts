@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { dayKey, localIso, minutesOfDay } from './secretary.dates';
 import {
   MOCK_APPOINTMENTS,
+  MOCK_CONVERSATIONS,
   MOCK_DOCTORS,
   MOCK_PATIENTS,
   MOCK_SCHEDULES,
@@ -566,6 +567,164 @@ describe('SecretarySession', () => {
           appointment.id,
         ).toBeNull();
       }
+    });
+  });
+
+  describe('messaging', () => {
+    // The outer `beforeEach` rewinds the clock to today's first appointment, which
+    // is *earlier* than the newest message fixture — the message fixtures are
+    // anchored to when the module was imported, not to a booking. A reply sent on
+    // that clock would be stamped before the messages it is replying to and would
+    // sort into the middle of the thread, so messaging starts from the real clock.
+    beforeEach(() => session.now.set(new Date()));
+
+    it('lists every conversation, most recently active first', () => {
+      expect(session.conversations().length).toBe(MOCK_CONVERSATIONS.length);
+
+      const times = session.conversations().map((c) => c.lastSentAt);
+      expect([...times].sort().reverse()).toEqual(times);
+    });
+
+    it('names each conversation after the patient or doctor fixture it points at', () => {
+      // `partyId` rather than a copied name, so a thread cannot disagree with the
+      // Patients page about who somebody is.
+      for (const { conversation, name } of session.conversations()) {
+        const expected =
+          conversation.party === 'doctor'
+            ? session.doctorById(conversation.partyId)?.name
+            : session.patientById(conversation.partyId)?.name;
+        expect(name).toBe(expected);
+      }
+    });
+
+    it('carries messages in the order they were sent', () => {
+      for (const { messages } of session.conversations()) {
+        const times = messages.map((m) => m.sentAt);
+        expect([...times].sort()).toEqual(times);
+      }
+    });
+
+    it('counts unread only for the other party', () => {
+      // Your own reply is never unread. Counting it would make the number go up
+      // the moment you answered somebody, which is the opposite of useful.
+      for (const { messages, unreadCount } of session.conversations()) {
+        const expected = messages.filter((m) => !m.fromSecretary && m.readAt === null).length;
+        expect(unreadCount).toBe(expected);
+      }
+    });
+
+    it('agrees with the sum of the per-thread counts', () => {
+      // The nav badge and the list below it are counting the same set. Two
+      // independent counts is how a badge ends up promising something that is not
+      // flagged in the list.
+      const summed = session.conversations().reduce((total, c) => total + c.unreadCount, 0);
+      expect(session.unreadMessageCount()).toBe(summed);
+    });
+
+    it('has a thread that is read to the end and still owes the clinic something', () => {
+      // The case that collapses if `awaitingAction` is derived from the unread
+      // count: a thread the Secretary has read and not yet acted on.
+      const settled = session
+        .conversations()
+        .filter((c) => c.unreadCount === 0 && c.conversation.awaitingAction);
+      expect(settled.length).toBeGreaterThan(0);
+    });
+
+    it('marks a thread read without touching the messages you sent', () => {
+      const target = session.conversations().find((c) => c.unreadCount > 0)!;
+      const mineBefore = target.messages.filter((m) => m.fromSecretary).length;
+
+      expect(session.markConversationRead(target.conversation.id)).toBe(true);
+
+      const after = session.conversationById(target.conversation.id)!;
+      expect(after.unreadCount).toBe(0);
+      expect(after.messages.filter((m) => m.fromSecretary).length).toBe(mineBefore);
+      expect(after.messages.every((m) => m.fromSecretary || m.readAt !== null)).toBe(true);
+    });
+
+    it('reports no change when marking an already-read thread', () => {
+      // The caller uses this to tell a real transition from a no-op, so it has to
+      // be honest rather than always returning true.
+      const target = session.conversations().find((c) => c.unreadCount > 0)!;
+      session.markConversationRead(target.conversation.id);
+      expect(session.markConversationRead(target.conversation.id)).toBe(false);
+    });
+
+    it('appends a reply and puts it at the end of the thread', () => {
+      const target = session.conversations()[0];
+      const before = target.messages.length;
+
+      const sent = session.sendMessage(target.conversation.id, '  Confirmed for 5:30 PM.  ');
+
+      expect(sent).not.toBeNull();
+      expect(sent!.fromSecretary).toBe(true);
+      expect(sent!.body).toBe('Confirmed for 5:30 PM.');
+      expect(sent!.readAt).not.toBeNull();
+
+      const after = session.conversationById(target.conversation.id)!;
+      expect(after.messages.length).toBe(before + 1);
+      expect(after.messages[after.messages.length - 1].id).toBe(sent!.id);
+    });
+
+    it('refuses an empty or whitespace-only reply', () => {
+      // So the composer can clear itself only when something was actually sent,
+      // rather than eating what somebody typed.
+      const target = session.conversations()[0];
+      expect(session.sendMessage(target.conversation.id, '   ')).toBeNull();
+      expect(session.sendMessage(target.conversation.id, '')).toBeNull();
+      expect(session.conversationById(target.conversation.id)!.messages.length).toBe(
+        target.messages.length,
+      );
+    });
+
+    it('refuses a reply to a thread that does not exist', () => {
+      expect(session.sendMessage('cnv-nope', 'Hello?')).toBeNull();
+    });
+
+    it('gives two replies in a session different ids', () => {
+      // Checked against the live list rather than the fixtures, for the same
+      // reason appointment ids are: a collision would overwrite the first reply.
+      const target = session.conversations()[0];
+      const first = session.sendMessage(target.conversation.id, 'First')!;
+      const second = session.sendMessage(target.conversation.id, 'Second')!;
+      expect(first.id).not.toBe(second.id);
+    });
+
+    it('flattens a multi-line reply to one line for the list preview', () => {
+      // The row is one line tall, so a body with newlines has to be collapsed
+      // rather than left to CSS to clip at some height.
+      const target = session.conversations()[0];
+      session.sendMessage(target.conversation.id, 'Line one\nLine two\n\nLine four');
+
+      const after = session.conversationById(target.conversation.id)!;
+      expect(after.preview).toBe('Line one Line two Line four');
+      expect(after.preview).not.toContain('\n');
+    });
+
+    it('says a patient is booked rather than calling them new', () => {
+      // `visitCount` counts only completed and missed appointments, so a patient
+      // with a confirmed appointment for next week would otherwise read as
+      // "New patient" — which is both wrong and easy to say out loud to them.
+      const booked = MOCK_APPOINTMENTS.find(
+        (a) =>
+          a.status === 'confirmed' &&
+          session.conversations().some((c) => c.conversation.partyId === a.patientId),
+      );
+      if (!booked) return;
+
+      const conversation = MOCK_CONVERSATIONS.find((c) => c.partyId === booked.patientId)!;
+      expect(session.conversationSubtitle(conversation)).toContain('Next visit');
+      expect(session.conversationSubtitle(conversation)).not.toContain('New patient');
+    });
+
+    it('describes a doctor by specialty, not by visit count', () => {
+      const doctor = session.conversations().find((c) => c.conversation.party === 'doctor')!;
+      const expected = session.doctorById(doctor.conversation.partyId)!.specialization;
+      expect(session.conversationSubtitle(doctor.conversation)).toBe(`Doctor · ${expected}`);
+    });
+
+    it('tolerates a conversation whose id matches nothing', () => {
+      expect(session.conversationById('cnv-nope')).toBeNull();
     });
   });
 

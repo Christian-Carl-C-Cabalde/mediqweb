@@ -6,6 +6,7 @@ import {
   StaffLayout,
   type StaffCrumb,
   type StaffNavEntry,
+  type StaffNavItem,
   type StaffProfile,
 } from '../shared/layouts';
 import { SecretarySession } from './secretary-session';
@@ -16,8 +17,13 @@ const DASHBOARD_ROUTE = '/secretary/dashboard';
  * Secretary menu. Declared once and used for both the sidebar and the mobile
  * drawer, so the two cannot drift apart. Logout is not here: the layout always
  * renders it, because every role needs a way out.
+ *
+ * Declared flat rather than grouped: `nav` below rewrites the Messages entry's
+ * badge, and doing that to a `StaffNavEntry` would mean handling the group case
+ * as well. When a group is wanted here, it should be added deliberately rather
+ * than by loosening this type.
  */
-const SECRETARY_NAV: readonly StaffNavEntry[] = [
+const SECRETARY_NAV: readonly StaffNavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', route: DASHBOARD_ROUTE },
   {
     id: 'appointments',
@@ -28,6 +34,7 @@ const SECRETARY_NAV: readonly StaffNavEntry[] = [
   { id: 'patients', label: 'Patients', icon: 'users', route: '/secretary/patients' },
   { id: 'doctors', label: 'Doctors', icon: 'stethoscope', route: '/secretary/doctors' },
   { id: 'schedules', label: 'Schedules', icon: 'clipboard', route: '/secretary/schedules' },
+  { id: 'messages', label: 'Messages', icon: 'messages', route: '/secretary/messages' },
   { id: 'profile', label: 'Profile', icon: 'settings', route: '/secretary/profile' },
 ];
 
@@ -63,7 +70,24 @@ export class SecretaryShell {
     role: 'Secretary',
   }));
 
-  protected readonly nav = SECRETARY_NAV;
+  /**
+   * The menu, with the Messages badge filled in from the session.
+   *
+   * A computed rather than the constant, because the badge is a live count: it has
+   * to fall as threads are read, and a static array cannot. The count is the same
+   * one the list below it is showing, so the two cannot disagree about how much is
+   * waiting.
+   *
+   * Zero renders as no badge rather than a "0" — an empty pill on a nav item reads
+   * as something being wrong with the item.
+   */
+  protected readonly nav = computed<readonly StaffNavEntry[]>(() =>
+    SECRETARY_NAV.map((item) =>
+      item.id === 'messages'
+        ? { ...item, badge: this.session.unreadMessageCount() || undefined }
+        : item,
+    ),
+  );
 
   /**
    * Navigation counter, bumped after every completed navigation.

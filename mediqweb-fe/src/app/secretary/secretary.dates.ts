@@ -79,3 +79,87 @@ export const DAY_NAMES = [
   'Friday',
   'Saturday',
 ] as const;
+
+/** Short month names, for the day separators in a message thread. */
+const MONTH_NAMES = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+] as const;
+
+/** Whole days between two instants, floored. */
+function daysBetween(a: Date, b: Date): number {
+  return Math.floor((startOfDay(a).getTime() - startOfDay(b).getTime()) / 86_400_000);
+}
+
+/**
+ * A timestamp phrased relative to now: "Just now", "12 min ago", "2:05 PM",
+ * "Yesterday", "4 Mar".
+ *
+ * Used for the conversation list, where the useful question is "how stale is
+ * this?" rather than "on what date?". The cut-off is deliberately a calendar-day
+ * boundary rather than a fixed 24 hours, so something sent at 11pm reads as
+ * "Yesterday" at 9am — which is what the sender meant — instead of for another
+ * nine hours.
+ */
+export function relativeStamp(iso: string, now: Date): string {
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return '';
+
+  const minutes = Math.round((now.getTime() - at.getTime()) / 60_000);
+  if (minutes < 1) return 'Just now';
+  if (minutes < 60) return `${minutes} min ago`;
+
+  const days = daysBetween(now, at);
+  if (days === 0) {
+    const hours = at.getHours();
+    const meridiem = hours < 12 ? 'AM' : 'PM';
+    const twelve = hours % 12 === 0 ? 12 : hours % 12;
+    return `${twelve}:${pad(at.getMinutes())} ${meridiem}`;
+  }
+  if (days === 1) return 'Yesterday';
+  return shortDate(at);
+}
+
+/**
+ * `Apr 18`, with no year.
+ *
+ * Past a certain age a date stops being ambiguous and a weekday name starts
+ * being the wrong kind of answer: "Sunday" for a message from two days ago
+ * could be either of the last two Sundays, and there is no way to tell which from
+ * the word. So the conversation list says "Today", "Yesterday", and then a date —
+ * never a weekday.
+ *
+ * The year is dropped only because every conversation in this area is about the
+ * current clinic year; a list that could span one would need it back.
+ */
+export function shortDate(date: Date): string {
+  return `${MONTH_NAMES[date.getMonth()]} ${date.getDate()}`;
+}
+
+/**
+ * The heading above a run of messages: "Today", "Yesterday", or a date.
+ *
+ * Separate from `relativeStamp` because the two answer different questions and
+ * collapse differently: a thread from last month is "Tuesday" in a list row but
+ * "4 Mar" as a divider, since the divider has to stay unambiguous however far
+ * back the thread goes.
+ */
+export function dayLabel(iso: string, now: Date): string {
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return '';
+
+  const days = daysBetween(now, at);
+  if (days === 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  return `${MONTH_NAMES[at.getMonth()]} ${at.getDate()}`;
+}

@@ -76,6 +76,13 @@ export const SECRETARY_ROUTES: Routes = [
           ),
       },
       {
+        path: 'messages',
+        title: 'Messages · Secretary · MediQ',
+        data: { heading: 'Messages' },
+        loadComponent: () =>
+          import('./pages/secretary-messages/secretary-messages').then((m) => m.SecretaryMessages),
+      },
+      {
         path: 'profile',
         title: 'My Profile · Secretary · MediQ',
         data: { heading: 'My Profile' },

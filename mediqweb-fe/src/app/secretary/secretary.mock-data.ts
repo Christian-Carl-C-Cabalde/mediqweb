@@ -1,6 +1,8 @@
 import { localIso, minutesOfDay } from './secretary.dates';
 import type {
   Appointment,
+  Conversation,
+  ConversationMessage,
   Doctor,
   Patient,
   ScheduleDay,
@@ -630,5 +632,161 @@ export const MOCK_APPOINTMENTS: readonly Appointment[] = [
     durationMinutes: 30,
     status: 'booked',
     reason: 'Vaccination schedule',
+  },
+];
+
+// ---------------------------------------------------------------------------
+// Messaging
+// ---------------------------------------------------------------------------
+
+/**
+ * A zone-less local timestamp `minutes` before this module was first imported.
+ *
+ * Messaging is the one fixture set whose whole point is *when* something
+ * happened: a list ordered by recency, an "1 hour ago" label and a day divider
+ * are all meaningless against hand-written dates. Anchoring on module load keeps
+ * every thread plausible whenever the app happens to be opened — a conversation
+ * cannot land in the future, and "yesterday" stays yesterday.
+ *
+ * Like `openDayOn` above, this reads the wall clock once at import rather than on
+ * every render, so the fixtures do not drift while the app is open. `SecretarySession`
+ * keeps its own `now` signal for anything that has to move with it.
+ */
+function minutesAgo(minutes: number): string {
+  const date = new Date();
+  date.setMinutes(date.getMinutes() - minutes);
+  return localIso(date);
+}
+
+/**
+ * The threads on the Secretary's desk.
+ *
+ * `partyId` points at the existing patient and doctor fixtures rather than
+ * repeating names, so a thread can never disagree with the Patients page about
+ * who somebody is — and the avatar initials come from the same source.
+ *
+ * Three of the five are `awaitingAction`, and deliberately not all of them are
+ * unread: a thread that has been read to the last word can still owe the clinic
+ * a phone call. Deriving one from the other would quietly drop that case, so the
+ * flag is its own field.
+ */
+export const MOCK_CONVERSATIONS: readonly Conversation[] = [
+  { id: 'cnv-01', party: 'patient', partyId: 'pat-211', awaitingAction: true },
+  { id: 'cnv-02', party: 'patient', partyId: 'pat-215', awaitingAction: true },
+  { id: 'cnv-03', party: 'doctor', partyId: 'doc-002', awaitingAction: true },
+  { id: 'cnv-04', party: 'patient', partyId: 'pat-205', awaitingAction: false },
+  { id: 'cnv-05', party: 'patient', partyId: 'pat-208', awaitingAction: false },
+];
+
+/**
+ * Messages across those threads, oldest first within each thread.
+ *
+ * A `readAt` of `null` is what makes a row show "New" and the nav show a count,
+ * so the unread fixtures are spread over two threads rather than piled into one
+ * — otherwise the count and the list could not disagree, and a badge that can
+ * never disagree with the list below it proves nothing.
+ *
+ * The bodies are the front desk doing its actual job: moving a lab slot,
+ * chasing a doctor for an extra opening, confirming a cancellation. That is what
+ * a Secretary's messages are for, and placeholder text would not exercise the
+ * bubble widths that make a thread readable.
+ */
+export const MOCK_MESSAGES: readonly ConversationMessage[] = [
+  // ---- cnv-01 · patient moving a lab slot. Two read, then a fresh question.
+  {
+    id: 'msg-0001',
+    conversationId: 'cnv-01',
+    sentAt: minutesAgo(320),
+    body: 'Hello, is it possible to change my scheduled lab interpretation with Dr. Oribello from 10:30 AM to the afternoon? I have a work meeting in the morning.',
+    fromSecretary: false,
+    readAt: minutesAgo(318),
+  },
+  {
+    id: 'msg-0002',
+    conversationId: 'cnv-01',
+    sentAt: minutesAgo(300),
+    body: 'Hi Elena! Let me check the schedule. Dr. Oribello has an open slot at 5:30 PM that day. Would that work for you?',
+    fromSecretary: true,
+    readAt: minutesAgo(299),
+  },
+  {
+    id: 'msg-0003',
+    conversationId: 'cnv-01',
+    sentAt: minutesAgo(12),
+    body: 'Yes please, 5:30 PM is fine. Will the results still be ready the same week?',
+    fromSecretary: false,
+    readAt: null,
+  },
+
+  // ---- cnv-02 · a brand new question, never opened.
+  {
+    id: 'msg-0004',
+    conversationId: 'cnv-02',
+    sentAt: minutesAgo(55),
+    body: 'Good afternoon. Is the immunization session on Saturday open to walk-ins, or do we need to book a slot for each child?',
+    fromSecretary: false,
+    readAt: null,
+  },
+
+  // ---- cnv-03 · a doctor offering an extra opening. Read, but still owed a reply.
+  {
+    id: 'msg-0005',
+    conversationId: 'cnv-03',
+    sentAt: minutesAgo(190),
+    body: 'Celine, I can take one extra patient on Thursday afternoon if the list is still short. Let me know by end of day.',
+    fromSecretary: false,
+    readAt: minutesAgo(188),
+  },
+  {
+    id: 'msg-0006',
+    conversationId: 'cnv-03',
+    sentAt: minutesAgo(165),
+    body: 'Noted, thank you Dr. Lim. I will confirm once the morning cancellations are in.',
+    fromSecretary: true,
+    readAt: minutesAgo(164),
+  },
+
+  // ---- cnv-04 · settled: a follow-up booking the patient has acknowledged.
+  {
+    id: 'msg-0007',
+    conversationId: 'cnv-04',
+    sentAt: minutesAgo(1560),
+    body: 'Can I book the eczema review for next week instead? The current slot clashes with my shift.',
+    fromSecretary: false,
+    readAt: minutesAgo(1558),
+  },
+  {
+    id: 'msg-0008',
+    conversationId: 'cnv-04',
+    sentAt: minutesAgo(1540),
+    body: 'Moved to the following Tuesday at 9:00 AM with Dr. Navarro. You will get a confirmation shortly.',
+    fromSecretary: true,
+    readAt: minutesAgo(1539),
+  },
+  {
+    id: 'msg-0009',
+    conversationId: 'cnv-04',
+    sentAt: minutesAgo(1500),
+    body: 'Thank you for the quick confirmation!',
+    fromSecretary: false,
+    readAt: minutesAgo(1499),
+  },
+
+  // ---- cnv-05 · settled two days ago: a cancellation the patient accepted.
+  {
+    id: 'msg-0010',
+    conversationId: 'cnv-05',
+    sentAt: minutesAgo(3000),
+    body: 'I am sorry, I need to cancel the mole screening. Something came up at work.',
+    fromSecretary: false,
+    readAt: minutesAgo(2998),
+  },
+  {
+    id: 'msg-0011',
+    conversationId: 'cnv-05',
+    sentAt: minutesAgo(2980),
+    body: 'Cancelled. No charge for a notice this short. Rebook any time and we will find you a slot.',
+    fromSecretary: true,
+    readAt: minutesAgo(2979),
   },
 ];
