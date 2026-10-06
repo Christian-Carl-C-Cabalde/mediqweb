@@ -6,9 +6,19 @@
 
 .nav {
   display: flex;
+  // `flex-grow`, not `min-height: 100%`.
+  //
+  // The host sets `min-height: 100%` but its height property is `auto`, so a
+  // percentage min-height here resolves against an indefinite parent and does
+  // nothing. The nav stayed at its content height, which left the footer's
+  // `margin-top: auto` with no free space to consume -- so Logout sat directly
+  // under the last item, 175px above the bottom of the sidebar.
+  //
+  // Growing rather than stretching means a nav taller than the sidebar still
+  // overflows and scrolls instead of being squashed to fit.
+  flex-grow: 1;
   flex-direction: column;
   gap: var(--space-6);
-  min-height: 100%;
   padding: var(--space-5) var(--space-3);
 }
 
