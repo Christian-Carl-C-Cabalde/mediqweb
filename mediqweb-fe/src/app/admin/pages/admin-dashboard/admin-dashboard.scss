@@ -10,8 +10,17 @@
   list-style: none;
 }
 
+// A log row is laid out as columns rather than flex, because in flex the only
+// variable-width part was the action badge and it pushed every subject below it
+// to a different x — a 69px spread across six rows, so the names read as a ragged
+// edge rather than a column.
+//
+// The badge track is sized to the longest action in use, "Updated patient contact
+// number" at 204px, and the subject takes the slack so a long one still has room.
+// The actor and the timestamp are fixed tracks so they read as columns too.
 .activity__item {
-  display: flex;
+  display: grid;
+  grid-template-columns: 13.5rem minmax(0, 1fr) 7rem 9rem;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-3) 0;
@@ -23,8 +32,20 @@
   padding-bottom: 0;
 }
 
+// Sized to its own text rather than stretched across the track. The track is
+// what aligns the subjects, so the chip gains nothing by filling it — and
+// "Added specialization" should not be as wide a pill as the longest label.
+//
+// `start` also means every chip begins at the same x, so the raggedness is
+// confined to the chip's right edge where a pill is expected to vary.
+.activity__action {
+  min-width: 0;
+  justify-self: start;
+  max-width: 100%;
+  overflow: hidden;
+}
+
 .activity__target {
-  flex: 1;
   min-width: 0;
   font-weight: var(--font-weight-medium);
   overflow: hidden;
@@ -32,17 +53,18 @@
   white-space: nowrap;
 }
 
+// Right-aligned against each other so the pair reads as one block against the
+// right edge, rather than the actor drifting with the length of the name.
 .activity__actor,
 .activity__when {
-  flex-shrink: 0;
+  min-width: 0;
   font-size: var(--font-size-small);
   line-height: var(--line-height-small);
   color: var(--color-text-secondary);
-}
-
-.activity__when {
-  min-width: 9rem;
   text-align: end;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .activity__empty {
@@ -50,14 +72,36 @@
   color: var(--color-text-muted);
 }
 
-// The row wraps rather than squeezing on a phone.
+// Four columns do not survive a phone, so the row becomes two rows of two: the
+// action and its subject above, then who and when.
 @media (max-width: 639px) {
   .activity__item {
-    flex-wrap: wrap;
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: var(--space-2);
+  }
+
+  .activity__action,
+  .activity__target,
+  .activity__actor,
+  .activity__when {
+    overflow: visible;
+  }
+
+  .activity__action {
+    grid-area: 1 / 1;
   }
 
   .activity__target {
-    flex-basis: 100%;
-    order: -1;
+    grid-area: 1 / 2;
+    text-align: end;
+  }
+
+  .activity__actor {
+    grid-area: 2 / 1;
+    text-align: start;
+  }
+
+  .activity__when {
+    grid-area: 2 / 2;
   }
 }

@@ -31,7 +31,7 @@
   <ul class="activity">
     @for (entry of activity(); track entry.id) {
       <li class="activity__item">
-        <ui-status-badge [tone]="severityTone(entry.severity)" size="sm">
+        <ui-status-badge class="activity__action" [tone]="severityTone(entry.severity)" size="sm">
           {{ entry.action }}
         </ui-status-badge>
         <span class="activity__target">{{ entry.target }}</span>
