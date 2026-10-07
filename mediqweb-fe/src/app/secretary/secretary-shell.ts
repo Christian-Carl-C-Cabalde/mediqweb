@@ -32,7 +32,6 @@ const SECRETARY_NAV: readonly StaffNavItem[] = [
     route: '/secretary/appointments',
   },
   { id: 'patients', label: 'Patients', icon: 'users', route: '/secretary/patients' },
-  { id: 'doctors', label: 'Doctors', icon: 'stethoscope', route: '/secretary/doctors' },
   { id: 'schedules', label: 'Schedules', icon: 'clipboard', route: '/secretary/schedules' },
   { id: 'messages', label: 'Messages', icon: 'messages', route: '/secretary/messages' },
   { id: 'profile', label: 'Profile', icon: 'settings', route: '/secretary/profile' },
