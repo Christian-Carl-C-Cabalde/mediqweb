@@ -55,18 +55,10 @@ export const SECRETARY_ROUTES: Routes = [
           ),
       },
       {
-        path: 'doctors',
-        title: 'Doctors · Secretary · MediQ',
-        data: { heading: 'Doctors' },
-        loadComponent: () =>
-          import('./pages/secretary-doctors/secretary-doctors').then((m) => m.SecretaryDoctors),
-      },
-      {
-        // `doctors` and `schedules` are siblings rather than nested: a Secretary is
-        // assigned one doctor, so the schedules page is that doctor's published
-        // week and the roster page is the same person with their booking figures.
-        // Nesting the schedule under `doctors/:id` would be a second route to keep
-        // in step with no reader who needs it — there is only one doctor here.
+        // The published week lives here and nowhere else. It used to have a
+        // sibling `doctors` page listing the same one person with their booking
+        // figures, which duplicated the week and added a second screen to keep in
+        // step; the appointments list is where booking figures are read.
         path: 'schedules',
         title: 'Schedules · Secretary · MediQ',
         data: { heading: 'Schedules' },
