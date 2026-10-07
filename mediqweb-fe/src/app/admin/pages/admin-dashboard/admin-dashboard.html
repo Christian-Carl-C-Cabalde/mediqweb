@@ -28,28 +28,38 @@
     <a class="see-all" routerLink="/admin/audit-logs">View all logs</a>
   </ng-container>
 
-  <ul class="activity">
-    @for (entry of activity(); track entry.id) {
-      <li class="activity__item">
-        <!--
-          Severity is a dot, not a filled pill. Six tinted pills stacked down the
-          side of a dashboard read as banners and made the action -- secondary
-          information -- louder than the subject it was describing.
-        -->
-        <span
-          class="activity__dot"
-          [style.background-color]="severityToken(entry.severity)"
-          aria-hidden="true"
-        ></span>
-        <span class="activity__action">{{ entry.action }}</span>
-        <span class="activity__subject">{{ entry.target }}</span>
-        <span class="activity__actor">{{ entry.actor }}</span>
-        <time class="activity__when" [attr.datetime]="entry.at">
-          {{ entry.at | date: 'MMM d, h:mm a' }}
-        </time>
-      </li>
-    } @empty {
-      <li class="activity__empty">Nothing has happened yet.</li>
-    }
-  </ul>
+  <!--
+    The list is the content of the card, so it keeps the width and the
+    breakdown of it sits beside as context. Below the layout's sidebar
+    breakpoint the two stack rather than squeezing the list's timestamps into
+    ellipses to make room for a 13rem column.
+  -->
+  <div class="activity-split">
+    <ul class="activity">
+      @for (entry of activity(); track entry.id) {
+        <li class="activity__item">
+          <!--
+            Severity is a dot, not a filled pill. Six tinted pills stacked down the
+            side of a dashboard read as banners and made the action -- secondary
+            information -- louder than the subject it was describing.
+          -->
+          <span
+            class="activity__dot"
+            [style.background-color]="severityToken(entry.severity)"
+            aria-hidden="true"
+          ></span>
+          <span class="activity__action">{{ entry.action }}</span>
+          <span class="activity__subject">{{ entry.target }}</span>
+          <span class="activity__actor">{{ entry.actor }}</span>
+          <time class="activity__when" [attr.datetime]="entry.at">
+            {{ entry.at | date: 'MMM d, h:mm a' }}
+          </time>
+        </li>
+      } @empty {
+        <li class="activity__empty">Nothing has happened yet.</li>
+      }
+    </ul>
+
+    <ui-pie-chart [slices]="severitySlices()" caption="By severity" />
+  </div>
 </ui-card>

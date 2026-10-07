@@ -69,6 +69,34 @@ describe('AdminDashboard', () => {
     expect(page().severityTone('info')).toBe('info');
   });
 
+  it('breaks the rendered list down by severity, totalling the same rows', () => {
+    const slices = page().severitySlices();
+    const total = slices.reduce((sum: number, slice: any) => sum + slice.value, 0);
+    expect(total).toBe(page().activity().length);
+    expect(slices.length).toBeGreaterThan(0);
+  });
+
+  it('counts every severity present exactly once', () => {
+    const severities = new Set(page().activity().map((entry: any) => entry.severity));
+    expect(page().severitySlices()).toHaveLength(severities.size);
+  });
+
+  it('names each slice the way the audit log page does', () => {
+    const labels: string[] = page().severitySlices().map((slice: any) => slice.label);
+    for (const label of labels) {
+      expect(['Routine', 'Needs attention', 'Problem']).toContain(label);
+    }
+  });
+
+  it('draws the breakdown beside the list, not instead of it', () => {
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.querySelector('.activity-split .activity')).toBeTruthy();
+    expect(host.querySelector('.activity-split ui-pie-chart')).toBeTruthy();
+    expect(
+      host.querySelectorAll('ui-pie-chart .pie__item').length,
+    ).toBe(page().severitySlices().length);
+  });
+
   it('states plainly that the data is a sample', () => {
     expect(text()).toContain('Sample data.');
   });

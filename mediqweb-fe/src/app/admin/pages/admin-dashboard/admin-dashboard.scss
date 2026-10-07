@@ -2,6 +2,26 @@
 // dashboard, so they come from one source rather than being copied here.
 @use '../../../shared/scss/dashboard';
 
+// Two columns inside the activity card: the list, and the severity breakdown of
+// that same list. The list keeps `minmax(0, 1fr)` so its timestamps stay pinned
+// to one right edge at any width, and the chart column is a fixed 13rem because
+// chart.js needs a width it can be certain of to lay a canvas out — an `auto`
+// track would be sized by the canvas it is meant to size.
+.activity-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 13rem;
+  gap: var(--space-6);
+  align-items: start;
+}
+
+// One column at the layout's sidebar breakpoint, where a side column would
+// leave the list too narrow to hold action, actor and timestamp on a row.
+@media (max-width: 1023px) {
+  .activity-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .activity {
   display: flex;
   flex-direction: column;
