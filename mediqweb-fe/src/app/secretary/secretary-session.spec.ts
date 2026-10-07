@@ -6,9 +6,16 @@ import {
   MOCK_DOCTORS,
   MOCK_PATIENTS,
   MOCK_SCHEDULES,
+  MOCK_SECRETARY_PROFILE,
 } from './secretary.mock-data';
 import type { Appointment } from './secretary.models';
 import { SecretarySession } from './secretary-session';
+
+/** The doctor the signed-in sample Secretary is assigned to. */
+const DESK = MOCK_SECRETARY_PROFILE.assignedDoctorId!;
+
+/** A patient on that doctor's panel, so booking tests are not refused on the patient. */
+const DESK_PATIENT = MOCK_PATIENTS.find((p) => p.doctorId === DESK)!.id;
 
 /**
  * Pins the session clock to the first *today* fixture, so the day-scoped
@@ -19,6 +26,23 @@ import { SecretarySession } from './secretary-session';
 function pinToToday(session: SecretarySession): void {
   const today = MOCK_APPOINTMENTS.find((a) => a.startsAt.slice(0, 10) === dayKey(new Date()));
   session.now.set(new Date(today?.startsAt ?? MOCK_APPOINTMENTS[0].startsAt));
+}
+
+/**
+ * Puts the session on a different doctor's desk.
+ *
+ * The fixtures are module constants and the assignment is a fact about the signed-in
+ * user, so there is no seam for handing the store another profile — and without one
+ * the two desks the sample does not cover could not be exercised at all: a desk with
+ * no doctor, a desk whose doctor is disabled, and a desk that can reach its doctor's
+ * message thread. This reaches the state the way the API would set it, which is the
+ * one thing worth testing it through.
+ */
+function assignTo(session: SecretarySession, doctorId: string | null): void {
+  (session as any).profileState.update((profile: typeof MOCK_SECRETARY_PROFILE) => ({
+    ...profile,
+    assignedDoctorId: doctorId,
+  }));
 }
 
 /** A future local timestamp `days` out at `hour`, for booking tests. */
@@ -57,44 +81,36 @@ function nextOpenDay(doctorId: string, days: number, minutesAfterOpen = 0): Date
 }
 
 /**
- * Today's opening time for a doctor who is working, at an offset no fixture has
- * taken.
+ * A free half-hour slot published by the assigned doctor today.
  *
- * Needed by any test about *today* specifically: a doctor whose only closed day
- * happened to be today would send `nextOpenDay(id, 0)` looking at tomorrow, and
- * the booking would be created correctly while failing every assertion about the
- * day it landed in. The offset is walked forward because the fixtures book the
- * opening slots of whoever is working today, so the first one is usually taken.
+ * Only the assigned doctor: another doctor's slot is refused as `not-your-doctor`
+ * before the clash check is reached, so probing the roster would hand back a slot
+ * the store then refuses to book.
  */
 function freeSlotToday(session: SecretarySession): { doctorId: string; at: Date } {
   const today = new Date().getDay();
-  const open = MOCK_DOCTORS.filter(
-    (doctor) => doctor.status === 'active' && MOCK_SCHEDULES[doctor.id][today].enabled,
-  );
-  expect(open.length, 'no doctor is working today').toBeGreaterThan(0);
+  const day = MOCK_SCHEDULES[DESK][today];
+  expect(day.enabled, 'the assigned doctor does not work today').toBe(true);
 
-  for (const doctor of open) {
-    const day = MOCK_SCHEDULES[doctor.id][today];
-    const opensAt = minutesOfDay(day.startTime)!;
-    const closesAt = minutesOfDay(day.endTime)!;
+  const opensAt = minutesOfDay(day.startTime)!;
+  const closesAt = minutesOfDay(day.endTime)!;
 
-    for (let offset = 0; offset + 30 <= closesAt - opensAt; offset += 30) {
-      const at = new Date();
-      const minutes = opensAt + offset;
-      at.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
-      if (
-        session.bookingRefusal({
-          patientId: 'pat-201',
-          doctorId: doctor.id,
-          startsAt: localIso(at),
-          durationMinutes: 30,
-          reason: 'Slot probe',
-        }) === 'doctor-busy'
-      ) {
-        continue;
-      }
-      return { doctorId: doctor.id, at };
+  for (let offset = 0; offset + 30 <= closesAt - opensAt; offset += 30) {
+    const at = new Date();
+    const minutes = opensAt + offset;
+    at.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
+    if (
+      session.bookingRefusal({
+        patientId: DESK_PATIENT,
+        doctorId: DESK,
+        startsAt: localIso(at),
+        durationMinutes: 30,
+        reason: 'Slot probe',
+      }) === 'doctor-busy'
+    ) {
+      continue;
     }
+    return { doctorId: DESK, at };
   }
 
   throw new Error('no free half-hour slot is published today');
@@ -109,47 +125,165 @@ describe('SecretarySession', () => {
     pinToToday(session);
   });
 
-  describe('the clinic-wide view', () => {
-    it('is not scoped to one doctor, unlike the Doctor area', () => {
-      // The defining difference between the two areas: a Secretary books for the
-      // whole clinic, so every doctor's appointments have to be present.
-      const doctors = new Set(session.appointments().map((a) => a.doctorId));
-      expect(doctors.size).toBeGreaterThan(1);
-      expect(session.appointments().length).toBe(MOCK_APPOINTMENTS.length);
+  describe('the assigned desk', () => {
+    it('shows only the assigned doctor appointments, not the clinic them', () => {
+      // The scoping rule everything else rests on. The fixtures stay clinic-wide
+      // precisely so this can be checked: if they were scoped too, the assertion
+      // would pass without anything having filtered anything.
+      const onDesk = MOCK_APPOINTMENTS.filter((a) => a.doctorId === DESK);
+      expect(session.appointments().length).toBe(onDesk.length);
+      expect(session.appointments().length).toBeLessThan(MOCK_APPOINTMENTS.length);
+      expect(new Set(session.appointments().map((a) => a.doctorId))).toEqual(new Set([DESK]));
     });
 
-    it('shows every patient on file, including one with no appointments', () => {
-      // A walk-in has to be bookable before they have any history, so the list
-      // is the patient table rather than something derived from appointments.
-      expect(session.patients().length).toBe(MOCK_PATIENTS.length);
+    it('shows only the assigned doctor patients, including one with no appointments', () => {
+      // A walk-in has to be bookable before they have any history, so membership
+      // comes from the patient's panel rather than from a visit they have not had.
+      const onDesk = MOCK_PATIENTS.filter((p) => p.doctorId === DESK);
+      expect(session.patients().length).toBe(onDesk.length);
+      expect(session.patients().length).toBeLessThan(MOCK_PATIENTS.length);
 
-      const unbooked = MOCK_PATIENTS.filter(
-        (p) => !MOCK_APPOINTMENTS.some((a) => a.patientId === p.id),
-      );
+      const unbooked = onDesk.filter((p) => !MOCK_APPOINTMENTS.some((a) => a.patientId === p.id));
       expect(unbooked.length).toBeGreaterThan(0);
       expect(session.patients().some((s) => s.patient.id === unbooked[0].id)).toBe(true);
+    });
+
+    it('offers one doctor and one published week', () => {
+      expect(session.doctors().length).toBe(1);
+      expect(session.doctors()[0].doctor.id).toBe(DESK);
+      expect(Object.keys(session.schedule())).toEqual([DESK]);
     });
 
     it('orders appointments soonest first', () => {
       const times = session.appointments().map((a) => a.startsAt);
       expect([...times].sort()).toEqual(times);
     });
+
+    it('counts only the visits this desk could have watched', () => {
+      // `visitCount` is built from the scoped appointments, so a patient who also
+      // saw another doctor reads as having fewer visits here. That is the honest
+      // answer, and it is the reason the figure is derived rather than stored.
+      const onDesk = MOCK_APPOINTMENTS.filter((a) => a.doctorId === DESK);
+      const done = onDesk.filter((a) => a.status === 'completed' || a.status === 'no-show');
+      expect(session.patients().reduce((total, p) => total + p.visitCount, 0)).toBe(done.length);
+    });
+  });
+
+  describe('a desk with no doctor, and a desk with a disabled one', () => {
+    // Both are reachable in the real flow: a Secretary can be created before a
+    // doctor is enabled, and an administrator can disable the doctor afterwards.
+    it('reads as empty everywhere rather than as the whole clinic', () => {
+      assignTo(session, null);
+
+      expect(session.assignedDoctor()).toBeNull();
+      expect(session.appointments()).toEqual([]);
+      expect(session.patients()).toEqual([]);
+      expect(session.doctors()).toEqual([]);
+      expect(session.schedule()).toEqual({});
+      expect(session.conversations()).toEqual([]);
+      expect(session.unreadMessageCount()).toBe(0);
+      expect(session.awaitingActionCount()).toBe(0);
+      expect(session.unassignedMessage).toContain('not assigned to a doctor');
+    });
+
+    it('refuses every booking, because there is nobody to book for', () => {
+      assignTo(session, null);
+
+      expect(
+        session.bookingRefusal({
+          patientId: DESK_PATIENT,
+          doctorId: '',
+          startsAt: localIso(nextOpenDay(DESK, 7)),
+          durationMinutes: 30,
+          reason: 'Test booking',
+        }),
+      ).toBe('no-patient');
+    });
+
+    it('shows a disabled doctor as not taking bookings', () => {
+      const inactive = MOCK_DOCTORS.find((d) => d.status === 'inactive')!;
+      assignTo(session, inactive.id);
+
+      expect(session.doctors()[0].doctor.id).toBe(inactive.id);
+      expect(session.doctors()[0].weeklyHours).toBe('Not taking bookings');
+      expect(session.activeDoctorCount()).toBe(0);
+    });
+
+    it('refuses to book for a doctor who has been disabled', () => {
+      const inactive = MOCK_DOCTORS.find((d) => d.status === 'inactive')!;
+      assignTo(session, inactive.id);
+
+      // A plain future time rather than a published slot: this doctor has no
+      // published day at all, and the store checks their status before it looks
+      // at any hour, so asking for one would fail for the wrong reason.
+      expect(
+        session.bookingRefusal({
+          patientId: MOCK_PATIENTS.find((p) => p.doctorId === inactive.id)!.id,
+          doctorId: inactive.id,
+          startsAt: futureAt(7, 10),
+          durationMinutes: 30,
+          reason: 'Test booking',
+        }),
+      ).toBe('inactive-doctor');
+    });
+  });
+
+  describe('another doctor reached by id', () => {
+    const other = MOCK_DOCTORS.find((d) => d.id !== DESK)!;
+    const otherPatient = MOCK_PATIENTS.find((p) => p.doctorId === other.id)!;
+
+    it('will not look up their patient', () => {
+      // The list filter is not the only door: a route param is a perfectly good
+      // way to ask for somebody else's record.
+      expect(session.patientById(otherPatient.id)).toBeNull();
+    });
+
+    it('returns no appointments for them, by patient or by doctor', () => {
+      expect(session.appointmentsForPatient(otherPatient.id)).toEqual([]);
+      expect(session.appointmentsForDoctor(other.id)).toEqual([]);
+    });
+
+    it('returns an empty week for them', () => {
+      expect(session.scheduleFor(other.id)).toEqual([]);
+      expect(session.weeklyMinutes(other.id)).toBe(0);
+    });
+
+    it('refuses to reschedule or cancel one of their appointments', () => {
+      // The scoped list never offers these ids, but the store refusing them is what
+      // makes the scoping something the store owns rather than a view's accident.
+      const theirs = MOCK_APPOINTMENTS.find(
+        (a) => a.doctorId === other.id && a.status === 'booked',
+      )!;
+
+      expect(session.reschedule(theirs.id, localIso(nextOpenDay(other.id, 21)))).toBe(false);
+      expect(session.cancel(theirs.id)).toBe(false);
+      expect(
+        MOCK_APPOINTMENTS.find((a) => a.id === theirs.id)!.status,
+        'the fixture is untouched, so a refusal is not a write',
+      ).toBe('booked');
+    });
+
+    it('cannot be booked for', () => {
+      expect(
+        session.bookingRefusal({
+          patientId: DESK_PATIENT,
+          doctorId: other.id,
+          startsAt: localIso(nextOpenDay(other.id, 7)),
+          durationMinutes: 30,
+          reason: 'Test booking',
+        }),
+      ).toBe('not-your-doctor');
+    });
   });
 
   describe('today', () => {
-    it("lists today's appointments for every doctor", () => {
+    it("lists today's appointments, all of them the assigned doctor's", () => {
       const today = session.todaysAppointments();
       expect(today.length).toBeGreaterThan(0);
       for (const appointment of today) {
         expect(appointment.startsAt.slice(0, 10)).toBe(dayKey(session.now()));
+        expect(appointment.doctorId).toBe(DESK);
       }
-    });
-
-    it("lists today's appointments for more than one doctor", () => {
-      // A Secretary's day is the clinic's day. If the fixtures only ever booked
-      // one provider, the dashboard and the doctor filter would look right while
-      // hiding the fact that neither has been exercised.
-      expect(new Set(session.todaysAppointments().map((a) => a.doctorId)).size).toBeGreaterThan(1);
     });
 
     it('drops a cancelled appointment from the day plan', () => {
@@ -160,7 +294,7 @@ describe('SecretarySession', () => {
       session.now.set(new Date(at.getTime() - 60_000));
 
       const created = session.book({
-        patientId: 'pat-201',
+        patientId: DESK_PATIENT,
         doctorId,
         startsAt: localIso(at),
         durationMinutes: 30,
@@ -178,7 +312,7 @@ describe('SecretarySession', () => {
       const { doctorId, at } = freeSlotToday(session);
       session.now.set(new Date(at.getTime() - 60_000));
       const created = session.book({
-        patientId: 'pat-201',
+        patientId: DESK_PATIENT,
         doctorId,
         startsAt: localIso(at),
         durationMinutes: 30,
@@ -193,9 +327,9 @@ describe('SecretarySession', () => {
 
   describe('booking rules', () => {
     const draft = (over: Partial<Parameters<SecretarySession['bookingRefusal']>[0]> = {}) => ({
-      patientId: 'pat-201',
-      doctorId: 'doc-003',
-      startsAt: localIso(nextOpenDay('doc-003', 7)),
+      patientId: DESK_PATIENT,
+      doctorId: DESK,
+      startsAt: localIso(nextOpenDay(DESK, 7)),
       durationMinutes: 30,
       reason: 'Test booking',
       ...over,
@@ -216,6 +350,13 @@ describe('SecretarySession', () => {
       expect(session.bookingRefusal(draft({ patientId: '' }))).toBe('no-patient');
     });
 
+    it('refuses a booking for a patient on another doctor desk', () => {
+      // Same refusal as an id nobody has. Telling the two apart would confirm that
+      // the patient exists somewhere in the clinic, which is what the scoping is for.
+      const elsewhere = MOCK_PATIENTS.find((p) => p.doctorId !== DESK)!;
+      expect(session.bookingRefusal(draft({ patientId: elsewhere.id }))).toBe('no-patient');
+    });
+
     it('refuses a booking with no doctor chosen', () => {
       expect(session.bookingRefusal(draft({ doctorId: '' }))).toBe('no-doctor');
     });
@@ -225,27 +366,20 @@ describe('SecretarySession', () => {
       expect(session.bookingRefusal(draft({ doctorId: 'doc-999' }))).toBe('no-doctor');
     });
 
-    it('refuses a booking for a doctor who is not taking them', () => {
-      const inactive = MOCK_DOCTORS.find((d) => d.status === 'inactive')!;
-      expect(session.bookingRefusal(draft({ doctorId: inactive.id }))).toBe('inactive-doctor');
-    });
-
-    it('refuses a booking on a day the doctor does not work', () => {
-      // doc-003's one closed weekday.
+    it('refuses a booking for a day the doctor does not work', () => {
+      // The assigned doctor's one closed weekday.
       const closed = new Date();
-      while (MOCK_SCHEDULES['doc-003'][closed.getDay()].enabled) {
+      while (MOCK_SCHEDULES[DESK][closed.getDay()].enabled) {
         closed.setDate(closed.getDate() + 1);
       }
       closed.setHours(10, 0, 0, 0);
       before(closed);
 
-      expect(
-        session.bookingRefusal(draft({ startsAt: localIso(closed), doctorId: 'doc-003' })),
-      ).toBe('day-closed');
+      expect(session.bookingRefusal(draft({ startsAt: localIso(closed) }))).toBe('day-closed');
     });
 
     it('refuses a booking before the doctor opens', () => {
-      const early = nextOpenDay('doc-003', 7, -120);
+      const early = nextOpenDay(DESK, 7, -120);
       before(early);
       expect(session.bookingRefusal(draft({ startsAt: localIso(early) }))).toBe('outside-hours');
     });
@@ -256,10 +390,10 @@ describe('SecretarySession', () => {
         .appointments()
         .filter((a) => a.status === 'booked' || a.status === 'confirmed')
         .filter((a) => new Date(a.startsAt).getTime() > session.now().getTime())
-        .find((a) => a.doctorId === 'doc-003')!;
+        .find((a) => a.doctorId === DESK)!;
 
       before(new Date(clash.startsAt));
-      expect(session.bookingRefusal(draft({ doctorId: 'doc-003', startsAt: clash.startsAt }))).toBe(
+      expect(session.bookingRefusal(draft({ doctorId: DESK, startsAt: clash.startsAt }))).toBe(
         'doctor-busy',
       );
     });
@@ -271,7 +405,7 @@ describe('SecretarySession', () => {
         .appointments()
         .filter((a) => a.status === 'booked' || a.status === 'confirmed')
         .filter((a) => new Date(a.startsAt).getTime() > session.now().getTime())
-        .find((a) => a.doctorId === 'doc-003' && a.durationMinutes === 30)!;
+        .find((a) => a.doctorId === DESK && a.durationMinutes === 30)!;
 
       const ends = new Date(first.startsAt);
       ends.setMinutes(ends.getMinutes() + first.durationMinutes);
@@ -279,7 +413,7 @@ describe('SecretarySession', () => {
 
       expect(
         session.bookingRefusal(
-          draft({ doctorId: 'doc-003', startsAt: localIso(ends), durationMinutes: 30 }),
+          draft({ doctorId: DESK, startsAt: localIso(ends), durationMinutes: 30 }),
         ),
       ).not.toBe('doctor-busy');
     });
@@ -315,7 +449,7 @@ describe('SecretarySession', () => {
       // The last half hour of the published window, booked for longer than it
       // lasts: still starting inside the hours, but no longer finishing inside
       // them.
-      const late = nextOpenDay('doc-003', 7, 150);
+      const late = nextOpenDay(DESK, 7, 150);
       before(late);
       expect(session.bookingRefusal(draft({ startsAt: localIso(late), durationMinutes: 45 }))).toBe(
         'ends-after-close',
@@ -326,7 +460,7 @@ describe('SecretarySession', () => {
       // The boundary is inclusive: a slot finishing at the moment the doctor
       // closes is a legitimate booking, and refusing it would waste the last
       // half hour of every clinic day.
-      const closing = nextOpenDay('doc-003', 7, 120);
+      const closing = nextOpenDay(DESK, 7, 120);
       before(closing);
       expect(
         session.bookingRefusal(draft({ startsAt: localIso(closing), durationMinutes: 60 })),
@@ -337,13 +471,13 @@ describe('SecretarySession', () => {
   describe('rescheduling', () => {
     let live: Appointment;
 
-    /** A future live appointment of `doc-003`, with the clock moved before it. */
+    /** A future live appointment of the assigned doctor, with the clock moved before it. */
     function futureLive(): Appointment {
       return session
         .appointments()
         .filter((a) => a.status === 'booked' || a.status === 'confirmed')
         .filter((a) => new Date(a.startsAt).getTime() > session.now().getTime())
-        .find((a) => a.doctorId === 'doc-003')!;
+        .find((a) => a.doctorId === DESK)!;
     }
 
     beforeEach(() => {
@@ -351,7 +485,7 @@ describe('SecretarySession', () => {
     });
 
     it('moves a booking into a free published slot and keeps its status', () => {
-      const target = nextOpenDay('doc-003', 21);
+      const target = nextOpenDay(DESK, 21);
       session.now.set(new Date(target.getTime() - 60_000));
 
       expect(session.reschedule(live.id, localIso(target))).toBe(true);
@@ -362,7 +496,7 @@ describe('SecretarySession', () => {
     });
 
     it('keeps the patient, doctor and duration of a moved appointment', () => {
-      const target = nextOpenDay('doc-003', 21);
+      const target = nextOpenDay(DESK, 21);
       session.now.set(new Date(target.getTime() - 60_000));
       session.reschedule(live.id, localIso(target));
 
@@ -398,7 +532,7 @@ describe('SecretarySession', () => {
 
     it('refuses a move outside the doctor published hours', () => {
       const closed = new Date();
-      while (MOCK_SCHEDULES['doc-003'][closed.getDay()].enabled) {
+      while (MOCK_SCHEDULES[DESK][closed.getDay()].enabled) {
         closed.setDate(closed.getDate() + 1);
       }
       closed.setHours(10, 0, 0, 0);
@@ -409,7 +543,7 @@ describe('SecretarySession', () => {
 
     it('refuses to move an appointment that has already finished', () => {
       const finished = session.appointments().find((a) => a.status === 'completed')!;
-      const target = nextOpenDay('doc-003', 21);
+      const target = nextOpenDay(DESK, 21);
       session.now.set(new Date(target.getTime() - 60_000));
       expect(session.reschedule(finished.id, localIso(target))).toBe(false);
     });
@@ -418,11 +552,11 @@ describe('SecretarySession', () => {
       // Its time no longer matters, and reviving one silently would make a
       // cancellation reversible without anyone deciding to.
       const cancelled = session.appointments().find((a) => a.status === 'cancelled')!;
-      expect(session.reschedule(cancelled.id, localIso(nextOpenDay('doc-003', 21)))).toBe(false);
+      expect(session.reschedule(cancelled.id, localIso(nextOpenDay(DESK, 21)))).toBe(false);
     });
 
     it('refuses an id that matches no appointment', () => {
-      expect(session.reschedule('appt-999', localIso(nextOpenDay('doc-003', 21)))).toBe(false);
+      expect(session.reschedule('appt-999', localIso(nextOpenDay(DESK, 21)))).toBe(false);
     });
   });
 
@@ -445,37 +579,24 @@ describe('SecretarySession', () => {
     });
   });
 
-  describe('doctors and their schedules', () => {
-    it('lists every doctor, including one who is inactive', () => {
-      expect(session.doctors().length).toBe(MOCK_DOCTORS.length);
-      expect(session.doctors().some((s) => s.doctor.status === 'inactive')).toBe(true);
+  describe('the doctor and their schedule', () => {
+    it('lists the assigned doctor and nobody else', () => {
+      expect(session.doctors().map((s) => s.doctor.id)).toEqual([DESK]);
     });
 
-    it('counts only active doctors as taking bookings', () => {
-      expect(session.activeDoctorCount()).toBe(
-        MOCK_DOCTORS.filter((d) => d.status === 'active').length,
-      );
+    it('counts the assigned doctor as taking bookings', () => {
+      const desk = MOCK_DOCTORS.find((d) => d.id === DESK)!;
+      expect(session.activeDoctorCount()).toBe(desk.status === 'active' ? 1 : 0);
     });
 
-    it('summarises an inactive doctor as not taking bookings', () => {
-      const inactive = MOCK_DOCTORS.find((d) => d.status === 'inactive')!;
-      expect(session.doctors().find((s) => s.doctor.id === inactive.id)?.weeklyHours).toBe(
-        'Not taking bookings',
-      );
+    it('summarises the assigned doctor weekly hours from what they publish', () => {
+      // doc-003 works six mornings of three hours, Monday closed.
+      expect(session.doctors()[0].weeklyHours).toBe('18h a week');
     });
 
-    it('gives every doctor a seven-day week', () => {
-      for (const doctor of MOCK_DOCTORS) {
-        expect(session.scheduleFor(doctor.id)).toHaveLength(7);
-      }
-    });
-
-    it('sorts each week Sunday-first', () => {
-      for (const doctor of MOCK_DOCTORS) {
-        expect(session.scheduleFor(doctor.id).map((d) => d.dayOfWeek)).toEqual([
-          0, 1, 2, 3, 4, 5, 6,
-        ]);
-      }
+    it('gives the assigned doctor a seven-day week, Sunday-first', () => {
+      expect(session.scheduleFor(DESK).map((d) => d.dayOfWeek)).toEqual([0, 1, 2, 3, 4, 5, 6]);
+      expect(session.scheduleFor(DESK)).toHaveLength(7);
     });
 
     it('returns an empty week for an id that matches nobody', () => {
@@ -485,13 +606,11 @@ describe('SecretarySession', () => {
     });
 
     it('counts published minutes per week', () => {
-      for (const doctor of MOCK_DOCTORS) {
-        const expected = MOCK_SCHEDULES[doctor.id].reduce((total, day) => {
-          if (!day.enabled) return total;
-          return total + (minutesOfDay(day.endTime)! - minutesOfDay(day.startTime)!);
-        }, 0);
-        expect(session.weeklyMinutes(doctor.id)).toBe(expected);
-      }
+      const expected = MOCK_SCHEDULES[DESK].reduce((total, day) => {
+        if (!day.enabled) return total;
+        return total + (minutesOfDay(day.endTime)! - minutesOfDay(day.startTime)!);
+      }, 0);
+      expect(session.weeklyMinutes(DESK)).toBe(expected);
     });
 
     it('places every fixture appointment inside its doctor published hours', () => {
@@ -544,13 +663,19 @@ describe('SecretarySession', () => {
       }
     });
 
-    it('refuses nothing about the clinic own live appointments', () => {
+    it('refuses nothing about this desk own live appointments', () => {
       // The end-to-end version of the hours check: with the clock a week back,
-      // every fixture booking is one the store itself would accept. This is what
-      // catches a schedule edited without the appointments being moved with it.
+      // every fixture booking on this desk is one the store itself would accept.
+      // This is what catches a schedule edited without the appointments being
+      // moved with it — and it only covers this desk, because an appointment
+      // belonging to another doctor is refused before any hour is considered.
       session.now.set(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
-      for (const appointment of MOCK_APPOINTMENTS) {
-        if (appointment.status !== 'booked' && appointment.status !== 'confirmed') continue;
+      const live = MOCK_APPOINTMENTS.filter(
+        (a) => a.doctorId === DESK && (a.status === 'booked' || a.status === 'confirmed'),
+      );
+      expect(live.length).toBeGreaterThan(0);
+
+      for (const appointment of live) {
         expect(
           session.bookingRefusal(
             {
@@ -568,6 +693,31 @@ describe('SecretarySession', () => {
         ).toBeNull();
       }
     });
+
+    it('refuses every other doctor fixture appointment as off this desk', () => {
+      // The same data from the other side: on somebody else's appointment the
+      // store's answer is the scoping rule, not an hours complaint. Which of the two
+      // refusals comes back depends on whether the patient happens to be on this
+      // panel — a patient who also saw this doctor gets `not-your-doctor`, one who
+      // does not gets `no-patient` first — and both are the scoping rule.
+      session.now.set(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
+      const theirs = MOCK_APPOINTMENTS.filter((a) => a.doctorId !== DESK);
+      expect(theirs.length).toBeGreaterThan(0);
+
+      for (const appointment of theirs) {
+        const refusal = session.bookingRefusal(
+          {
+            patientId: appointment.patientId,
+            doctorId: appointment.doctorId,
+            startsAt: appointment.startsAt,
+            durationMinutes: appointment.durationMinutes,
+            reason: appointment.reason,
+          },
+          appointment.id,
+        );
+        expect(['no-patient', 'not-your-doctor'], appointment.id).toContain(refusal);
+      }
+    });
   });
 
   describe('messaging', () => {
@@ -578,11 +728,33 @@ describe('SecretarySession', () => {
     // sort into the middle of the thread, so messaging starts from the real clock.
     beforeEach(() => session.now.set(new Date()));
 
-    it('lists every conversation, most recently active first', () => {
-      expect(session.conversations().length).toBe(MOCK_CONVERSATIONS.length);
+    it('lists only this desk threads, most recently active first', () => {
+      // Resolved through the party rather than compared to the id directly: a
+      // patient thread points at a patient, and reading it as a doctor id would
+      // leave this desk with no patient messages at all.
+      const expected = MOCK_CONVERSATIONS.filter((conversation) =>
+        conversation.party === 'doctor'
+          ? conversation.partyId === DESK
+          : MOCK_PATIENTS.find((p) => p.id === conversation.partyId)?.doctorId === DESK,
+      );
+      expect(expected.length).toBeGreaterThan(0);
+      expect(expected.length).toBeLessThan(MOCK_CONVERSATIONS.length);
+      expect(session.conversations().length).toBe(expected.length);
 
       const times = session.conversations().map((c) => c.lastSentAt);
       expect([...times].sort().reverse()).toEqual(times);
+    });
+
+    it('does not count threads belonging to another desk in either badge', () => {
+      // The nav badges read these, so a clinic-wide count here would put another
+      // Secretary's patients in the number over this desk's head.
+      const theirs = MOCK_CONVERSATIONS.filter(
+        (c) => !session.conversations().some((s) => s.conversation.id === c.id),
+      );
+      expect(theirs.length).toBeGreaterThan(0);
+      expect(session.awaitingActionCount()).toBe(
+        session.conversations().filter((c) => c.conversation.awaitingAction).length,
+      );
     });
 
     it('names each conversation after the patient or doctor fixture it points at', () => {
@@ -681,6 +853,19 @@ describe('SecretarySession', () => {
       expect(session.sendMessage('cnv-nope', 'Hello?')).toBeNull();
     });
 
+    it('refuses to read or reply to a thread on another desk', () => {
+      // Same refusal as an unknown id: a thread on another desk is not something
+      // this session can act on at all, and saying so differently would confirm it
+      // exists.
+      const theirs = MOCK_CONVERSATIONS.find(
+        (c) => !session.conversations().some((s) => s.conversation.id === c.id),
+      )!;
+
+      expect(session.conversationById(theirs.id)).toBeNull();
+      expect(session.sendMessage(theirs.id, 'Hello?')).toBeNull();
+      expect(session.markConversationRead(theirs.id)).toBe(false);
+    });
+
     it('gives two replies in a session different ids', () => {
       // Checked against the live list rather than the fixtures, for the same
       // reason appointment ids are: a collision would overwrite the first reply.
@@ -718,6 +903,11 @@ describe('SecretarySession', () => {
     });
 
     it('describes a doctor by specialty, not by visit count', () => {
+      // Reached by putting the session on that doctor's desk: the sample's own
+      // doctor thread belongs to somebody else, which is the point of the filter.
+      const thread = MOCK_CONVERSATIONS.find((c) => c.party === 'doctor')!;
+      assignTo(session, thread.partyId);
+
       const doctor = session.conversations().find((c) => c.conversation.party === 'doctor')!;
       const expected = session.doctorById(doctor.conversation.partyId)!.specialization;
       expect(session.conversationSubtitle(doctor.conversation)).toBe(`Doctor · ${expected}`);
@@ -736,6 +926,21 @@ describe('SecretarySession', () => {
       expect(after.name).toBe('New Name');
       expect(after.email).toBe('new@mediq.ph');
       expect(after.joinedOn).toBe(before.joinedOn);
+    });
+
+    it('cannot be used to reassign the Secretary to another doctor', () => {
+      // The assignment is an administrator's to make. It is not in the
+      // `ProfileDraft` type, and this checks the store agrees at runtime rather
+      // than only at compile time.
+      const before = session.profile().assignedDoctorId;
+      session.updateProfile({
+        name: 'New Name',
+        email: 'new@mediq.ph',
+        phone: '+63 900 000 0000',
+        assignedDoctorId: MOCK_DOCTORS.find((d) => d.id !== DESK)!.id,
+      } as any);
+
+      expect(session.profile().assignedDoctorId).toBe(before);
     });
   });
 });

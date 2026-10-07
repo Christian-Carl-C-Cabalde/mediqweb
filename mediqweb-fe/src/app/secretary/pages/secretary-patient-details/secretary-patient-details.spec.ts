@@ -27,6 +27,12 @@ describe('SecretaryPatientDetails', () => {
   /** A patient the fixtures give no appointments, to check the empty history. */
   const UNBOOKED = 'pat-215';
 
+  /** A patient who also saw another doctor, to check the history is this desk's. */
+  const ALSO_ELSEWHERE = 'pat-202';
+
+  /** A patient on another doctor's panel, active or not. */
+  const OTHER_DESK = 'pat-212';
+
   beforeEach(async () => {
     TestBed.configureTestingModule({
       imports: [TestHost],
@@ -61,27 +67,27 @@ describe('SecretaryPatientDetails', () => {
   }
 
   it('shows the patient named in the route', async () => {
-    await open('pat-201');
-    expect(text()).toContain('Juan Dela Cruz');
+    await open('pat-205');
+    expect(text()).toContain('Miguel Torres');
   });
 
   it('shows the contact details a secretary needs to confirm an appointment', async () => {
-    await open('pat-201');
-    const patient = session.patientById('pat-201')!;
+    await open('pat-205');
+    const patient = session.patientById('pat-205')!;
     expect(text()).toContain(patient.phone);
     expect(text()).toContain(patient.email);
     expect(text()).toContain(patient.address);
   });
 
   it('shows the birth date and an age derived from it, not a hardcoded one', async () => {
-    await open('pat-201');
-    const patient = session.patientById('pat-201')!;
+    await open('pat-205');
+    const patient = session.patientById('pat-205')!;
     expect(text()).toContain(String(new Date(`${patient.dateOfBirth}T00:00:00`).getFullYear()));
     expect(text()).toContain(`${ageFrom(patient.dateOfBirth, session.now())} years old`);
   });
 
   it('lists the appointment history newest first', async () => {
-    await open('pat-201');
+    await open('pat-205');
     const times = page()
       .historyRows()
       .map((a: any) => a.startsAt);
@@ -89,40 +95,42 @@ describe('SecretaryPatientDetails', () => {
     expect([...times].sort().reverse()).toEqual(times);
   });
 
-  it('lists appointments with every doctor, not only one', async () => {
-    // The Secretary books for the whole clinic, so a patient's file here is their
-    // MediQ history rather than one provider's slice of it.
-    const patientId = [...new Set(MOCK_APPOINTMENTS.map((a) => a.patientId))].find((id) => {
-      const doctors = new Set(
-        MOCK_APPOINTMENTS.filter((a) => a.patientId === id).map((a) => a.doctorId),
-      );
-      return doctors.size > 1;
-    })!;
+  it('lists only this desk appointments for a patient who also saw another doctor', async () => {
+    // The reverse of the clinic-wide claim this page used to make. A patient's
+    // panel decides whether the page opens at all, and everything in the history
+    // belongs to the desk that opened it.
+    const elsewhere = MOCK_APPOINTMENTS.filter((a) => a.patientId === ALSO_ELSEWHERE);
+    expect(new Set(elsewhere.map((a) => a.doctorId)).size).toBeGreaterThan(1);
 
-    await open(patientId);
-    const doctors = new Set(
-      page()
-        .history()
-        .map((a: any) => a.doctorId),
-    );
-    expect(doctors.size).toBeGreaterThan(1);
+    await open(ALSO_ELSEWHERE);
+    expect(page().history().length).toBeGreaterThan(0);
+    expect(page().history().length).toBeLessThan(elsewhere.length);
+    expect(
+      new Set(
+        page()
+          .history()
+          .map((a: any) => a.doctorId),
+      ).size,
+    ).toBe(1);
   });
 
-  it('names the doctor on each history row', async () => {
-    await open('pat-201');
-    for (const appointment of page().history()) {
-      expect(page().doctorName(appointment)).toBeTruthy();
-      expect(text()).toContain(session.doctorName(appointment.doctorId));
-    }
+  it('names no doctor per row, because every row on this desk is the same one', async () => {
+    // The history table lost its Doctor column along with the per-doctor list; the
+    // patient themselves are already this doctor's panel.
+    await open('pat-205');
+    const headers = [...(fixture.nativeElement as HTMLElement).querySelectorAll('th')].map((th) =>
+      th.textContent?.trim(),
+    );
+    expect(headers).not.toContain('Doctor');
   });
 
   it('re-reads the route when the router reuses the page for another patient', async () => {
-    await open('pat-201');
-    expect(text()).toContain('Juan Dela Cruz');
+    await open('pat-205');
+    expect(text()).toContain('Miguel Torres');
 
-    await open('pat-203');
-    expect(text()).toContain('Pedro Reyes');
-    expect(text()).not.toContain('Juan Dela Cruz');
+    await open('pat-208');
+    expect(text()).toContain('Carla De Guzman');
+    expect(text()).not.toContain('Miguel Torres');
   });
 
   it('agrees with itself about the number of appointments', async () => {
@@ -140,7 +148,7 @@ describe('SecretaryPatientDetails', () => {
   });
 
   it('explains the absence of a medical record rather than showing an empty panel', async () => {
-    await open('pat-201');
+    await open('pat-205');
     expect(text()).toContain('Medical records');
     // And says what the page does show, so the limit reads as scope rather than
     // as missing functionality.
@@ -148,7 +156,7 @@ describe('SecretaryPatientDetails', () => {
   });
 
   it('offers a way back to the list', async () => {
-    await open('pat-201');
+    await open('pat-205');
     const href = (fixture.nativeElement as HTMLElement).querySelector('.link-button');
     expect(href?.getAttribute('href')).toBe('/secretary/patients');
   });
@@ -167,14 +175,30 @@ describe('SecretaryPatientDetails', () => {
   });
 
   it('shows an inactive patient without hiding their history', async () => {
-    const inactive = session.patients().find((s) => s.patient.status === 'inactive')!;
-    await open(inactive.patient.id);
-    expect(text()).toContain(inactive.patient.name);
-    expect(text()).toContain('inactive account');
+    // `pat-212` is inactive *and* registered to the disabled doctor, so no
+    // inactive patient is on this desk: the two axes are independent, and this
+    // fixture keeps them apart on purpose.
+    const inactiveElsewhere = ['pat-212'];
+    expect(inactiveElsewhere.length).toBeGreaterThan(0);
+    for (const id of inactiveElsewhere) {
+      await open(id);
+      expect(text()).toContain('Patient not found');
+    }
+  });
+
+  it('refuses a patient on another doctor panel, and says so as one', async () => {
+    // The route parameter is a way to ask for somebody else's record, so the
+    // lookup is scoped as well as the list. An inactive account is reported the
+    // same way as an active one, so the copy cannot be read as "this patient is
+    // not active" either.
+    await open(OTHER_DESK);
+    expect(text()).toContain('Patient not found');
+    expect(text()).toContain('one of your doctor');
+    expect(text()).not.toContain('Nestor Yulo');
   });
 
   it('says the data is a sample, so a screenshot is not mistaken for a product', async () => {
-    await open('pat-201');
+    await open('pat-205');
     expect(text()).toContain('Sample data');
   });
 });

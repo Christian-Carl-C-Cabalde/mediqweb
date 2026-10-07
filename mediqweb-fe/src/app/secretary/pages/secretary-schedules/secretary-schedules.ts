@@ -1,23 +1,16 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import {
-  Avatar,
-  Button,
-  Card,
-  MockNotice,
-  StatusBadge,
-  type BadgeTone,
-} from '../../../shared/components';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { Avatar, Card, MockNotice, StatusBadge, type BadgeTone } from '../../../shared/components';
 import { DAY_NAMES, formatDuration } from '../../secretary.dates';
 import { SecretarySession } from '../../secretary-session';
 import type { DoctorSummary, ScheduleDay } from '../../secretary.models';
 
 /**
- * Every doctor's published week, side by side.
+ * The assigned doctor's published week.
  *
- * A Secretary's real question is "who is free on Thursday?", which a per-doctor
- * page answers one doctor at a time. Laying the weeks out together turns the
- * question into a single glance down a column, which is why this is one page for
- * all doctors rather than `/doctors/:id/schedule`.
+ * This page used to lay every doctor's week out side by side, because a Secretary's
+ * real question was "who is free on Thursday?" — a question only a clinic-wide desk
+ * has to ask. A Secretary assigned to one doctor has one week to book inside, so the
+ * page is that week, and the "who else is free" question is somebody else's.
  *
  * Read-only on purpose: a doctor publishes their own hours from the Doctor area,
  * and a Secretary editing them would make the published week depend on who last
@@ -26,7 +19,7 @@ import type { DoctorSummary, ScheduleDay } from '../../secretary.models';
  */
 @Component({
   selector: 'app-secretary-schedules',
-  imports: [Avatar, Button, Card, MockNotice, StatusBadge],
+  imports: [Avatar, Card, MockNotice, StatusBadge],
   templateUrl: './secretary-schedules.html',
   styleUrl: './secretary-schedules.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -36,14 +29,10 @@ export class SecretarySchedules {
 
   protected readonly dayNames = DAY_NAMES;
 
-  /** Filters the weeks to one doctor when set; otherwise shows every doctor. */
-  protected readonly selectedDoctorId = signal<string | null>(null);
+  /** The one doctor on this desk, so an empty list means unassigned. */
+  protected readonly doctors = computed<DoctorSummary[]>(() => this.session.doctors());
 
-  protected readonly doctors = computed<DoctorSummary[]>(() => {
-    const selected = this.selectedDoctorId();
-    const all = this.session.doctors();
-    return selected ? all.filter((summary) => summary.doctor.id === selected) : all;
-  });
+  protected readonly unassignedMessage = this.session.unassignedMessage;
 
   /** A doctor's week, sorted Sunday-first, ready for the grid. */
   protected daysFor(summary: DoctorSummary): ScheduleDay[] {
@@ -60,7 +49,7 @@ export class SecretarySchedules {
     return `${day.startTime} – ${day.endTime}`;
   }
 
-  /** The summary line above each doctor's week. */
+  /** The summary line above the week's hours. */
   protected publishedFor(summary: DoctorSummary): string {
     const days = this.daysFor(summary);
     const open = days.filter((day) => day.enabled).length;
@@ -72,20 +61,6 @@ export class SecretarySchedules {
 
   protected statusTone(summary: DoctorSummary): BadgeTone {
     return summary.doctor.status === 'active' ? 'success' : 'neutral';
-  }
-
-  protected selectDoctor(id: string | null): void {
-    // Toggling the active doctor clears the filter, so the same control reads as
-    // "show one" and "show all again" rather than needing a separate button.
-    this.selectedDoctorId.update((current) => (current === id ? null : id));
-  }
-
-  protected isSelected(id: string): boolean {
-    return this.selectedDoctorId() === id;
-  }
-
-  protected reset(): void {
-    this.selectedDoctorId.set(null);
   }
 
   /** Appointments this doctor has left to come, for the "how busy" footnote. */

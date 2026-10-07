@@ -263,6 +263,34 @@
         </ui-form-field>
       </div>
     }
+
+    <!--
+      The mirror of the section above: a doctor has a specialty and a licence, a
+      secretary has a desk. The assignment is what every screen in the Secretary
+      area is scoped by, so it is asked for at creation rather than left blank
+      and patched later — a secretary with no doctor signs in to an empty area.
+    -->
+    @if (kind() === 'secretary') {
+      <h3 class="form-section">Secretary details</h3>
+
+      <ui-form-field
+        label="Assigned doctor"
+        controlId="add-assigned-doctor"
+        [required]="true"
+        [hint]="assignedDoctorHint()"
+        [error]="assignedDoctorError()"
+      >
+        <!-- Same read-back as the specialty field: `ui-dropdown` is not a form
+             control, so the trigger text is kept in step by hand. -->
+        <ui-dropdown
+          id="add-assigned-doctor"
+          [items]="assignedDoctorItems()"
+          [selected]="form.controls.assignedDoctorId.value"
+          placeholder="Select doctor"
+          (selectionChange)="onAssignedDoctorChange($event)"
+        />
+      </ui-form-field>
+    }
   </form>
 
   <ng-container modalFooter>

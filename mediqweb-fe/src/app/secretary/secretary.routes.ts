@@ -62,11 +62,11 @@ export const SECRETARY_ROUTES: Routes = [
           import('./pages/secretary-doctors/secretary-doctors').then((m) => m.SecretaryDoctors),
       },
       {
-        // `doctors` and `schedules` are siblings rather than nested: the schedules
-        // page shows every doctor's week side by side, which is how a Secretary
-        // reads them when answering "who is free on Thursday?". Nesting it under
-        // `doctors/:id` would mean an extra click for the common case and a
-        // second route to keep in step.
+        // `doctors` and `schedules` are siblings rather than nested: a Secretary is
+        // assigned one doctor, so the schedules page is that doctor's published
+        // week and the roster page is the same person with their booking figures.
+        // Nesting the schedule under `doctors/:id` would be a second route to keep
+        // in step with no reader who needs it — there is only one doctor here.
         path: 'schedules',
         title: 'Schedules · Secretary · MediQ',
         data: { heading: 'Schedules' },

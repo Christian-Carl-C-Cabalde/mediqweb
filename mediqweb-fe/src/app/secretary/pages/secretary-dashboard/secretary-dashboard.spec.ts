@@ -38,13 +38,8 @@ describe('SecretaryDashboard', () => {
     return (fixture.nativeElement as HTMLElement).textContent ?? '';
   }
 
-  it("counts today's appointments", () => {
+  it('counts todays appointments, all of them this desk', () => {
     expect(page().todayCount()).toBe(session.todaysAppointments().length);
-  });
-
-  it("shows today's appointments for the whole clinic, not one doctor", () => {
-    // The defining claim of this screen: a Secretary's day is the clinic's day.
-    // One doctor's diary would be the Doctor area's dashboard instead.
     expect(page().today().length).toBeGreaterThan(0);
     expect(
       new Set(
@@ -52,7 +47,17 @@ describe('SecretaryDashboard', () => {
           .today()
           .map((a: any) => a.doctorId),
       ).size,
-    ).toBeGreaterThan(1);
+    ).toBe(1);
+  });
+
+  it('names the assigned doctor on the stats, so the numbers are not the clinic ones', () => {
+    // "Across all doctors" was true of this page and false of everything else in
+    // the area. The count belongs to one doctor, so the card says whose it is.
+    const doctor = session.doctors()[0].doctor;
+    expect(doctor.name).toBeTruthy();
+    expect(page().assignedDoctor().id).toBe(doctor.id);
+    expect(text()).toContain(doctor.name);
+    expect(text()).not.toContain('Across all doctors');
   });
 
   it('counts the bookings still waiting on a confirmation', () => {
@@ -61,14 +66,19 @@ describe('SecretaryDashboard', () => {
     );
   });
 
-  it('counts every patient on file, not just those with appointments', () => {
+  it('counts this desk patients, not every patient on file', () => {
     expect(page().patientCount()).toBe(session.patients().length);
+    expect(text()).toContain('On this doctor');
   });
 
-  it('counts only the doctors taking bookings', () => {
-    expect(page().doctorCount()).toBe(
-      session.doctors().filter((s) => s.doctor.status === 'active').length,
-    );
+  it('counts what has been completed this week instead of doctors available', () => {
+    // The "N doctors available" stat counted to one on this desk, every morning,
+    // which is not a fact anybody acts on. What the desk can act on is how much
+    // of the week is already done.
+    expect(page().doctorCount).toBeUndefined();
+    expect(page().availableDoctors).toBeUndefined();
+    expect(page().completedCount()).toBe(session.completedThisWeek().length);
+    expect(text()).toContain('Seen in the last 7 days');
   });
 
   it("lists today's appointments by time", () => {
@@ -78,16 +88,21 @@ describe('SecretaryDashboard', () => {
     expect([...times].sort()).toEqual(times);
   });
 
-  it('names the patient and the doctor on every row of the day list', () => {
-    // The Secretary answers "is that mine, and with whom" — a time alone is not
-    // enough to act on.
+  it('names the patient on every row of the day list, and the doctor once', () => {
+    // The day list no longer repeats the doctor's name per row: there is one
+    // doctor, and the stat card above already says who.
     for (const appointment of page().today()) {
       expect(text()).toContain(session.patientName(appointment.patientId));
-      expect(text()).toContain(session.doctorName(appointment.doctorId));
+    }
+    const reasons = [
+      ...(fixture.nativeElement as HTMLElement).querySelectorAll('.agenda__reason'),
+    ].map((node) => node.textContent?.trim() ?? '');
+    for (const reason of reasons) {
+      expect(reason).not.toContain(session.doctors()[0].doctor.name);
     }
   });
 
-  it("links each appointment to the patient's details", () => {
+  it('links each appointment to the patient details', () => {
     const hrefs = [
       ...(fixture.nativeElement as HTMLElement).querySelectorAll('.agenda__patient'),
     ].map((a) => a.getAttribute('href'));
@@ -95,24 +110,12 @@ describe('SecretaryDashboard', () => {
     expect(hrefs[0]).toMatch(/^\/secretary\/patients\//);
   });
 
-  it('offers only doctors who are taking bookings as available', () => {
-    // An inactive doctor is not somewhere a patient can be sent, so listing them
-    // here would invite a booking the form then refuses.
-    expect(page().availableDoctors().length).toBeGreaterThan(0);
-    for (const summary of page().availableDoctors()) {
-      expect(summary.doctor.status).toBe('active');
-    }
-  });
-
-  it('orders the available doctors by how much room is left today', () => {
-    const booked = page()
-      .availableDoctors()
-      .map((s: any) => page().bookedToday(s));
-    expect([...booked].sort((a: number, b: number) => a - b)).toEqual(booked);
-  });
-
-  it('caps the available-doctor list so the side column stays scannable', () => {
-    expect(page().availableDoctors().length).toBeLessThanOrEqual(5);
+  it('no longer lists doctors who are free, because there is only one doctor', () => {
+    // The card this column ended with asked "who can I still book?" — a question
+    // for a clinic-wide desk. A one-row answer is not a list, so the card is gone.
+    expect(page().bookedToday).toBeUndefined();
+    expect(text()).not.toContain('Available doctors');
+    expect(text()).not.toContain('No doctors are taking bookings');
   });
 
   it('shows the next appointment, not a past one', () => {
@@ -150,5 +153,19 @@ describe('SecretaryDashboard', () => {
 
   it('says the data is a sample, so a screenshot is not mistaken for a product', () => {
     expect(text()).toContain('Sample data');
+  });
+
+  it('says so plainly when the desk has no doctor, instead of four empty cards', () => {
+    // An unassigned desk is not a quiet day. This is the first screen somebody
+    // lands on, so it is where the reason has to be.
+    (session as any).profileState.update((profile: any) => ({
+      ...profile,
+      assignedDoctorId: null,
+    }));
+    fixture.detectChanges();
+
+    expect(text()).toContain('not assigned to a doctor');
+    expect(text()).not.toContain('Nothing booked in for today');
+    expect(page().assignedDoctor()).toBeNull();
   });
 });

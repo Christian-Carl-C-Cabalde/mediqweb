@@ -7,8 +7,10 @@ import type { AccountStatus } from '../shared/domain/account-status';
  * business rules — every screen is static until a real service replaces
  * `SecretarySession`.
  *
- * The Secretary manages appointments for all doctors and sees all patients.
- * Unlike the Doctor area, there is no scoping to a single provider.
+ * The Secretary works one doctor's desk: an administrator assigns them to a
+ * doctor, and every appointment, patient and schedule here is that doctor's. The
+ * records stay clinic-wide in the fixtures — there is one clinic — but nothing
+ * below is reachable without going through the assignment first.
  */
 
 /**
@@ -64,6 +66,17 @@ export interface Patient {
   /** ISO date. */
   readonly registeredOn: string;
   readonly status: AccountStatus;
+  /**
+   * The doctor whose panel this patient is registered with.
+   *
+   * An attribute of the registration rather than something derived from
+   * appointments, and that is the whole reason it is here: a patient who has
+   * never had an appointment has no appointment to derive it from, so a panel
+   * derived that way would make every walk-in invisible to the desk that has to
+   * book them. It is a required id for the same reason `Appointment.doctorId` is
+   * — a patient on the books belongs to somebody.
+   */
+  readonly doctorId: string;
 }
 
 /** A patient plus the visit figures the list and dashboard need. */
@@ -111,6 +124,16 @@ export interface SecretaryProfile {
   readonly phone: string;
   /** ISO date. */
   readonly joinedOn: string;
+  /**
+   * The doctor whose desk this Secretary works, or null while unassigned.
+   *
+   * Set by an administrator, not by the Secretary: it arrives with the signed-in
+   * user and is the one fact every screen in this area is scoped by. Null is a
+   * real state rather than a placeholder — a desk with no doctor yet — so the
+   * screens can say so instead of showing an empty list that looks like a quiet
+   * day. With real authentication this field is a field on the current user.
+   */
+  readonly assignedDoctorId: string | null;
 }
 
 // ---------------------------------------------------------------------------

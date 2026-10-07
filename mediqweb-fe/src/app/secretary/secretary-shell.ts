@@ -158,9 +158,12 @@ export class SecretaryShell {
   /**
    * The patient's name, for the details page heading.
    *
-   * An id that matches nobody falls back to the route's own heading rather than
-   * rendering "undefined" — the page body then explains that the record does not
-   * exist, and the title does not have to.
+   * An id this desk cannot open falls back to the route's own heading rather than
+   * rendering "undefined" — and because `patientById` only answers for the
+   * assigned doctor's patients, an id belonging to somebody else's patient gets
+   * the same fallback as an id nobody has, so the address bar cannot be used to
+   * read a name off a record this desk may not see. The page body explains why
+   * there is nothing there.
    */
   private patientHeading(fallback: string | null): string {
     const route = this.deepestRoute();

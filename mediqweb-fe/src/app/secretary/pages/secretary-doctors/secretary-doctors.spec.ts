@@ -1,10 +1,13 @@
 import { type ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { MOCK_APPOINTMENTS, MOCK_DOCTORS } from '../../secretary.mock-data';
+import { MOCK_APPOINTMENTS, MOCK_DOCTORS, MOCK_SECRETARY_PROFILE } from '../../secretary.mock-data';
 import { SecretarySession } from '../../secretary-session';
 import { SecretaryDoctors } from './secretary-doctors';
 
 describe('SecretaryDoctors', () => {
+  /** The one doctor on this desk. */
+  const DESK = MOCK_SECRETARY_PROFILE.assignedDoctorId!;
+
   let fixture: ComponentFixture<SecretaryDoctors>;
   let session: SecretarySession;
 
@@ -37,111 +40,64 @@ describe('SecretaryDoctors', () => {
     return (fixture.nativeElement as HTMLElement).textContent ?? '';
   }
 
-  it('lists every doctor on the clinic roster', () => {
-    expect(page().rows().length).toBe(MOCK_DOCTORS.length);
+  it('lists the assigned doctor and nobody else from the clinic roster', () => {
+    expect(page().rows().length).toBe(1);
+    expect(page().rows()[0].id).toBe(DESK);
+    expect(MOCK_DOCTORS.length).toBeGreaterThan(1);
   });
 
-  it('keeps an inactive doctor visible, because past bookings still matter', () => {
-    // The Secretary books for the whole roster; a doctor who has stopped taking
-    // bookings still has a history to be asked about at the front desk.
-    const inactive = MOCK_DOCTORS.find((d) => d.status === 'inactive')!;
-    expect(text()).toContain(inactive.name);
-  });
-
-  it("repeats the doctor's published hours from the store", () => {
-    for (const summary of session.doctors()) {
-      const row = page()
-        .rows()
-        .find((r: any) => r.id === summary.doctor.id);
-      expect(row.weeklyHours).toBe(summary.weeklyHours);
+  it('does not name another doctor anywhere on the page', () => {
+    for (const doctor of MOCK_DOCTORS.filter((d) => d.id !== DESK)) {
+      expect(text()).not.toContain(doctor.name);
     }
   });
 
-  it('counts the days a doctor works from the published week itself', () => {
-    for (const doctor of MOCK_DOCTORS) {
-      const row = page()
-        .rows()
-        .find((r: any) => r.id === doctor.id);
-      const expected = session.scheduleFor(doctor.id).filter((day) => day.enabled).length;
-      expect(row.openDays).toBe(expected);
-    }
+  it('drops the search and account filters that could only hide one row', () => {
+    // A search box over a list of one can only find what is already on screen, and
+    // an account filter can only hide the single row. Both controls are gone, and
+    // their absence is worth asserting: they would look like the list was bigger
+    // than it is.
+    expect(page().query).toBeUndefined();
+    expect(page().statusFilter).toBeUndefined();
+    expect(page().onStatusFilterChange).toBeUndefined();
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.querySelector('input[type="search"]')).toBeNull();
+    expect(text()).not.toContain('Search doctors');
+  });
+
+  it('repeats the published hours from the store', () => {
+    const summary = session.doctors()[0];
+    expect(page().rows()[0].weeklyHours).toBe(summary.weeklyHours);
+  });
+
+  it('counts the days the doctor works from the published week itself', () => {
+    const expected = session.scheduleFor(DESK).filter((day) => day.enabled).length;
+    expect(page().rows()[0].openDays).toBe(expected);
   });
 
   it('counts live appointments, not the whole past diary', () => {
     // "Booked" answers "can I still reach this doctor's diary today", to which a
     // completed appointment contributes nothing.
     const now = session.now().getTime();
-    for (const doctor of MOCK_DOCTORS) {
-      const row = page()
-        .rows()
-        .find((r: any) => r.id === doctor.id);
-      const expected = session
-        .appointmentsForDoctor(doctor.id)
-        .filter(
-          (a) =>
-            (a.status === 'booked' || a.status === 'confirmed') &&
-            new Date(a.startsAt).getTime() >= now,
-        ).length;
-      expect(row.appointmentCount).toBe(expected);
-    }
+    const expected = session
+      .appointmentsForDoctor(DESK)
+      .filter(
+        (a) =>
+          (a.status === 'booked' || a.status === 'confirmed') &&
+          new Date(a.startsAt).getTime() >= now,
+      ).length;
+    expect(page().rows()[0].appointmentCount).toBe(expected);
   });
 
-  it('counts zero live appointments for the doctor who is not taking bookings', () => {
-    const inactive = MOCK_DOCTORS.find((d) => d.status === 'inactive')!;
-    const row = page()
-      .rows()
-      .find((r: any) => r.id === inactive.id);
-    expect(row.appointmentCount).toBe(0);
-    expect(row.nextAvailableAt).toBeNull();
-    expect(text()).toContain('Nothing booked');
+  it('says the assigned doctor is taking bookings, in words rather than code', () => {
+    const desk = MOCK_DOCTORS.find((d) => d.id === DESK)!;
+    expect(desk.status).toBe('active');
+    expect(text()).toContain('Taking bookings');
+    expect(text()).not.toContain('Not taking bookings');
   });
 
-  it('filters by name', () => {
-    page().query.set('ana');
-    fixture.detectChanges();
-    expect(page().rows().length).toBeGreaterThan(0);
-    for (const row of page().rows()) {
-      expect(row.name.toLowerCase()).toContain('ana');
-    }
-  });
-
-  it('filters by specialization', () => {
-    page().query.set('cardiology');
-    fixture.detectChanges();
-    expect(page().rows().length).toBe(1);
-    expect(page().rows()[0].specialization).toBe('Cardiology');
-  });
-
-  it('filters by email', () => {
-    page().query.set('navarro');
-    fixture.detectChanges();
-    expect(page().rows().length).toBe(1);
-    expect(page().rows()[0].id).toBe('doc-003');
-  });
-
-  it('filters by account status', () => {
-    page().statusFilter.set('inactive');
-    fixture.detectChanges();
-    const rows = page().rows();
-    expect(rows.length).toBeGreaterThan(0);
-    for (const row of rows) expect(row.status).toBe('inactive');
-  });
-
-  it('says a doctor who is not taking bookings in words, not in code', () => {
-    const inactive = MOCK_DOCTORS.find((d) => d.status === 'inactive')!;
-    page().query.set(inactive.name);
-    fixture.detectChanges();
-    expect(text()).toContain('Not taking bookings');
-  });
-
-  it('explains an empty result rather than showing a bare table', () => {
-    page().query.set('nobody by this name');
-    fixture.detectChanges();
-    expect(text()).toContain('No doctors match your filters');
-  });
-
-  it('counts the roster in the table caption', () => {
-    expect(text()).toContain(`${MOCK_DOCTORS.length} doctors on the clinic roster`);
+  it('counts the desk in the table caption', () => {
+    expect(text()).toContain('The doctor you are assigned to');
   });
 
   it('gives every sort column a primitive to sort on', () => {
@@ -158,17 +114,17 @@ describe('SecretaryDoctors', () => {
     }
   });
 
-  it('links each row to the published schedule', () => {
+  it('links the row to the published schedule', () => {
     const hrefs = [...(fixture.nativeElement as HTMLElement).querySelectorAll('.link-action')].map(
       (a) => a.getAttribute('href'),
     );
     expect(hrefs).toContain('/secretary/schedules');
   });
 
-  it('leaves the roster status to the Administrator, and says so', () => {
-    // A Secretary books inside a doctor's hours; stopping a doctor taking
-    // bookings is an account decision, not a diary one.
-    expect(text()).toContain("an Administrator's action, not a Secretary's");
+  it('says who assigns the desk, so the page does not read as a clinic roster', () => {
+    // The footnote used to talk about turning a doctor off. What a Secretary
+    // actually needs to know is who put them on this desk at all.
+    expect(text()).toContain('An Administrator assigns you');
   });
 
   it('says the data is a sample, so a screenshot is not mistaken for a product', () => {

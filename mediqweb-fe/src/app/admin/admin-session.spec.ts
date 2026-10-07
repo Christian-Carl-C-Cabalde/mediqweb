@@ -85,10 +85,53 @@ describe('AdminSession', () => {
         status: 'active',
         specializationId: 'spec-cardio',
         licenseNumber: 'PRC-123',
+        assignedDoctorId: 'doc-001',
       });
 
       expect(created.specializationId).toBeNull();
       expect(created.licenseNumber).toBeNull();
+    });
+
+    it('keeps the doctor a secretary is assigned to', () => {
+      // The whole Secretary area is scoped by this id, so losing it would leave a
+      // desk with nobody on it rather than a secretary with a doctor.
+      const created = session.addStaffAccount('secretary', {
+        name: 'Bea Cruz',
+        email: 'bea.cruz@mediq.ph',
+        username: 'bcruz',
+        status: 'active',
+        assignedDoctorId: 'doc-003',
+      });
+
+      expect(created.assignedDoctorId).toBe('doc-003');
+    });
+
+    it('normalises a blank assignment to no doctor', () => {
+      // The form refuses to submit without one, but a whitespace-only value from
+      // a caller must not persist as an id that resolves to no doctor.
+      const created = session.addStaffAccount('secretary', {
+        name: 'Bea Cruz',
+        email: 'bea.cruz@mediq.ph',
+        username: 'bcruz',
+        status: 'active',
+        assignedDoctorId: '   ',
+      });
+
+      expect(created.assignedDoctorId).toBeNull();
+    });
+
+    it('gives a doctor no desk, even if a draft names one', () => {
+      const created = session.addStaffAccount('doctor', {
+        name: 'Ana Reyes',
+        email: 'ana.reyes@mediq.ph',
+        username: 'areyes',
+        status: 'active',
+        specializationId: 'spec-cardio',
+        licenseNumber: 'PRC-999',
+        assignedDoctorId: 'doc-001',
+      });
+
+      expect(created.assignedDoctorId).toBeNull();
     });
 
     it('trims whitespace from the name', () => {

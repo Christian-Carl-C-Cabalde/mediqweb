@@ -9,19 +9,25 @@ import {
   StatCard,
 } from '../../../shared/components';
 import { SecretarySession } from '../../secretary-session';
-import type { Appointment, DoctorSummary } from '../../secretary.models';
+import type { Appointment } from '../../secretary.models';
 
 /**
  * Landing page for the Secretary area.
  *
  * Answers the three questions a secretary has on arrival: what is happening
- * today, who can still be booked, and what is outstanding. The counts come from
+ * today, who is still to be seen, and what is outstanding. The counts come from
  * the mock session, so they move as appointments are booked and cancelled
  * elsewhere in the area.
  *
+ * Everything here is one doctor's day, not the clinic's: a Secretary is assigned
+ * to a doctor and sees that doctor's appointments, patients and schedule. So
+ * there is no "N doctors available" stat and no available-doctors list to scan —
+ * with one doctor on the roster both would be a list of one saying what the page
+ * heading could say instead.
+ *
  * The booking action is a link rather than a form on this page: booking needs a
- * patient, a doctor, a time and a reason, which is a screen of its own. Opening
- * the list with the form ready is one click and no lost context.
+ * patient, a time and a reason, which is a screen of its own. Opening the list
+ * with the form ready is one click and no lost context.
  */
 @Component({
   selector: 'app-secretary-dashboard',
@@ -33,55 +39,22 @@ import type { Appointment, DoctorSummary } from '../../secretary.models';
 export class SecretaryDashboard {
   private readonly session = inject(SecretarySession);
 
+  /** The doctor whose desk this is, or `null` while unassigned. */
+  protected readonly assignedDoctor = computed(() => this.session.assignedDoctor());
+
+  protected readonly unassignedMessage = this.session.unassignedMessage;
+
   protected readonly todayCount = computed(() => this.session.todaysAppointments().length);
 
   protected readonly awaitingCount = computed(() => this.session.awaitingConfirmation().length);
 
   protected readonly patientCount = computed(() => this.session.patients().length);
 
-  protected readonly doctorCount = computed(() => this.session.activeDoctorCount());
+  protected readonly completedCount = computed(() => this.session.completedThisWeek().length);
 
   protected readonly today = computed(() => this.session.todaysAppointments());
 
   protected readonly next = computed(() => this.session.nextAppointment());
-
-  /**
-   * Doctors who can still be booked today, busiest-last.
-   *
-   * Only active doctors, because an inactive one is not somewhere a patient can
-   * be sent. Ordered by how much of today they have left so the list answers
-   * "who has room?" rather than presenting a directory.
-   */
-  protected readonly availableDoctors = computed<DoctorSummary[]>(() =>
-    this.session
-      .doctors()
-      .filter((summary) => summary.doctor.status === 'active')
-      .sort((a, b) => this.remainingToday(a) - this.remainingToday(b))
-      .slice(0, 5),
-  );
-
-  /**
-   * Appointments still to come today for a doctor.
-   *
-   * A method rather than a `computed` because it is only ever called from inside
-   * `availableDoctors`, and a `computed` per doctor would need its own signal to
-   * invalidate on.
-   */
-  private remainingToday(summary: DoctorSummary): number {
-    const now = this.session.now().getTime();
-    return this.session
-      .appointmentsForDoctor(summary.doctor.id)
-      .filter(
-        (appointment) =>
-          (appointment.status === 'booked' || appointment.status === 'confirmed') &&
-          new Date(appointment.startsAt).getTime() >= now &&
-          new Date(appointment.startsAt).toDateString() === new Date(now).toDateString(),
-      ).length;
-  }
-
-  protected bookedToday(summary: DoctorSummary): number {
-    return this.remainingToday(summary);
-  }
 
   protected patientName(appointment: Appointment): string {
     return this.session.patientName(appointment.patientId);

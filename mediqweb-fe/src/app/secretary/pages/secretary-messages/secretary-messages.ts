@@ -38,6 +38,12 @@ type ThreadRow = DayDivider | MessageRow;
  * the work here is comparing a thread against the others ("has anybody else
  * asked about Saturday?"), which a route change would hide.
  *
+ * Scoped to the assigned doctor, like every other screen here: a thread with one
+ * of this doctor's patients, or with the doctor themselves. The bodies name people
+ * and quote their appointments, so a thread that survived a name-based filter
+ * while carrying another patient's details would be the worst kind of leak — the
+ * filter is on the party, in the store.
+ *
  * Sending a reply appends to the in-memory session, exactly as booking appends to
  * the appointments, so the round trip is demonstrable end to end with no backend.
  * That is the whole feature: there is no transport, no delivery state and no

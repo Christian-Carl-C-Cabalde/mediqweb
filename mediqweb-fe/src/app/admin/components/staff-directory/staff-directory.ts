@@ -152,13 +152,20 @@ export class StaffDirectory {
     status: ['active' as AccountStatus],
     // Both of these are doctor-only fields, so they carry no static validator:
     // a `required` on a control that is hidden for secretaries would make the
-    // form unsaveable for them. `submit` checks them by role instead.
+    // form unsaveable for them. `submit` checks them by role instead. The
+    // assigned doctor is the mirror image — secretary-only, and checked the same
+    // way for the same reason.
     specializationId: [''],
     licenseNumber: [''],
+    assignedDoctorId: [''],
   });
 
   protected readonly specializationItems = computed(() =>
     this.session.specializationOptions().map((o) => ({ id: o.id, label: o.label })),
+  );
+
+  protected readonly assignedDoctorItems = computed(() =>
+    this.session.activeDoctorOptions().map((o) => ({ id: o.id, label: o.label })),
   );
 
   /** Status is chosen here rather than left implicit, so a new hire can start disabled. */
@@ -214,6 +221,38 @@ export class StaffDirectory {
     return field.value.trim() ? null : 'This field is required.';
   }
 
+  /**
+   * Required for secretaries, irrelevant for doctors, so it is checked by role —
+   * and for a method rather than a `computed` for the reason given above.
+   */
+  protected assignedDoctorError(): string | null {
+    if (this.kind() !== 'secretary') return null;
+    const field = this.form.controls.assignedDoctorId;
+    if (!field.touched) return null;
+    return field.value ? null : 'Choose a doctor to assign them to.';
+  }
+
+  /**
+   * Whether the form could be saved at all.
+   *
+   * A clinic with no active doctor has nobody to hand a new secretary to, and
+   * the field would then offer an empty dropdown with nothing to pick.
+   */
+  protected readonly noDoctorToAssign = computed(
+    () => this.kind() === 'secretary' && this.assignedDoctorItems().length === 0,
+  );
+
+  /**
+   * The field's help text, which has to change when there is nothing to pick:
+   * an empty dropdown still carrying the usual explanation reads as a broken
+   * control rather than as a clinic with no active doctor.
+   */
+  protected readonly assignedDoctorHint = computed(() =>
+    this.noDoctorToAssign()
+      ? 'No active doctor to assign. Enable a doctor account first.'
+      : 'They will see only this doctor: their appointments, patients and schedules.',
+  );
+
   // ---------------------------------------------------------------------------
   // Actions
   // ---------------------------------------------------------------------------
@@ -239,6 +278,11 @@ export class StaffDirectory {
     this.form.controls.specializationId.markAsTouched();
   }
 
+  protected onAssignedDoctorChange(item: DropdownItem): void {
+    this.form.controls.assignedDoctorId.setValue(item.id);
+    this.form.controls.assignedDoctorId.markAsTouched();
+  }
+
   protected onStatusChange(item: DropdownItem): void {
     this.form.controls.status.setValue(item.id as AccountStatus);
     this.form.controls.status.markAsTouched();
@@ -249,16 +293,26 @@ export class StaffDirectory {
       this.kind() === 'doctor' && !this.form.controls.specializationId.value;
     const missingLicense =
       this.kind() === 'doctor' && !this.form.controls.licenseNumber.value.trim();
+    // A secretary with no doctor is not a secretary yet: signing in would show
+    // them an empty area, so the assignment is a condition of creating them
+    // rather than something to fill in later.
+    const missingDoctor = this.kind() === 'secretary' && !this.form.controls.assignedDoctorId.value;
     const mismatched =
       this.form.controls.confirmPassword.value !== this.form.controls.temporaryPassword.value;
 
-    if (this.form.invalid || missingSpecialization || missingLicense || mismatched) {
+    if (
+      this.form.invalid ||
+      missingSpecialization ||
+      missingLicense ||
+      missingDoctor ||
+      mismatched
+    ) {
       this.form.markAllAsTouched();
       return;
     }
 
     this.saving.set(true);
-    const { name, email, username, status, specializationId, licenseNumber } =
+    const { name, email, username, status, specializationId, licenseNumber, assignedDoctorId } =
       this.form.getRawValue();
 
     const created = this.session.addStaffAccount(this.kind(), {
@@ -266,9 +320,11 @@ export class StaffDirectory {
       email,
       username,
       status,
-      // Secretaries have no specialization, so ignore the hidden fields for them.
+      // Secretaries have no specialization, and doctors have no desk, so each
+      // role's field is dropped for the other.
       specializationId: this.kind() === 'doctor' ? specializationId : null,
       licenseNumber: this.kind() === 'doctor' ? licenseNumber : null,
+      assignedDoctorId: this.kind() === 'secretary' ? assignedDoctorId : null,
     });
 
     this.saving.set(false);

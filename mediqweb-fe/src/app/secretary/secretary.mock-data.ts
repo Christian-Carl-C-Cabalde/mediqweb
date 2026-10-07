@@ -18,12 +18,13 @@ import type {
  *
  * This is a *separate* cohort from `admin.mock-data.ts` and `doctor.mock-data.ts`.
  * The three areas are independent stores: the Admin area manages staff accounts,
- * the Doctor area sees only their own diary, and the Secretary area sees the
- * whole clinic — every doctor, every patient, every appointment. Sharing one set
- * of fixtures would have meant the Secretary being shown a patient list scoped to
- * somebody else's diary, which is exactly the bug the Doctor area's
- * `patientForDoctor` exists to prevent. When each area's session is replaced by a
- * service talking to the API, the question disappears.
+ * the Doctor area sees only their own diary, and the Secretary area works one
+ * doctor's desk — the doctor an administrator assigned them to, in
+ * `MOCK_SECRETARY_PROFILE`. Sharing one set of fixtures would have meant the
+ * Secretary being shown a patient list scoped to somebody else's diary, which is
+ * exactly the bug the Doctor area's `patientForDoctor` exists to prevent. When
+ * each area's session is replaced by a service talking to the API, the question
+ * disappears.
  */
 
 /** The signed-in Secretary. Fixed until authentication exists. */
@@ -35,6 +36,12 @@ export const MOCK_SECRETARY_PROFILE: SecretaryProfile = {
   email: 'celine.villanueva@mediq.ph',
   phone: '+63 917 555 0201',
   joinedOn: '2025-09-01',
+  // The assignment an administrator makes on the Add Secretary form, read here as
+  // a field of the signed-in user because that is where it arrives once
+  // authentication exists. doc-003 on purpose: a closed Monday, an
+  // appointment-free patient and a clinic with two cancelled appointments
+  // elsewhere, so the scoping rules all have something to bite on at this desk.
+  assignedDoctorId: 'doc-003',
 };
 
 export const MOCK_DOCTORS: readonly Doctor[] = [
@@ -102,6 +109,7 @@ export const MOCK_PATIENTS: readonly Patient[] = [
     address: '24 Katipunan Ave, Quezon City',
     registeredOn: '2025-11-12',
     status: 'active',
+    doctorId: 'doc-001',
   },
   {
     id: 'pat-202',
@@ -112,6 +120,7 @@ export const MOCK_PATIENTS: readonly Patient[] = [
     address: '8 Aurelio St, Mandaluyong',
     registeredOn: '2026-01-08',
     status: 'active',
+    doctorId: 'doc-003',
   },
   {
     id: 'pat-203',
@@ -122,6 +131,7 @@ export const MOCK_PATIENTS: readonly Patient[] = [
     address: '115 Shaw Blvd, Mandaluyong',
     registeredOn: '2026-02-14',
     status: 'active',
+    doctorId: 'doc-003',
   },
   {
     id: 'pat-204',
@@ -132,6 +142,7 @@ export const MOCK_PATIENTS: readonly Patient[] = [
     address: '3 Pelaez St, Manila',
     registeredOn: '2026-03-21',
     status: 'active',
+    doctorId: 'doc-004',
   },
   {
     id: 'pat-205',
@@ -142,6 +153,7 @@ export const MOCK_PATIENTS: readonly Patient[] = [
     address: '77 San Juan St, Makati',
     registeredOn: '2026-04-02',
     status: 'active',
+    doctorId: 'doc-003',
   },
   {
     id: 'pat-206',
@@ -152,6 +164,7 @@ export const MOCK_PATIENTS: readonly Patient[] = [
     address: '12 Ilang Ilang, Parañaque',
     registeredOn: '2026-04-11',
     status: 'active',
+    doctorId: 'doc-001',
   },
   {
     id: 'pat-207',
@@ -162,6 +175,7 @@ export const MOCK_PATIENTS: readonly Patient[] = [
     address: '5 Legazpi Village, Makati',
     registeredOn: '2025-08-30',
     status: 'active',
+    doctorId: 'doc-002',
   },
   {
     id: 'pat-208',
@@ -172,6 +186,7 @@ export const MOCK_PATIENTS: readonly Patient[] = [
     address: '31 Aurora St, Quezon City',
     registeredOn: '2026-01-27',
     status: 'active',
+    doctorId: 'doc-003',
   },
   {
     id: 'pat-209',
@@ -182,6 +197,7 @@ export const MOCK_PATIENTS: readonly Patient[] = [
     address: '9 Magsaysay Ave, Pasig',
     registeredOn: '2025-10-19',
     status: 'active',
+    doctorId: 'doc-001',
   },
   {
     id: 'pat-210',
@@ -192,6 +208,7 @@ export const MOCK_PATIENTS: readonly Patient[] = [
     address: '44 Katipunan St, Mandaluyong',
     registeredOn: '2026-02-05',
     status: 'active',
+    doctorId: 'doc-001',
   },
   {
     id: 'pat-211',
@@ -202,6 +219,7 @@ export const MOCK_PATIENTS: readonly Patient[] = [
     address: '6 Kalachuchi, Manila',
     registeredOn: '2026-05-30',
     status: 'active',
+    doctorId: 'doc-004',
   },
   {
     id: 'pat-212',
@@ -212,6 +230,11 @@ export const MOCK_PATIENTS: readonly Patient[] = [
     address: '18 Katipanan, Antipolo',
     registeredOn: '2025-12-08',
     status: 'inactive',
+    // On the disabled doctor's panel, while their appointment is with doc-002.
+    // Deliberate: a doctor can be taken off the roster with patients still
+    // registered to them, and this is what that state looks like — nobody's list
+    // at all, and a patient whose one appointment is on somebody else's desk.
+    doctorId: 'doc-005',
   },
   {
     id: 'pat-213',
@@ -222,6 +245,7 @@ export const MOCK_PATIENTS: readonly Patient[] = [
     address: '2 Rizal Ave, Marikina',
     registeredOn: '2025-07-14',
     status: 'active',
+    doctorId: 'doc-002',
   },
   {
     id: 'pat-214',
@@ -232,6 +256,7 @@ export const MOCK_PATIENTS: readonly Patient[] = [
     address: '21 Boni Ave, Mandaluyong',
     registeredOn: '2026-06-08',
     status: 'active',
+    doctorId: 'doc-003',
   },
   {
     id: 'pat-215',
@@ -245,6 +270,7 @@ export const MOCK_PATIENTS: readonly Patient[] = [
     address: '47 Rizal St, Antipolo',
     registeredOn: '2026-08-19',
     status: 'active',
+    doctorId: 'doc-003',
   },
 ];
 
@@ -665,17 +691,26 @@ function minutesAgo(minutes: number): string {
  * repeating names, so a thread can never disagree with the Patients page about
  * who somebody is — and the avatar initials come from the same source.
  *
- * Three of the five are `awaitingAction`, and deliberately not all of them are
- * unread: a thread that has been read to the last word can still owe the clinic
+ * Four of the five are `awaitingAction`, and deliberately not all of them are
+ * unread: two threads have been read to the last word and can still owe the clinic
  * a phone call. Deriving one from the other would quietly drop that case, so the
- * flag is its own field.
+ * flag is its own field — and one of those two is on this desk, so the case the
+ * flag exists for is reachable without reassigning anybody.
+ *
+ * Five threads for a clinic, not for a desk: `SecretarySession` shows the
+ * Secretary the ones belonging to their own patients and to their own doctor, so
+ * the signed-in sample sees three of these five. The other two are not dead
+ * fixtures — they are what another Secretary's desk looks like, and the scoping
+ * is only worth asserting because the clinic is bigger than one person.
  */
 export const MOCK_CONVERSATIONS: readonly Conversation[] = [
   { id: 'cnv-01', party: 'patient', partyId: 'pat-211', awaitingAction: true },
   { id: 'cnv-02', party: 'patient', partyId: 'pat-215', awaitingAction: true },
   { id: 'cnv-03', party: 'doctor', partyId: 'doc-002', awaitingAction: true },
   { id: 'cnv-04', party: 'patient', partyId: 'pat-205', awaitingAction: false },
-  { id: 'cnv-05', party: 'patient', partyId: 'pat-208', awaitingAction: false },
+  // Read to the last word and still owed a reply, so the read/owed distinction is
+  // reachable from the signed-in desk rather than only from another one.
+  { id: 'cnv-05', party: 'patient', partyId: 'pat-208', awaitingAction: true },
 ];
 
 /**
@@ -718,12 +753,14 @@ export const MOCK_MESSAGES: readonly ConversationMessage[] = [
     readAt: null,
   },
 
-  // ---- cnv-02 · a brand new question, never opened.
+  // ---- cnv-02 · a brand new question, never opened. From the walk-in on
+  // doc-003's panel: registered at the desk, no appointment on file, asking how
+  // to become a patient.
   {
     id: 'msg-0004',
     conversationId: 'cnv-02',
     sentAt: minutesAgo(55),
-    body: 'Good afternoon. Is the immunization session on Saturday open to walk-ins, or do we need to book a slot for each child?',
+    body: 'Good afternoon. I was told Dr. Navarro keeps an opening in the mornings — is that still free this week, or do we need to book a slot for a first consultation?',
     fromSecretary: false,
     readAt: null,
   },
