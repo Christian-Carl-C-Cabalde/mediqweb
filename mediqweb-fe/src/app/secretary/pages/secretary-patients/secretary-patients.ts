@@ -48,12 +48,14 @@ interface PatientRow {
 }
 
 /**
- * Every patient the clinic has.
+ * The assigned doctor's patients.
  *
- * Unlike the Doctor area's equivalent, this list is not derived from anybody's
- * diary. A Secretary opens a patient record in order to book them, so someone
- * with no appointments yet still has to appear here — otherwise a walk-in could
- * never be registered, which is the one case the desk most needs to handle.
+ * Not derived from anybody's diary, unlike the Doctor area's equivalent list: a
+ * Secretary opens a patient record in order to book them, so somebody with no
+ * appointments yet still has to appear here — otherwise a walk-in could never be
+ * registered, which is the one case the desk most needs to handle. That is what
+ * the patient's panel is for: membership comes from the assignment, not from a
+ * visit somebody has not had yet.
  */
 @Component({
   selector: 'app-secretary-patients',
@@ -120,12 +122,17 @@ export class SecretaryPatients {
       }));
   });
 
-  /** How many of the patients on file have something booked. */
+  /** How many of the patients on this desk have something booked. */
   protected readonly bookedCount = computed(
     () => this.session.patients().filter((summary) => summary.nextVisit !== null).length,
   );
 
   protected readonly totalCount = computed(() => this.session.patients().length);
+
+  /** Null while unassigned, so the empty state can say why it is empty. */
+  protected readonly assignedDoctor = computed(() => this.session.assignedDoctor());
+
+  protected readonly unassignedMessage = this.session.unassignedMessage;
 
   protected onStatusFilterChange(item: DropdownItem): void {
     this.statusFilter.set(item.id as StatusFilter);

@@ -36,6 +36,16 @@ export interface StaffAccount {
   readonly specializationId: string | null;
   /** Doctors only. */
   readonly licenseNumber: string | null;
+  /**
+   * Secretaries only. The doctor whose desk this secretary works, and the whole
+   * limit on what they can see: the Secretary area reads its appointments,
+   * patients and schedules through this one doctor and nothing else.
+   *
+   * Null rather than absent because an unassigned secretary is a real state an
+   * admin can create (there may be no active doctor to give them yet), and the
+   * screens that would show it need to be able to say so rather than guess.
+   */
+  readonly assignedDoctorId: string | null;
   /** ISO date, e.g. `2026-04-18`. */
   readonly joinedOn: string;
   /** ISO date, or null when the account has never signed in. */
@@ -121,4 +131,10 @@ export interface StaffDraft {
   readonly specializationId?: string | null;
   /** Doctors only. */
   readonly licenseNumber?: string | null;
+  /**
+   * Secretaries only. Optional on the draft because the form collects one field
+   * for each role and the other role's field is simply left out; `addStaffAccount`
+   * is what decides which of them survives onto the account.
+   */
+  readonly assignedDoctorId?: string | null;
 }

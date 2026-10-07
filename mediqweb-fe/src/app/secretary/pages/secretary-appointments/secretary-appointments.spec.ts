@@ -1,12 +1,21 @@
 import { type ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { localIso, minutesOfDay } from '../../secretary.dates';
-import { MOCK_APPOINTMENTS, MOCK_SCHEDULES } from '../../secretary.mock-data';
+import {
+  MOCK_APPOINTMENTS,
+  MOCK_SCHEDULES,
+  MOCK_SECRETARY_PROFILE,
+} from '../../secretary.mock-data';
 import { SecretarySession } from '../../secretary-session';
 import type { Appointment } from '../../secretary.models';
 import { SecretaryAppointments } from './secretary-appointments';
 
 describe('SecretaryAppointments', () => {
+  /** The doctor every row on this page belongs to. */
+  const DESK = MOCK_SECRETARY_PROFILE.assignedDoctorId!;
+
+  /** A patient on that doctor's panel. */
+  const DESK_PATIENT = 'pat-205';
   let fixture: ComponentFixture<SecretaryAppointments>;
   let session: SecretarySession;
 
@@ -16,11 +25,11 @@ describe('SecretaryAppointments', () => {
     date.setHours(0, 0, 0, 0);
     date.setDate(date.getDate() + days);
     for (let skip = 0; skip < 14; skip += 1) {
-      if (MOCK_SCHEDULES['doc-003'][date.getDay()].enabled) break;
+      if (MOCK_SCHEDULES[DESK][date.getDay()].enabled) break;
       date.setDate(date.getDate() + 1);
     }
     const pad = (n: number) => String(n).padStart(2, '0');
-    const open = minutesOfDay(MOCK_SCHEDULES['doc-003'][date.getDay()].startTime)!;
+    const open = minutesOfDay(MOCK_SCHEDULES[DESK][date.getDay()].startTime)!;
     return {
       date: `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`,
       time: `${pad(Math.floor(open / 60))}:${pad(open % 60)}`,
@@ -84,8 +93,7 @@ describe('SecretaryAppointments', () => {
   /** Fills the booking form with a slot the store will accept. */
   function fillValidBooking(over: Record<string, unknown> = {}): void {
     form().setValue({
-      patientId: 'pat-201',
-      doctorId: 'doc-003',
+      patientId: DESK_PATIENT,
       ...futureSlot(),
       duration: 30,
       reason: 'Routine check-up',
@@ -100,32 +108,25 @@ describe('SecretaryAppointments', () => {
 
   // --- The list
 
-  it('lists every appointment in the clinic', () => {
+  it('lists the assigned doctor appointments, and no others', () => {
     expect(page().appointments().length).toBe(session.appointments().length);
-  });
-
-  it('filters by patient name', () => {
-    page().query.set('juan');
-    fixture.detectChanges();
     expect(page().appointments().length).toBeGreaterThan(0);
     for (const appointment of page().appointments()) {
-      expect(session.patientName(appointment.patientId).toLowerCase()).toContain('juan');
+      expect(appointment.doctorId).toBe(DESK);
     }
   });
 
-  it('filters by doctor name', () => {
-    // A secretary is routinely looking for "what does Dr Lim have today", so the
-    // search box has to reach the doctor as well as the patient and the reason.
-    page().query.set('lim');
+  it('filters by patient name', () => {
+    page().query.set('maria');
     fixture.detectChanges();
     expect(page().appointments().length).toBeGreaterThan(0);
     for (const appointment of page().appointments()) {
-      expect(session.doctorName(appointment.doctorId).toLowerCase()).toContain('lim');
+      expect(session.patientName(appointment.patientId).toLowerCase()).toContain('maria');
     }
   });
 
   it('filters by reason', () => {
-    page().query.set('knee');
+    page().query.set('eczema');
     fixture.detectChanges();
     expect(page().appointments().length).toBeGreaterThan(0);
   });
@@ -138,29 +139,21 @@ describe('SecretaryAppointments', () => {
     }
   });
 
-  it('filters by doctor', () => {
-    const doctorId = page().doctorOptions()[1].id;
-    page().onDoctorFilterChange({ id: doctorId, label: 'x' });
-    fixture.detectChanges();
-    for (const appointment of page().appointments()) {
-      expect(appointment.doctorId).toBe(doctorId);
-    }
-  });
-
-  it('offers every doctor as a filter, including one who is not taking bookings', () => {
-    // Filtering to an inactive doctor is how the secretary finds the history of
-    // somebody who has left the roster.
-    expect(page().doctorOptions()[0].id).toBe('all');
-    expect(page().doctorOptions().length).toBe(session.doctors().length + 1);
+  it('offers no doctor filter, because there is only one doctor to filter by', () => {
+    // A dropdown whose every option is the same doctor is a control that can only
+    // confuse: it looks like the list can be widened again.
+    expect(page().doctorFilter).toBeUndefined();
+    expect(page().doctorOptions).toBeUndefined();
+    expect(text()).not.toContain('Filter by doctor');
   });
 
   it('combines the search box with the filters', () => {
-    page().query.set('juan');
+    page().query.set('maria');
     page().statusFilter.set('confirmed');
     fixture.detectChanges();
     expect(page().appointments().length).toBeGreaterThan(0);
     for (const appointment of page().appointments()) {
-      expect(session.patientName(appointment.patientId).toLowerCase()).toContain('juan');
+      expect(session.patientName(appointment.patientId).toLowerCase()).toContain('maria');
       expect(appointment.status).toBe('confirmed');
     }
   });
@@ -171,22 +164,41 @@ describe('SecretaryAppointments', () => {
     expect(text()).toContain('No appointments match your filters');
   });
 
-  it('names the patient and the doctor on every row', () => {
+  it('names the patient on every row, and the doctor once for the page', () => {
+    // The doctor is the same on every row, so the column that repeated one name
+    // is gone and the booking card names them instead.
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.querySelector('th')?.textContent).not.toContain('Doctor');
     for (const appointment of page().appointments()) {
       expect(page().patientName(appointment)).toBeTruthy();
-      expect(page().doctorName(appointment)).toBeTruthy();
     }
+    expect(text()).toContain(session.doctors()[0].doctor.name);
   });
 
   // --- Booking
 
-  it('offers only active doctors in the booking form', () => {
-    // A Secretary cannot book a doctor who is not taking bookings, so offering
-    // them and then refusing would waste the secretary's time.
-    expect(page().bookableDoctors().length).toBeGreaterThan(0);
-    for (const summary of page().bookableDoctors()) {
-      expect(summary.doctor.status).toBe('active');
-    }
+  it('books for the assigned doctor, without asking which one', () => {
+    // The form has no doctor control: there is one doctor on this desk, and a
+    // select offering a single option is a way to be wrong rather than a choice.
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.querySelector('#book-doctor')).toBeNull();
+    expect(page().assignedDoctorName()).toBe(session.doctors()[0].doctor.name);
+    expect(text()).toContain(`hours ${session.doctors()[0].doctor.name} published`);
+  });
+
+  it('offers only this desk patients in the booking form', () => {
+    const options = [
+      ...(fixture.nativeElement as HTMLElement).querySelectorAll('#book-patient option'),
+    ]
+      .map((option) => option.getAttribute('value'))
+      .filter((value): value is string => !!value);
+
+    expect(options.sort()).toEqual(
+      session
+        .patients()
+        .map((p) => p.patient.id)
+        .sort(),
+    );
   });
 
   it('says nothing is wrong with an untouched form', () => {
@@ -217,8 +229,7 @@ describe('SecretaryAppointments', () => {
     )!;
     const slot = futureSlot();
     form().setValue({
-      patientId: 'pat-201',
-      doctorId: 'doc-003',
+      patientId: DESK_PATIENT,
       ...slot,
       duration: 30,
       reason: 'Routine check-up',
@@ -263,7 +274,6 @@ describe('SecretaryAppointments', () => {
     const at = new Date(existing.startsAt);
 
     fillValidBooking({
-      doctorId: existing.doctorId,
       date: `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, '0')}-${String(at.getDate()).padStart(2, '0')}`,
       time: `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`,
     });
@@ -275,7 +285,7 @@ describe('SecretaryAppointments', () => {
 
   it('refuses a booking on a day the doctor does not work', () => {
     const closed = new Date();
-    while (MOCK_SCHEDULES['doc-003'][closed.getDay()].enabled) {
+    while (MOCK_SCHEDULES[DESK][closed.getDay()].enabled) {
       closed.setDate(closed.getDate() + 1);
     }
     fillValidBooking({
@@ -285,19 +295,13 @@ describe('SecretaryAppointments', () => {
     expect(page().canSubmitBooking()).toBe(false);
   });
 
-  it('refuses a booking for an inactive doctor', () => {
-    const inactive = session.doctors().find((s) => s.doctor.status !== 'active')!;
-    fillValidBooking({ doctorId: inactive.doctor.id });
-    expect(page().bookingProblem()).toBe('inactive-doctor');
-  });
-
   it('refuses a booking in the past', () => {
     fillValidBooking({ date: '2020-01-01', time: '09:00' });
     expect(page().bookingProblem()).toBe('not-in-the-future');
   });
 
   it('will not submit an incomplete form', () => {
-    form().setValue({ patientId: '', doctorId: '', date: '', time: '', duration: 30, reason: '' });
+    form().setValue({ patientId: '', date: '', time: '', duration: 30, reason: '' });
     fixture.detectChanges();
     expect(page().canSubmitBooking()).toBe(false);
 
@@ -359,9 +363,7 @@ describe('SecretaryAppointments', () => {
     // `futureSlot` produces a doc-003 window, so the appointment being moved has
     // to be a doc-003 one — moving another doctor's on to 09:00 would trip the
     // hours rule and fail for the wrong reason.
-    const live = session
-      .appointments()
-      .find((a) => a.status === 'booked' && a.doctorId === 'doc-003')!;
+    const live = session.appointments().find((a) => a.status === 'booked' && a.doctorId === DESK)!;
     const slot = futureSlot(21);
     page().openReschedule(live);
     page().rescheduleForm.setValue(slot);
@@ -379,9 +381,7 @@ describe('SecretaryAppointments', () => {
     // The store replaces the appointment with a new object, so a confirmation
     // built from the pre-move one reads "moved to the new time" beside the old
     // time. Pin the timestamp in the notice.
-    const live = session
-      .appointments()
-      .find((a) => a.status === 'booked' && a.doctorId === 'doc-003')!;
+    const live = session.appointments().find((a) => a.status === 'booked' && a.doctorId === DESK)!;
     const slot = futureSlot(21);
 
     page().openReschedule(live);
@@ -411,15 +411,13 @@ describe('SecretaryAppointments', () => {
   });
 
   it('explains a reschedule into a busy slot instead of moving it', () => {
-    const live = session
-      .appointments()
-      .find((a) => a.status === 'booked' && a.doctorId === 'doc-003')!;
+    const live = session.appointments().find((a) => a.status === 'booked' && a.doctorId === DESK)!;
     const other = session
       .appointments()
       .filter(
         (a) =>
           a.id !== live.id &&
-          a.doctorId === 'doc-003' &&
+          a.doctorId === DESK &&
           (a.status === 'booked' || a.status === 'confirmed'),
       )[0];
     const at = new Date(other.startsAt);

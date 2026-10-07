@@ -22,7 +22,6 @@ import { type BookingDraft, type BookingRefusal, SecretarySession } from '../../
 import type { Appointment, AppointmentStatus } from '../../secretary.models';
 
 type StatusFilter = 'all' | AppointmentStatus;
-type DoctorFilter = 'all' | string;
 
 const STATUS_ITEMS: DropdownItem[] = [
   { id: 'all', label: 'All statuses' },
@@ -32,8 +31,6 @@ const STATUS_ITEMS: DropdownItem[] = [
   { id: 'cancelled', label: 'Cancelled' },
   { id: 'no-show', label: 'No-show' },
 ];
-
-const ALL_DOCTORS: DropdownItem = { id: 'all', label: 'All doctors' };
 
 /** Bookable lengths, matching the durations the fixtures use. */
 const LENGTHS = [15, 30, 45, 60] as const;
@@ -62,8 +59,9 @@ interface Notice {
  */
 const REFUSAL_TEXT: Record<BookingRefusal, string> = {
   'no-patient': 'Choose the patient this appointment is for.',
-  'no-doctor': 'Choose a doctor.',
-  'inactive-doctor': 'That doctor is not taking bookings. Choose another one.',
+  'no-doctor': 'You are not assigned to a doctor yet.',
+  'not-your-doctor': 'You can only book for the doctor you are assigned to.',
+  'inactive-doctor': 'That doctor is not taking bookings. Ask an administrator to reassign you.',
   'day-closed': 'The doctor does not work on that day. Pick another day.',
   'outside-hours': 'That time is before the doctor opens. Pick a later time.',
   'ends-after-close': 'That appointment would run past the doctor closing time.',
@@ -78,6 +76,10 @@ const REFUSAL_TEXT: Record<BookingRefusal, string> = {
  * version of this page, a Secretary creates appointments and changes their time —
  * confirming, completing and recording a no-show are the doctor's decisions and
  * are deliberately not offered here.
+ *
+ * Scoped to the assigned doctor, so the page carries no doctor filter and no
+ * doctor column: every row would say the same name. The booking form names the
+ * doctor once, as context, instead of offering a choice of one.
  *
  * The booking rules (inside published hours, no clash, doctor active) are asked
  * of the store rather than reimplemented here, so the reason shown next to the
@@ -111,7 +113,6 @@ export class SecretaryAppointments {
 
   protected readonly query = signal('');
   protected readonly statusFilter = signal<StatusFilter>('all');
-  protected readonly doctorFilter = signal<DoctorFilter>('all');
   protected readonly confirmCancelFor = signal<Appointment | null>(null);
   protected readonly rescheduleFor = signal<Appointment | null>(null);
   protected readonly notice = signal<Notice | null>(null);
@@ -121,22 +122,14 @@ export class SecretaryAppointments {
 
   protected readonly statusOptions = STATUS_ITEMS;
 
-  protected readonly doctorOptions = computed<DropdownItem[]>(() => [
-    ALL_DOCTORS,
-    ...this.session.doctors().map((summary) => ({
-      id: summary.doctor.id,
-      label: summary.doctor.name,
-      description: summary.doctor.specialization,
-      // An inactive doctor can still be filtered on — there is history to find —
-      // but cannot be booked, which is a rule on the booking form, not here.
-      disabled: false,
-    })),
-  ]);
+  /** The doctor every row on this page belongs to, named once for the form. */
+  protected readonly assignedDoctorName = computed(
+    () => this.session.assignedDoctor()?.name ?? 'your doctor',
+  );
 
   protected readonly columns: TableColumn<Appointment>[] = [
     { key: 'startsAt', header: 'When', sortable: true },
     { key: 'patientId', header: 'Patient' },
-    { key: 'doctorId', header: 'Doctor' },
     { key: 'reason', header: 'Reason', hideBelow: 'lg' },
     { key: 'durationMinutes', header: 'Length', hideBelow: 'lg' },
     { key: 'status', header: 'Status', sortable: true },
@@ -151,14 +144,8 @@ export class SecretaryAppointments {
       .sort((a, b) => a.name.localeCompare(b.name)),
   );
 
-  /** Doctors offered in the booking form. Inactive ones are disabled. */
-  protected readonly bookableDoctors = computed(() =>
-    this.session.doctors().filter((summary) => summary.doctor.status === 'active'),
-  );
-
   protected readonly bookingForm = this.fb.group({
     patientId: this.fb.control('', Validators.required),
-    doctorId: this.fb.control('', Validators.required),
     date: this.fb.control('', Validators.required),
     time: this.fb.control('09:00', Validators.required),
     duration: this.fb.control(30, Validators.required),
@@ -183,18 +170,14 @@ export class SecretaryAppointments {
     this.formChanged();
     const term = this.query().trim().toLowerCase();
     const status = this.statusFilter();
-    const doctor = this.doctorFilter();
 
     return this.session.appointments().filter((appointment) => {
       if (status !== 'all' && appointment.status !== status) return false;
-      if (doctor !== 'all' && appointment.doctorId !== doctor) return false;
       if (!term) return true;
-      // Search the patient's and the doctor's name as well as the reason,
-      // otherwise typing "Lim" to find the cardiologist finds nothing and the box
-      // looks broken.
+      // The patient's name as well as the reason: the doctor is the same on every
+      // row, so searching for one would only ever match everything.
       return (
         this.session.patientName(appointment.patientId).toLowerCase().includes(term) ||
-        this.session.doctorName(appointment.doctorId).toLowerCase().includes(term) ||
         appointment.reason.toLowerCase().includes(term)
       );
     });
@@ -215,7 +198,7 @@ export class SecretaryAppointments {
     const value = this.bookingForm.getRawValue();
     // An untouched form is not wrong yet: showing "choose a patient" before the
     // secretary has typed anything would be nagging rather than helping.
-    if (!value.patientId && !value.doctorId && !value.date) return null;
+    if (!value.patientId && !value.date) return null;
     return this.session.bookingRefusal(this.bookingDraft());
   });
 
@@ -261,16 +244,8 @@ export class SecretaryAppointments {
     this.statusFilter.set(item.id as StatusFilter);
   }
 
-  protected onDoctorFilterChange(item: DropdownItem): void {
-    this.doctorFilter.set(item.id);
-  }
-
   protected patientName(appointment: Appointment): string {
     return this.session.patientName(appointment.patientId);
-  }
-
-  protected doctorName(appointment: Appointment): string {
-    return this.session.doctorName(appointment.doctorId);
   }
 
   protected length(appointment: Appointment): string {
@@ -362,7 +337,10 @@ export class SecretaryAppointments {
     const value = this.bookingForm.getRawValue();
     return {
       patientId: value.patientId,
-      doctorId: value.doctorId,
+      // From the session, not the form: a Secretary books for the doctor they were
+      // assigned, and a control offering a choice of one would be a way to be wrong.
+      // Null while unassigned, which the store refuses as `no-doctor`.
+      doctorId: this.session.assignedDoctor()?.id ?? '',
       startsAt: this.combine(value),
       // Coerced rather than passed through: the store adds this to a start time,
       // where a string would concatenate instead of add. The control is declared
@@ -396,11 +374,6 @@ export class SecretaryAppointments {
   protected patientError(): string | null {
     const control = this.bookingForm.controls.patientId;
     return control.touched && control.invalid ? 'Choose the patient.' : null;
-  }
-
-  protected doctorError(): string | null {
-    const control = this.bookingForm.controls.doctorId;
-    return control.touched && control.invalid ? 'Choose a doctor.' : null;
   }
 
   protected dateError(): string | null {

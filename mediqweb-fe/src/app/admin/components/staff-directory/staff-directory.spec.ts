@@ -93,10 +93,61 @@ describe('StaffDirectory', () => {
         status: 'active',
         specializationId: '',
         licenseNumber: '',
+        assignedDoctorId: session.activeDoctorOptions()[0].id,
       });
       dir['submit']();
       fixture.detectChanges();
       expect(session.secretaries().some((s) => s.email === 'new.hire@mediq.ph')).toBe(true);
+    });
+
+    it('offers only active doctors to assign, since an inactive one has no desk', () => {
+      const dir = fixture.componentInstance as any;
+      const offered = session.activeDoctorOptions().map((option) => option.id);
+      const active = session.doctors().filter((d) => d.status === 'active');
+      expect(offered).toEqual(active.map((d) => d.id));
+      expect(offered.length).toBeGreaterThan(0);
+      expect(dir['assignedDoctorItems']().length).toBe(active.length);
+    });
+
+    it('records the chosen doctor on the account it creates', () => {
+      const dir = fixture.componentInstance as any;
+      const doctor = session.activeDoctorOptions()[1];
+      dir['form'].setValue({
+        name: 'New Hire',
+        email: 'new.hire@mediq.ph',
+        username: 'newhire',
+        temporaryPassword: 'longenough1',
+        confirmPassword: 'longenough1',
+        status: 'active',
+        specializationId: '',
+        licenseNumber: '',
+        assignedDoctorId: doctor.id,
+      });
+      dir['submit']();
+      fixture.detectChanges();
+      const created = session.secretaries().find((s) => s.email === 'new.hire@mediq.ph');
+      expect(created?.assignedDoctorId).toBe(doctor.id);
+    });
+
+    it('will not create a secretary with no doctor to assign them to', () => {
+      // A desk with nobody on it is not a job, and the Secretary area would show
+      // them an empty clinic for the reason.
+      const dir = fixture.componentInstance as any;
+      dir['form'].setValue({
+        name: 'New Hire',
+        email: 'new.hire@mediq.ph',
+        username: 'newhire',
+        temporaryPassword: 'longenough1',
+        confirmPassword: 'longenough1',
+        status: 'active',
+        specializationId: '',
+        licenseNumber: '',
+        assignedDoctorId: '',
+      });
+      dir['submit']();
+      fixture.detectChanges();
+      expect(dir['assignedDoctorError']()).toBe('Choose a doctor to assign them to.');
+      expect(session.secretaries().some((s) => s.email === 'new.hire@mediq.ph')).toBe(false);
     });
   });
 
@@ -235,9 +286,10 @@ describe('StaffDirectory', () => {
       expect(dir['roleLabel']()).toBe('Doctor');
     });
 
-    it('omits the doctor detail section for a secretary', async () => {
+    it('omits the doctor detail section for a secretary, and adds their own', async () => {
       // A doctor's specialty and licence have no secretary equivalent, so an
-      // empty section heading would be worse than none.
+      // empty section heading would be worse than none — but a secretary has one
+      // role field of their own, and it belongs in a section of its own.
       await render('secretary');
       const dir = fixture.componentInstance as any;
       dir['openCreate']();
@@ -245,7 +297,8 @@ describe('StaffDirectory', () => {
       const sections = Array.from(
         (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>('.form-section'),
       ).map((h) => h.textContent?.trim());
-      expect(sections).toEqual(['Account information']);
+      expect(sections).toEqual(['Account information', 'Secretary details']);
+      expect(text()).toContain('Assigned doctor');
       expect(dir['roleLabel']()).toBe('Secretary');
     });
 

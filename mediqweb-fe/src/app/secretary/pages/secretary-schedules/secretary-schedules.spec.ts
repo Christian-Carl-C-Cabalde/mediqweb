@@ -1,10 +1,13 @@
 import { type ComponentFixture, TestBed } from '@angular/core/testing';
 import { DAY_NAMES, formatDuration } from '../../secretary.dates';
-import { MOCK_APPOINTMENTS, MOCK_DOCTORS } from '../../secretary.mock-data';
+import { MOCK_APPOINTMENTS, MOCK_DOCTORS, MOCK_SECRETARY_PROFILE } from '../../secretary.mock-data';
 import { SecretarySession } from '../../secretary-session';
 import { SecretarySchedules } from './secretary-schedules';
 
 describe('SecretarySchedules', () => {
+  /** The one doctor whose week this page shows. */
+  const DESK = MOCK_SECRETARY_PROFILE.assignedDoctorId!;
+
   let fixture: ComponentFixture<SecretarySchedules>;
   let session: SecretarySession;
 
@@ -35,11 +38,32 @@ describe('SecretarySchedules', () => {
     return (fixture.nativeElement as HTMLElement).textContent ?? '';
   }
 
-  it('shows a week for every doctor, side by side', () => {
-    expect(page().doctors().length).toBe(MOCK_DOCTORS.length);
-    for (const doctor of MOCK_DOCTORS) {
-      expect(text()).toContain(doctor.name);
+  it('shows the assigned doctor week, and no other doctor week', () => {
+    // This page used to lay every doctor's week side by side, to answer "who is
+    // free on Thursday?". A desk with one doctor has no such question.
+    expect(page().doctors().length).toBe(1);
+    expect(page().doctors()[0].doctor.id).toBe(DESK);
+    expect(text()).toContain(session.doctors()[0].doctor.name);
+
+    for (const doctor of MOCK_DOCTORS.filter((d) => d.id !== DESK)) {
+      expect(text()).not.toContain(doctor.name);
     }
+  });
+
+  it('offers no doctor filter, because a week cannot be narrowed to one of one', () => {
+    // The per-doctor toggle and the "Show every doctor" button went with the
+    // multi-doctor list. Both would have been controls with nothing to switch.
+    expect(page().selectDoctor).toBeUndefined();
+    expect(page().isSelected).toBeUndefined();
+    expect(page().reset).toBeUndefined();
+    expect(text()).not.toContain('Show every doctor');
+  });
+
+  it('does not offer the week as a control, because a doctor publishes it', () => {
+    // A row of days that is not a button: it was a toggle, so it took focus and
+    // announced itself as actionable for no reason.
+    expect((fixture.nativeElement as HTMLElement).querySelector('.week__toggle')).toBeNull();
+    expect((fixture.nativeElement as HTMLElement).querySelector('[aria-pressed]')).toBeNull();
   });
 
   it('labels the columns Sunday to Saturday', () => {
@@ -48,13 +72,12 @@ describe('SecretarySchedules', () => {
     }
   });
 
-  it('gives each doctor a Sunday-first week', () => {
-    for (const summary of page().doctors()) {
-      const week = page()
-        .daysFor(summary)
-        .map((d: any) => d.dayOfWeek);
-      expect(week).toEqual([0, 1, 2, 3, 4, 5, 6]);
-    }
+  it('gives the doctor a Sunday-first week', () => {
+    const summary = page().doctors()[0];
+    const week = page()
+      .daysFor(summary)
+      .map((d: any) => d.dayOfWeek);
+    expect(week).toEqual([0, 1, 2, 3, 4, 5, 6]);
   });
 
   it('shows the published window, and a dash for a closed day', () => {
@@ -69,6 +92,17 @@ describe('SecretarySchedules', () => {
     }
   });
 
+  it('marks the one closed weekday of this doctor', () => {
+    // doc-003's Monday is closed, which is what the booking rules are demonstrated
+    // against, so the page has to show the closure rather than hide the column.
+    const summary = page().doctors()[0];
+    const closed = page()
+      .daysFor(summary)
+      .filter((day: any) => !day.enabled);
+    expect(closed).toHaveLength(1);
+    expect(text()).toContain('Sunday to Saturday');
+  });
+
   it('summarises the week from the published days, not a constant', () => {
     const summary = page().doctors()[0];
     const open = page()
@@ -80,72 +114,17 @@ describe('SecretarySchedules', () => {
     expect(page().publishedFor(summary)).toBe(expected);
   });
 
-  it('says when a doctor publishes no hours at all', () => {
-    const inactive = page()
-      .doctors()
-      .find((s: any) => s.doctor.status === 'inactive');
-    expect(inactive).toBeTruthy();
-    expect(page().publishedFor(inactive)).toBe('Not publishing any hours');
-    expect(text()).toContain('Not taking bookings');
-  });
-
   it('counts the appointments still to come from the store', () => {
+    const summary = page().doctors()[0];
     const now = session.now().getTime();
-    for (const summary of page().doctors()) {
-      const expected = session
-        .appointmentsForDoctor(summary.doctor.id)
-        .filter(
-          (a) =>
-            (a.status === 'booked' || a.status === 'confirmed') &&
-            new Date(a.startsAt).getTime() >= now,
-        ).length;
-      expect(page().bookedFor(summary)).toBe(expected);
-    }
-  });
-
-  it('narrows to one doctor and back, through the same control', () => {
-    page().selectDoctor('doc-001');
-    fixture.detectChanges();
-
-    expect(page().doctors().length).toBe(1);
-    expect(page().doctors()[0].doctor.id).toBe('doc-001');
-    expect(page().isSelected('doc-001')).toBe(true);
-    expect(text()).toContain('Show every doctor');
-    expect(text()).not.toContain('Ana Lim');
-
-    // Toggling the same name clears the filter: one control reads as both
-    // "show one" and "show all again".
-    page().selectDoctor('doc-001');
-    fixture.detectChanges();
-    expect(page().doctors().length).toBe(MOCK_DOCTORS.length);
-    expect(text()).not.toContain('Show every doctor');
-  });
-
-  it('restores the full list from the clear button', () => {
-    page().selectDoctor('doc-002');
-    fixture.detectChanges();
-    expect(page().doctors().length).toBe(1);
-
-    const button = [...(fixture.nativeElement as HTMLElement).querySelectorAll('button')].find(
-      (b) => b.textContent?.trim() === 'Show every doctor',
-    );
-    expect(button).toBeTruthy();
-    button!.click();
-    fixture.detectChanges();
-
-    expect(page().doctors().length).toBe(MOCK_DOCTORS.length);
-    expect(page().selectedDoctorId()).toBeNull();
-  });
-
-  it('marks the chosen doctor as pressed so the filter is discoverable', () => {
-    const toggle = [...(fixture.nativeElement as HTMLElement).querySelectorAll('button')].find(
-      (b) => b.textContent?.includes('Rafael Santos'),
-    );
-    expect(toggle?.getAttribute('aria-pressed')).toBe('false');
-
-    page().selectDoctor('doc-001');
-    fixture.detectChanges();
-    expect(toggle?.getAttribute('aria-pressed')).toBe('true');
+    const expected = session
+      .appointmentsForDoctor(summary.doctor.id)
+      .filter(
+        (a) =>
+          (a.status === 'booked' || a.status === 'confirmed') &&
+          new Date(a.startsAt).getTime() >= now,
+      ).length;
+    expect(page().bookedFor(summary)).toBe(expected);
   });
 
   it('is read-only, and says the conversation belongs to the doctor', () => {
@@ -156,13 +135,6 @@ describe('SecretarySchedules', () => {
 
   it('explains what an appointment can be booked into', () => {
     expect(text()).toContain('the only hours an appointment can be booked into');
-  });
-
-  it('handles an empty list rather than rendering nothing', () => {
-    // The page filters internally, so the empty text is unreachable through the
-    // UI — but a store that came back empty must still say so.
-    expect(page().doctors().length).toBeGreaterThan(0);
-    expect(text()).toContain('Sunday to Saturday');
   });
 
   it('says the data is a sample, so a screenshot is not mistaken for a product', () => {

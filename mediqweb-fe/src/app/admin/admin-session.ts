@@ -114,6 +114,25 @@ export class AdminSession {
     return this.specializationsState().map((s) => ({ id: s.id, label: s.name }));
   }
 
+  /**
+   * Options for the create-account form's assigned-doctor field.
+   *
+   * Active doctors only, and the reason is the Secretary's side rather than the
+   * Admin's: an inactive doctor cannot take bookings and publishes no schedule,
+   * so a secretary assigned to one would sign in to an empty area with no way to
+   * tell that from their own fault. Enabling the doctor later is what makes the
+   * assignment usable, so the desk can wait for its doctor rather than the other
+   * way round.
+   *
+   * Offered with the specialization, so a reader can see both role fields are
+   * built the same way rather than wondering why one is filtered.
+   */
+  activeDoctorOptions(): { id: string; label: string }[] {
+    return this.doctorsState()
+      .filter((d) => d.status === 'active')
+      .map((d) => ({ id: d.id, label: d.name }));
+  }
+
   // ---------------------------------------------------------------------------
   // Mutations — mock only
   // ---------------------------------------------------------------------------
@@ -126,6 +145,11 @@ export class AdminSession {
       status: draft.status,
       specializationId: kind === 'doctor' ? (draft.specializationId ?? null) : null,
       licenseNumber: kind === 'doctor' ? draft.licenseNumber?.trim() || null : null,
+      // A doctor's desk belongs to them, so the field is meaningless on one and
+      // is dropped here rather than trusted from a draft the form built for the
+      // other role. Trimmed to null like the licence above: a whitespace-only
+      // assignment would otherwise persist as an id that resolves to no doctor.
+      assignedDoctorId: kind === 'secretary' ? draft.assignedDoctorId?.trim() || null : null,
       joinedOn: today(),
       lastActiveOn: null,
     };

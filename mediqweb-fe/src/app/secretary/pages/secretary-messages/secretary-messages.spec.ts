@@ -1,6 +1,6 @@
 import { type ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { MOCK_CONVERSATIONS } from '../../secretary.mock-data';
+import { MOCK_CONVERSATIONS, MOCK_PATIENTS } from '../../secretary.mock-data';
 import { SecretarySession } from '../../secretary-session';
 import { SecretaryMessages } from './secretary-messages';
 
@@ -61,8 +61,28 @@ describe('SecretaryMessages', () => {
     }));
   }
 
-  it('lists every conversation', () => {
-    expect(rows().length).toBe(MOCK_CONVERSATIONS.length);
+  it('lists this desk threads, not every thread in the clinic', () => {
+    // The message bodies name people and quote their appointments, so a thread
+    // that survived the filter while carrying another patient's details would be
+    // the worst kind of leak. The fixture is clinic-wide so this can be checked.
+    expect(rows().length).toBe(session.conversations().length);
+    expect(rows().length).toBeLessThan(MOCK_CONVERSATIONS.length);
+    expect(rows().length).toBeGreaterThan(0);
+  });
+
+  it('does not show a patient or doctor from another desk in the list', () => {
+    const elsewhere = MOCK_CONVERSATIONS.filter(
+      (c) => !session.conversations().some((s) => s.conversation.id === c.id),
+    );
+    expect(elsewhere.length).toBeGreaterThan(0);
+
+    for (const conversation of elsewhere) {
+      const name =
+        conversation.party === 'doctor'
+          ? session.doctorById(conversation.partyId)?.name
+          : MOCK_PATIENTS.find((p) => p.id === conversation.partyId)?.name;
+      expect(rows().map((row) => row.name)).not.toContain(name);
+    }
   });
 
   it('opens the most recently active thread without being told which', () => {

@@ -22,11 +22,16 @@ import type { Appointment } from '../../secretary.models';
 
 /**
  * A patient's file as the desk sees them: who they are, how to reach them, and
- * every appointment they have had with any of the clinic's doctors.
+ * every appointment they have had on this desk.
  *
  * The route parameter is read as a signal rather than from a snapshot, so the
  * page updates when the router reuses this component for a different id instead
  * of showing the previous patient.
+ *
+ * The lookup goes through `patientById`, which only answers for the assigned
+ * doctor's patients. That is what makes a hand-typed URL harmless: an id belonging
+ * to another doctor's patient renders the same not-found card as an id nobody has,
+ * so the address bar is not a way around the scoping the lists apply.
  *
  * A patient record — diagnoses, notes, prescriptions — is deliberately not here.
  * That is a separate milestone with its own access rules, and showing an empty
@@ -62,7 +67,7 @@ export class SecretaryPatientDetails {
     },
   );
 
-  /** `null` for an id that matches nobody, which the template renders as a 404. */
+  /** `null` for an id that is not one of this desk's patients, which renders as a 404. */
   protected readonly patient = computed(() => {
     const id = this.patientId();
     return id ? this.session.patientById(id) : null;
@@ -76,9 +81,10 @@ export class SecretaryPatientDetails {
   /** Newest first: a history is read backwards, and so is this table. */
   protected readonly historyRows = computed(() => [...this.history()].reverse());
 
+  // No Doctor column: every row on this desk is the assigned doctor, so the
+  // column would repeat one name down the page.
   protected readonly columns: TableColumn<Appointment>[] = [
     { key: 'startsAt', header: 'When', sortable: true },
-    { key: 'doctorId', header: 'Doctor' },
     { key: 'reason', header: 'Reason' },
     { key: 'durationMinutes', header: 'Length', hideBelow: 'md' },
     { key: 'status', header: 'Status', sortable: true },
@@ -89,10 +95,6 @@ export class SecretaryPatientDetails {
   protected age(): number {
     const patient = this.patient();
     return patient ? ageFrom(patient.dateOfBirth, this.now()) : 0;
-  }
-
-  protected doctorName(appointment: Appointment): string {
-    return this.session.doctorName(appointment.doctorId);
   }
 
   protected length(appointment: Appointment): string {

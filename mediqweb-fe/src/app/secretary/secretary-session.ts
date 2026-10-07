@@ -49,10 +49,16 @@ export interface BookingDraft {
  * Returned as a sentence rather than a code so the booking form can show it
  * directly — the alternative is a lookup table in the template that will drift
  * out of step with the rules the store enforces.
+ *
+ * `not-your-doctor` exists because the form no longer offers a doctor at all: the
+ * Secretary books for the doctor they are assigned to. It is still refused here,
+ * because the store's job is to hold the rule and the form's is to make it
+ * hard to break — not the other way round.
  */
 export type BookingRefusal =
   | 'no-patient'
   | 'no-doctor'
+  | 'not-your-doctor'
   | 'inactive-doctor'
   | 'day-closed'
   | 'outside-hours'
@@ -67,14 +73,19 @@ export type BookingRefusal =
  * exercised end to end without a backend. Replacing this with a service that
  * talks to the API is the only change the screens should ever need.
  *
- * Unlike `DoctorSession`, nothing here is scoped to one provider: a Secretary
- * books for the whole clinic and may see every patient, doctor and appointment.
- * What *is* enforced here is the set of rules that decide whether a booking is
- * allowed to exist — inside the doctor's published hours, not clashing with
- * another of that doctor's appointments, and not for a doctor who is inactive.
- * Those rules belong here rather than in a template because they are about the
- * data, not about how it looks: a form that merely turned the submit button grey
- * would still let a caller reach the same result by calling the store.
+ * Everything here is scoped to one doctor: the one an administrator assigned this
+ * Secretary to. The fixtures stay clinic-wide — there is one clinic, and the other
+ * desks have to exist for the scoping to mean anything — but every list, every
+ * count and every lookup is filtered through `isOnDesk` before a page can reach
+ * it, so a screen cannot accidentally read the clinic by going around a filter.
+ *
+ * What *is* enforced here, besides the scoping, is the set of rules that decide
+ * whether a booking is allowed to exist — for the assigned doctor, inside their
+ * published hours, not clashing with another of their appointments, and not for a
+ * doctor who is inactive. Those rules belong here rather than in a template
+ * because they are about the data, not about how it looks: a form that merely
+ * turned the submit button grey would still let a caller reach the same result by
+ * calling the store.
  */
 @Injectable()
 export class SecretarySession {
@@ -109,8 +120,59 @@ export class SecretarySession {
 
   readonly profile = computed(() => this.profileState());
 
-  /** Every appointment in the clinic, soonest first. */
-  readonly appointments = computed(() => [...this.appointmentState()].sort(byStart));
+  /**
+   * The doctor whose desk this Secretary works, or `null` while unassigned.
+   *
+   * Public because the screens have to explain the difference: an unassigned
+   * desk reads as an empty area on every page, and "nothing booked today" would
+   * be a lie. `unassignedMessage` is the sentence they share.
+   */
+  readonly assignedDoctor = computed<Doctor | null>(() => {
+    const id = this.profileState().assignedDoctorId;
+    return id ? this.doctorById(id) : null;
+  });
+
+  /**
+   * What an unassigned desk says for itself.
+   *
+   * One sentence, one place, because every list in the area would otherwise need
+   * its own version of it and they would drift apart.
+   */
+  readonly unassignedMessage =
+    'You are not assigned to a doctor yet. Ask an administrator to assign you to one.';
+
+  /**
+   * Whether a record belongs to this Secretary's desk.
+   *
+   * The one gate every read in this class goes through, and deliberately
+   * private: a page that could ask the question itself would eventually ask it
+   * wrong, and an unassigned desk has to read as empty everywhere at once rather
+   * than on the screens that remembered.
+   */
+  private isOnDesk(doctorId: string): boolean {
+    return this.profileState().assignedDoctorId === doctorId;
+  }
+
+  /**
+   * Whether a conversation belongs to this desk.
+   *
+   * Not `isOnDesk(partyId)`: a patient thread's `partyId` is a *patient* id, so
+   * comparing it to the assigned doctor would drop every thread with a patient in
+   * it and leave the desk with an empty message list while the numbers still
+   * looked plausible. Resolving the party first is the only correct reading.
+   */
+  private isConversationOnDesk(conversation: Conversation): boolean {
+    if (conversation.party === 'doctor') return this.isOnDesk(conversation.partyId);
+    const patient = this.patientState().find((candidate) => candidate.id === conversation.partyId);
+    return !!patient && this.isOnDesk(patient.doctorId);
+  }
+
+  /** The assigned doctor's appointments, soonest first. */
+  readonly appointments = computed(() =>
+    this.appointmentState()
+      .filter((appointment) => this.isOnDesk(appointment.doctorId))
+      .sort(byStart),
+  );
 
   /** Today's list, cancelled appointments dropped so the day reads as a plan. */
   readonly todaysAppointments = computed(() => {
@@ -149,73 +211,103 @@ export class SecretarySession {
   });
 
   /**
-   * Every patient the clinic has, with their visit figures.
+   * The assigned doctor's patients, with their visit figures.
    *
-   * A Secretary sees all of them: they are the one who opens a patient record in
-   * order to book, so a patient with no appointments yet still has to be
-   * reachable. That is the opposite of the Doctor area, where a patient is only
-   * visible once they have an appointment with that doctor.
+   * A patient's panel is the reason a Secretary can book somebody they have never
+   * met: the list is the assigned doctor's patients, not everybody with an
+   * appointment, so a walk-in registered at the desk is on it from the moment they
+   * are given to that doctor and stays bookable with no appointment to derive
+   * them from.
+   *
+   * Visit figures come from `appointments`, so they count only what this desk can
+   * see. A patient who also saw another doctor reads as having fewer visits here,
+   * which is the honest answer for a desk that could not have watched them.
    */
   readonly patients = computed<PatientSummary[]>(() => {
     const all = this.appointments();
     const now = this.now().getTime();
 
-    return this.patientState().map((patient): PatientSummary => {
-      const history = all
-        .filter((appointment) => appointment.patientId === patient.id)
-        .sort(byStart);
-      const past = history.filter((appointment) => new Date(appointment.startsAt).getTime() < now);
-      const future = history.filter(
-        (appointment) =>
-          new Date(appointment.startsAt).getTime() >= now &&
-          !CLOSED_STATUSES.includes(appointment.status),
-      );
+    return this.patientState()
+      .filter((patient) => this.isOnDesk(patient.doctorId))
+      .map((patient): PatientSummary => {
+        const history = all
+          .filter((appointment) => appointment.patientId === patient.id)
+          .sort(byStart);
+        const past = history.filter(
+          (appointment) => new Date(appointment.startsAt).getTime() < now,
+        );
+        const future = history.filter(
+          (appointment) =>
+            new Date(appointment.startsAt).getTime() >= now &&
+            !CLOSED_STATUSES.includes(appointment.status),
+        );
 
-      return {
-        patient,
-        lastVisit: past.length ? past[past.length - 1] : null,
-        nextVisit: future.length ? future[0] : null,
-        visitCount: history.filter(
-          (appointment) => appointment.status === 'completed' || appointment.status === 'no-show',
-        ).length,
-      };
-    });
+        return {
+          patient,
+          lastVisit: past.length ? past[past.length - 1] : null,
+          nextVisit: future.length ? future[0] : null,
+          visitCount: history.filter(
+            (appointment) => appointment.status === 'completed' || appointment.status === 'no-show',
+          ).length,
+        };
+      });
   });
 
-  /** Every doctor, with the availability the Secretary needs when booking. */
+  /**
+   * The assigned doctor, with the availability the Secretary needs when booking.
+   *
+   * A list rather than a single `Doctor` because that is the shape the Doctor List
+   * page and the booking form already read, and because an unassigned desk has to
+   * come back as an empty list rather than as a doctor-shaped hole.
+   */
   readonly doctors = computed<DoctorSummary[]>(() => {
     const now = this.now().getTime();
-    return this.doctorState().map((doctor) => {
-      const days = this.schedule()[doctor.id] ?? [];
-      const weekly = days.reduce((total, day) => total + this.dayMinutes(day), 0);
-      const nextLive = this.appointments()
-        .filter(
-          (appointment) =>
-            appointment.doctorId === doctor.id &&
-            LIVE_STATUSES.includes(appointment.status) &&
-            new Date(appointment.startsAt).getTime() >= now,
-        )
-        .sort(byStart)[0];
+    return this.doctorState()
+      .filter((doctor) => this.isOnDesk(doctor.id))
+      .map((doctor) => {
+        const days = this.schedule()[doctor.id] ?? [];
+        const weekly = days.reduce((total, day) => total + this.dayMinutes(day), 0);
+        // No doctor filter here: `appointments` is already this doctor's, and the
+        // loop above it already left only them.
+        const nextLive = this.appointments()
+          .filter(
+            (appointment) =>
+              LIVE_STATUSES.includes(appointment.status) &&
+              new Date(appointment.startsAt).getTime() >= now,
+          )
+          .sort(byStart)[0];
 
-      return {
-        doctor,
-        weeklyHours: weekly ? formatWeekHours(weekly) : 'Not taking bookings',
-        nextAvailable: nextLive?.startsAt ?? null,
-      };
-    });
+        return {
+          doctor,
+          weeklyHours: weekly ? formatWeekHours(weekly) : 'Not taking bookings',
+          nextAvailable: nextLive?.startsAt ?? null,
+        };
+      });
   });
 
+  /**
+   * How many doctors this desk can book with: one, or none while unassigned.
+   *
+   * Counted off `doctors` rather than the raw fixtures so the number cannot
+   * disagree with the roster the page renders beside it.
+   */
   readonly activeDoctorCount = computed(
-    () => this.doctorState().filter((doctor) => doctor.status === 'active').length,
+    () => this.doctors().filter((summary) => summary.doctor.status === 'active').length,
   );
 
-  /** Each doctor's published week, sorted Sunday-first. */
+  /**
+   * The assigned doctor's published week, Sunday-first.
+   *
+   * One entry, because a schedule is the doctor's own hours: another doctor's week
+   * is not this desk's business, and putting it in this record would let it leak
+   * into the booking rules. `scheduleFor` returns an empty list for any other id,
+   * which is what the schedules page and `bookingRefusal` both want.
+   */
   readonly schedule = computed(() =>
     Object.fromEntries(
-      Object.entries(this.scheduleState()).map(([id, days]) => [
-        id,
-        [...days].sort((a, b) => a.dayOfWeek - b.dayOfWeek),
-      ]),
+      Object.entries(this.scheduleState())
+        .filter(([id]) => this.isOnDesk(id))
+        .map(([id, days]) => [id, [...days].sort((a, b) => a.dayOfWeek - b.dayOfWeek)]),
     ),
   );
 
@@ -224,11 +316,18 @@ export class SecretarySession {
   // -------------------------------------------------------------------------
 
   /**
-   * Every thread, most recently active first.
+   * This desk's threads, most recently active first.
    *
    * Sorted here rather than in the page so the nav badge and the list are
    * counting and ordering the same set — two independent orderings is how a
    * badge ends up promising a conversation that is not at the top.
+   *
+   * Scoped to the desk, and the scoping is the same for both parties: a thread
+   * with one of this doctor's patients is this desk's, and a thread with any other
+   * doctor is another desk's. A message list is patient data in a different shape
+   * — the bodies name people and quote their appointments — so a thread that
+   * survives the filter but not the data it carries would be the worst kind of
+   * leak.
    *
    * An empty thread sorts last because its `lastSentAt` is `''`, which is also
    * what the list row renders as "No messages yet". The fixtures all have
@@ -238,6 +337,7 @@ export class SecretarySession {
     const messages = this.messageState();
 
     return this.conversationState()
+      .filter((conversation) => this.isConversationOnDesk(conversation))
       .map((conversation): ConversationSummary => {
         const thread = messages
           .filter((message) => message.conversationId === conversation.id)
@@ -262,9 +362,9 @@ export class SecretarySession {
     this.conversations().reduce((total, summary) => total + summary.unreadCount, 0),
   );
 
-  /** How many threads still owe the clinic something. */
+  /** How many of this desk's threads still owe the clinic something. */
   readonly awaitingActionCount = computed(
-    () => this.conversationState().filter((conversation) => conversation.awaitingAction).length,
+    () => this.conversations().filter((summary) => summary.conversation.awaitingAction).length,
   );
 
   /**
@@ -312,9 +412,14 @@ export class SecretarySession {
    *
    * Only their messages: a reply you sent yourself is never unread, and marking
    * it so would inflate the count back on the next read. Returns whether anything
-   * changed, so the caller can tell a real transition from a no-op.
+   * changed, so the caller can tell a real transition from a no-op — including the
+   * refusal to touch a thread on another desk, which changes nothing.
    */
   markConversationRead(conversationId: string): boolean {
+    if (!this.conversations().some((summary) => summary.conversation.id === conversationId)) {
+      return false;
+    }
+
     const at = localIso(this.now());
     let changed = false;
 
@@ -333,14 +438,18 @@ export class SecretarySession {
   /**
    * Appends a reply from the signed-in Secretary.
    *
-   * Returns the new message, or `null` for an empty body or an unknown thread —
-   * so the composer can clear itself only when something was actually sent,
-   * instead of silently eating what somebody typed.
+   * Returns the new message, or `null` for an empty body or a thread that is not
+   * on this desk — so the composer can clear itself only when something was
+   * actually sent, instead of silently eating what somebody typed.
    */
   sendMessage(conversationId: string, body: string): ConversationMessage | null {
     const text = body.trim();
     if (!text) return null;
-    if (!this.conversationState().some((c) => c.id === conversationId)) return null;
+    // Checked against `conversations` rather than the raw list, so a thread on
+    // another desk is refused the same way an unknown one is.
+    if (!this.conversations().some((summary) => summary.conversation.id === conversationId)) {
+      return null;
+    }
 
     const message: ConversationMessage = {
       id: this.nextMessageId(),
@@ -384,21 +493,47 @@ export class SecretarySession {
       : (this.patientById(conversation.partyId)?.name ?? 'Unknown patient');
   }
 
-  /** Patient lookup that tolerates a bad route param instead of throwing. */
+  /**
+   * One of this desk's patients, or `null` for an id that is not on it.
+   *
+   * Tolerating a bad id rather than throwing is the same contract as
+   * `conversationById`: the screen asks for a patient and renders what it got,
+   * rather than an unreachable id blanking the page. The scoping is here as well
+   * as in `patients` because a route param is a perfectly good way to ask for
+   * somebody else's patient, and a list filter does nothing about that.
+   */
   patientById(id: string): Patient | null {
-    return this.patientState().find((patient) => patient.id === id) ?? null;
+    const patient = this.patientState().find((candidate) => candidate.id === id);
+    return patient && this.isOnDesk(patient.doctorId) ? patient : null;
   }
 
+  /**
+   * A doctor by id, unscoped.
+   *
+   * A name resolver, not a list: the only ids any page can hold are the ones
+   * `appointments` and `conversations` already returned, so resolving one cannot
+   * widen what a page can see. `doctors` and `schedule` are the scoped reads.
+   */
   doctorById(id: string): Doctor | null {
     return this.doctorState().find((doctor) => doctor.id === id) ?? null;
   }
 
-  /** A patient's appointments across all doctors, soonest first. */
+  /**
+   * A patient's appointments on this desk, soonest first.
+   *
+   * Empty for a patient on another desk, which is the answer rather than a
+   * special case: this desk has never seen them.
+   */
   appointmentsForPatient(patientId: string): Appointment[] {
     return this.appointments().filter((appointment) => appointment.patientId === patientId);
   }
 
-  /** A doctor's appointments across every patient, soonest first. */
+  /**
+   * A doctor's appointments, soonest first.
+   *
+   * Empty for any doctor but the assigned one, for the same reason
+   * `appointmentsForPatient` is empty off-desk: the desk's view is its own.
+   */
   appointmentsForDoctor(doctorId: string): Appointment[] {
     return this.appointments().filter((appointment) => appointment.doctorId === doctorId);
   }
@@ -448,6 +583,7 @@ export class SecretarySession {
 
     const doctor = this.doctorById(draft.doctorId);
     if (!doctor) return 'no-doctor';
+    if (!this.isOnDesk(draft.doctorId)) return 'not-your-doctor';
     if (doctor.status !== 'active') return 'inactive-doctor';
 
     const startsAt = new Date(draft.startsAt);
@@ -512,10 +648,15 @@ export class SecretarySession {
    * published hours, on the same terms as a new booking. Cancelled appointments
    * cannot be moved: their time no longer matters, and reviving one silently
    * would make a cancellation reversible without anyone saying so.
+   *
+   * Refuses an appointment on another desk too. The list never offers one, but the
+   * id comes from the caller and a store that trusted it would be the one place
+   * the scoping could be undone.
    */
   reschedule(id: string, startsAt: string): boolean {
     const current = this.appointmentState().find((appointment) => appointment.id === id);
-    if (!current || CLOSED_STATUSES.includes(current.status)) return false;
+    if (!current || !this.isOnDesk(current.doctorId)) return false;
+    if (CLOSED_STATUSES.includes(current.status)) return false;
 
     if (
       this.bookingRefusal(
@@ -541,16 +682,18 @@ export class SecretarySession {
   }
 
   /**
-   * Cancels an appointment.
+   * Cancels an appointment on this desk.
    *
    * The only status the Secretary sets on an existing appointment: confirming,
    * completing and recording a no-show are the doctor's to do. Already-cancelled
    * and already-finished appointments are ignored, so a double click cannot
-   * rewrite history. Returns whether anything changed.
+   * rewrite history, and so can an id belonging to another desk. Returns whether
+   * anything changed.
    */
   cancel(id: string): boolean {
     const current = this.appointmentState().find((appointment) => appointment.id === id);
-    if (!current || CLOSED_STATUSES.includes(current.status)) return false;
+    if (!current || !this.isOnDesk(current.doctorId)) return false;
+    if (CLOSED_STATUSES.includes(current.status)) return false;
 
     this.appointmentState.update((appointments) =>
       appointments.map((appointment) =>
@@ -560,9 +703,21 @@ export class SecretarySession {
     return true;
   }
 
-  /** Applies the fields the Profile page is allowed to change. */
+  /**
+   * Applies the fields the Profile page is allowed to change.
+   *
+   * Named field by field rather than spread, so a caller handing over a whole
+   * profile object cannot reassign the Secretary to another doctor through it. The
+   * type says `ProfileDraft` is the three editable fields, but a spread would make
+   * the guarantee a compile-time suggestion rather than a rule.
+   */
   updateProfile(draft: ProfileDraft): void {
-    this.profileState.update((profile) => ({ ...profile, ...draft }));
+    this.profileState.update((profile) => ({
+      ...profile,
+      name: draft.name,
+      email: draft.email,
+      phone: draft.phone,
+    }));
   }
 
   /**
