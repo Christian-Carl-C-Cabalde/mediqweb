@@ -21,12 +21,16 @@
   text-align: center;
 }
 
-// chart.js measures its parent to size the canvas, so the height has to live
-// here — an auto height collapses to zero before the first draw, and a canvas
-// with no box never gets one.
+// A bounded square, centred in whatever box the card gives it. chart.js
+// measures this box to size the canvas, so the box decides the shape: with a
+// fixed height in a wide column the pie came out as a small circle adrift in a
+// wide empty band. Growing with the column stops at a size a circle stays
+// readable at, and no further.
 .pie__plot {
   position: relative;
-  height: 8.5rem;
+  width: min(100%, 14rem);
+  aspect-ratio: 1;
+  margin-inline: auto;
 }
 
 // Only a ceiling: chart.js sets the canvas inline once it has laid it out, and
@@ -38,11 +42,14 @@
   max-height: 100%;
 }
 
+// The legend lives in the same block as the plot, so its rows line up with the
+// circle above instead of running out to the card's edges on either side of it.
 .pie__legend {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
-  margin: var(--space-3) 0 0;
+  width: min(100%, 14rem);
+  margin: var(--space-3) auto 0;
   padding: 0;
   list-style: none;
 }

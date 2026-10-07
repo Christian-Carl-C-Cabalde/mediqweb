@@ -1,5 +1,6 @@
 import { type ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { BADGE_TONE_TOKEN } from '../../../shared/components';
 import { AdminSession } from '../../admin-session';
 import { AdminDashboard } from './admin-dashboard';
 
@@ -24,6 +25,18 @@ describe('AdminDashboard', () => {
 
   function page(): any {
     return fixture.componentInstance;
+  }
+
+  /** Everything the chart counts, across its three slices. */
+  function total(slices: readonly { value: number }[]): number {
+    return slices.reduce((sum, slice) => sum + slice.value, 0);
+  }
+
+  /** How many appointments the fixture holds in the given statuses. */
+  function shown(...statuses: string[]): number {
+    return session
+      .appointments()
+      .filter((appointment: any) => statuses.includes(appointment.status)).length;
   }
 
   it('shows a card for each area of the Admin', () => {
@@ -69,32 +82,45 @@ describe('AdminDashboard', () => {
     expect(page().severityTone('info')).toBe('info');
   });
 
-  it('breaks the rendered list down by severity, totalling the same rows', () => {
-    const slices = page().severitySlices();
-    const total = slices.reduce((sum: number, slice: any) => sum + slice.value, 0);
-    expect(total).toBe(page().activity().length);
-    expect(slices.length).toBeGreaterThan(0);
+  it('breaks the clinic appointments into pending, ongoing and finished', () => {
+    const slices = page().lifecycleSlices();
+    expect(slices.map((slice: any) => slice.label)).toEqual(['Pending', 'Ongoing', 'Finished']);
+    expect(total(slices)).toBe(shown('booked', 'confirmed', 'completed'));
   });
 
-  it('counts every severity present exactly once', () => {
-    const severities = new Set(page().activity().map((entry: any) => entry.severity));
-    expect(page().severitySlices()).toHaveLength(severities.size);
+  it('leaves cancelled and no-show out of the chart without losing them', () => {
+    const appointments = session.appointments();
+    const dropped = appointments.filter(
+      (appointment: any) => appointment.status === 'cancelled' || appointment.status === 'no-show',
+    );
+    // The fixture has to contain some, or dropping them proves nothing.
+    expect(dropped.length).toBeGreaterThan(0);
+    expect(total(page().lifecycleSlices()) + dropped.length).toBe(appointments.length);
   });
 
-  it('names each slice the way the audit log page does', () => {
-    const labels: string[] = page().severitySlices().map((slice: any) => slice.label);
-    for (const label of labels) {
-      expect(['Routine', 'Needs attention', 'Problem']).toContain(label);
-    }
+  it('draws the stages red, blue and green, in the order the work happens', () => {
+    expect(page().lifecycleSlices().map((slice: any) => slice.color)).toEqual([
+      BADGE_TONE_TOKEN.danger,
+      BADGE_TONE_TOKEN.info,
+      BADGE_TONE_TOKEN.success,
+    ]);
   });
 
-  it('draws the breakdown beside the list, not instead of it', () => {
+  it('shows the chart in its own Appointments card beside the activity list', () => {
     const host = fixture.nativeElement as HTMLElement;
-    expect(host.querySelector('.activity-split .activity')).toBeTruthy();
-    expect(host.querySelector('.activity-split ui-pie-chart')).toBeTruthy();
-    expect(
-      host.querySelectorAll('ui-pie-chart .pie__item').length,
-    ).toBe(page().severitySlices().length);
+    const dash = host.querySelector('.dash');
+    expect(dash?.querySelector('.activity')).toBeTruthy();
+
+    const chart = dash?.querySelector('ui-pie-chart');
+    expect(chart).toBeTruthy();
+    const card = chart?.closest('.ui-card') as HTMLElement;
+    expect(card.querySelector('.ui-card__title')?.textContent?.trim()).toBe('Appointments');
+
+    // Zero-count stages are dropped by the component, not drawn as flat arcs.
+    const drawn = page()
+      .lifecycleSlices()
+      .filter((slice: any) => slice.value > 0);
+    expect(chart?.querySelectorAll('.pie__item')).toHaveLength(drawn.length);
   });
 
   it('states plainly that the data is a sample', () => {

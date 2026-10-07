@@ -1,4 +1,10 @@
-import type { AuditEntry, PatientAccount, Specialization, StaffAccount } from './admin.models';
+import type {
+  Appointment,
+  AuditEntry,
+  PatientAccount,
+  Specialization,
+  StaffAccount,
+} from './admin.models';
 
 /**
  * Sample data standing in for API responses.
@@ -188,6 +194,166 @@ export const MOCK_PATIENTS: readonly PatientAccount[] = [
     dateOfBirth: '1996-03-15',
     status: 'active',
     registeredOn: '2026-08-02',
+  },
+];
+
+/**
+ * A timestamp `daysFromToday` days from now at `hour:minute` local time.
+ *
+ * Relative rather than written out, for the reason the Doctor and Secretary
+ * fixtures do the same: a `booked` appointment dated last March would be a
+ * booking nobody could still attend, and the lifecycle the dashboard charts
+ * would stop making sense the day after the file was written.
+ */
+function at(daysFromToday: number, hour: number, minute = 0): string {
+  const date = new Date();
+  date.setDate(date.getDate() + daysFromToday);
+  date.setHours(hour, minute, 0, 0);
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return (
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+    `T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+  );
+}
+
+/**
+ * Clinic-wide appointments, counting both directions of the lifecycle: the
+ * closed ones behind it and the open ones ahead of it, so a chart of pending,
+ * ongoing and finished has something in every slice.
+ *
+ * `cancelled` and `no-show` are present on purpose. They are outcomes rather
+ * than stages, so the dashboard's chart leaves them out — which is only worth
+ * asserting if the fixture actually contains them.
+ */
+export const MOCK_APPOINTMENTS: readonly Appointment[] = [
+  // ---- Closed out
+  {
+    id: 'appt-301',
+    patientId: 'pat-001',
+    doctorId: 'doc-001',
+    startsAt: at(-7, 9),
+    durationMinutes: 30,
+    status: 'completed',
+    reason: 'Follow-up: blood pressure review',
+  },
+  {
+    id: 'appt-302',
+    patientId: 'pat-002',
+    doctorId: 'doc-002',
+    startsAt: at(-5, 10, 30),
+    durationMinutes: 45,
+    status: 'completed',
+    reason: 'Follow-up: knee rehabilitation',
+  },
+  {
+    id: 'appt-303',
+    patientId: 'pat-003',
+    doctorId: 'doc-005',
+    startsAt: at(-3, 15),
+    durationMinutes: 20,
+    status: 'completed',
+    reason: 'Child wellness check',
+  },
+  {
+    id: 'appt-304',
+    patientId: 'pat-005',
+    doctorId: 'doc-003',
+    startsAt: at(-2, 11),
+    durationMinutes: 30,
+    status: 'completed',
+    reason: 'Skin rash assessment',
+  },
+  {
+    id: 'appt-305',
+    patientId: 'pat-006',
+    doctorId: 'doc-001',
+    startsAt: at(-1, 14),
+    durationMinutes: 30,
+    status: 'completed',
+    reason: 'ECG reading and review',
+  },
+  {
+    id: 'appt-306',
+    patientId: 'pat-002',
+    doctorId: 'doc-003',
+    startsAt: at(-2, 16),
+    durationMinutes: 15,
+    status: 'no-show',
+    reason: 'Skin check',
+  },
+  {
+    id: 'appt-307',
+    patientId: 'pat-006',
+    doctorId: 'doc-002',
+    startsAt: at(-1, 9),
+    durationMinutes: 45,
+    status: 'cancelled',
+    reason: 'Post-operative review',
+  },
+  {
+    id: 'appt-308',
+    patientId: 'pat-001',
+    doctorId: 'doc-005',
+    startsAt: at(2, 13),
+    durationMinutes: 20,
+    status: 'cancelled',
+    reason: 'Allergy follow-up',
+  },
+
+  // ---- Open: booked but not yet confirmed, and confirmed
+  {
+    id: 'appt-309',
+    patientId: 'pat-003',
+    doctorId: 'doc-005',
+    startsAt: at(0, 14),
+    durationMinutes: 20,
+    status: 'booked',
+    reason: 'Pediatric consult',
+  },
+  {
+    id: 'appt-310',
+    patientId: 'pat-005',
+    doctorId: 'doc-003',
+    startsAt: at(1, 9),
+    durationMinutes: 30,
+    status: 'booked',
+    reason: 'Dermatology consult',
+  },
+  {
+    id: 'appt-311',
+    patientId: 'pat-002',
+    doctorId: 'doc-001',
+    startsAt: at(1, 11),
+    durationMinutes: 30,
+    status: 'booked',
+    reason: 'Hypertension check',
+  },
+  {
+    id: 'appt-312',
+    patientId: 'pat-001',
+    doctorId: 'doc-002',
+    startsAt: at(0, 15),
+    durationMinutes: 45,
+    status: 'confirmed',
+    reason: 'Knee pain consult',
+  },
+  {
+    id: 'appt-313',
+    patientId: 'pat-006',
+    doctorId: 'doc-001',
+    startsAt: at(2, 10),
+    durationMinutes: 30,
+    status: 'confirmed',
+    reason: 'Cardiology follow-up',
+  },
+  {
+    id: 'appt-314',
+    patientId: 'pat-005',
+    doctorId: 'doc-003',
+    startsAt: at(4, 8, 30),
+    durationMinutes: 20,
+    status: 'confirmed',
+    reason: 'Mole check',
   },
 ];
 

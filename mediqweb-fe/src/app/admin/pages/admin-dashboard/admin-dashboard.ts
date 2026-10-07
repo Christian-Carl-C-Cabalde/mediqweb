@@ -11,7 +11,7 @@ import {
   type PieSlice,
 } from '../../../shared/components';
 import { AdminSession } from '../../admin-session';
-import type { AuditSeverity } from '../../admin.models';
+import type { AppointmentStatus, AuditSeverity } from '../../admin.models';
 
 /**
  * Severity and badge tone are the same set, so one map serves both. Declared
@@ -25,22 +25,28 @@ const SEVERITY_TONE: Record<AuditSeverity, BadgeTone> = {
 };
 
 /**
- * The severity's name in prose. Same words the audit log page prints in its
- * severity column: a chart and the table it summarises must not disagree about
- * what a colour is called.
+ * The three states the chart shows, in the order they appear in its legend,
+ * each with the tone it is drawn in.
+ *
+ * Each is a stage an appointment passes through: `booked` is waiting for the
+ * clinic to confirm it, `confirmed` is the one the patient is expected to turn
+ * up for, `completed` is the one they did. `cancelled` and `no-show` are
+ * outcomes rather than stages, so they are not counted here — the chart is a
+ * picture of work in flight, and a chart that folded a no-show into "finished"
+ * would be reporting an appointment that happened when it did not.
+ *
+ * The three colours read as a progress line rather than as severity, which is
+ * why they are chosen here instead of taken from the status badge's table: on a
+ * badge, `booked` is quiet because it is unremarkable, but on this chart a
+ * `booked` appointment is the one nobody has acted on yet, and red is what
+ * says so. Reading left to right the chart runs red -> blue -> green, the
+ * direction the work moves in.
  */
-const SEVERITY_LABEL: Record<AuditSeverity, string> = {
-  info: 'Routine',
-  warning: 'Needs attention',
-  danger: 'Problem',
-};
-
-/**
- * The order slices appear in the chart and its legend. Fixed rather than
- * derived from the entries, so a legend does not reorder itself as data
- * changes, and in the same order the audit log offers its severities in.
- */
-const SEVERITY_ORDER: readonly AuditSeverity[] = ['info', 'warning', 'danger'];
+const LIFECYCLE: readonly { label: string; status: AppointmentStatus; tone: BadgeTone }[] = [
+  { label: 'Pending', status: 'booked', tone: 'danger' },
+  { label: 'Ongoing', status: 'confirmed', tone: 'info' },
+  { label: 'Finished', status: 'completed', tone: 'success' },
+];
 
 /**
  * Landing page for the Admin area.
@@ -66,22 +72,23 @@ export class AdminDashboard {
   protected readonly activity = computed(() => this.session.recentActivity());
 
   /**
-   * The activity list, counted by severity for the chart beside it.
+   * The clinic's appointments, counted into the three stages the chart shows.
    *
-   * Counts are taken over the same capped list that is rendered, so the pie
-   * and the rows it sits next to always total the same entries — a breakdown
-   * of a wider window than the list would show a slice for something the
-   * reader cannot then find in the list.
+   * Counted from the whole fixture rather than a window of it: unlike the
+   * activity list beside it, "how much work is finished" is not a claim about
+   * the last few entries, it is a claim about everything, so filtering to a
+   * recent slice would understate the Finished count for no reason.
+   *
+   * Tone names resolve through the badge's own token table, so a slice is
+   * painted by the same tokens the design system already uses rather than by
+   * colour literals typed in here.
    */
-  protected readonly severitySlices = computed<PieSlice[]>(() => {
-    const counts: Record<AuditSeverity, number> = { info: 0, warning: 0, danger: 0 };
-    for (const entry of this.activity()) {
-      counts[entry.severity] += 1;
-    }
-    return SEVERITY_ORDER.filter((severity) => counts[severity] > 0).map((severity) => ({
-      label: SEVERITY_LABEL[severity],
-      value: counts[severity],
-      color: BADGE_TONE_TOKEN[SEVERITY_TONE[severity]],
+  protected readonly lifecycleSlices = computed<PieSlice[]>(() => {
+    const appointments = this.session.appointments();
+    return LIFECYCLE.map(({ label, status, tone }) => ({
+      label,
+      value: appointments.filter((appointment) => appointment.status === status).length,
+      color: BADGE_TONE_TOKEN[tone],
     }));
   });
 

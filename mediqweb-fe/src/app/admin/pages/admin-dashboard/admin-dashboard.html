@@ -23,18 +23,19 @@
   </ui-stat-card>
 </div>
 
-<ui-card heading="Recent activity" [headingLevel]="3">
-  <ng-container uiCardHeaderActions>
-    <a class="see-all" routerLink="/admin/audit-logs">View all logs</a>
-  </ng-container>
+<!--
+  Shared two-column dashboard layout rather than a split inside one card:
+  the activity list is one subject and the clinic's appointments are another,
+  and a card headed "Recent activity" cannot honestly carry a chart about
+  appointments. The list keeps the wide column; the chart sits in the side
+  column the Doctor and Secretary dashboards already use for context.
+-->
+<div class="dash">
+  <ui-card heading="Recent activity" [headingLevel]="3">
+    <ng-container uiCardHeaderActions>
+      <a class="see-all" routerLink="/admin/audit-logs">View all logs</a>
+    </ng-container>
 
-  <!--
-    The list is the content of the card, so it keeps the width and the
-    breakdown of it sits beside as context. Below the layout's sidebar
-    breakpoint the two stack rather than squeezing the list's timestamps into
-    ellipses to make room for a 13rem column.
-  -->
-  <div class="activity-split">
     <ul class="activity">
       @for (entry of activity(); track entry.id) {
         <li class="activity__item">
@@ -59,7 +60,9 @@
         <li class="activity__empty">Nothing has happened yet.</li>
       }
     </ul>
+  </ui-card>
 
-    <ui-pie-chart [slices]="severitySlices()" caption="By severity" />
-  </div>
-</ui-card>
+  <ui-card heading="Appointments" [headingLevel]="3">
+    <ui-pie-chart [slices]="lifecycleSlices()" caption="By status" />
+  </ui-card>
+</div>
