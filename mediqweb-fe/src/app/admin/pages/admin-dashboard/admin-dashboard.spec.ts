@@ -1,5 +1,6 @@
 import { type ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { BADGE_TONE_TOKEN } from '../../../shared/components';
 import { AdminSession } from '../../admin-session';
 import { AdminDashboard } from './admin-dashboard';
 
@@ -24,6 +25,18 @@ describe('AdminDashboard', () => {
 
   function page(): any {
     return fixture.componentInstance;
+  }
+
+  /** Everything the chart counts, across its three slices. */
+  function total(slices: readonly { value: number }[]): number {
+    return slices.reduce((sum, slice) => sum + slice.value, 0);
+  }
+
+  /** How many appointments the fixture holds in the given statuses. */
+  function shown(...statuses: string[]): number {
+    return session
+      .appointments()
+      .filter((appointment: any) => statuses.includes(appointment.status)).length;
   }
 
   it('shows a card for each area of the Admin', () => {
@@ -67,6 +80,47 @@ describe('AdminDashboard', () => {
     expect(page().severityTone('danger')).toBe('danger');
     expect(page().severityTone('warning')).toBe('warning');
     expect(page().severityTone('info')).toBe('info');
+  });
+
+  it('breaks the clinic appointments into pending, ongoing and finished', () => {
+    const slices = page().lifecycleSlices();
+    expect(slices.map((slice: any) => slice.label)).toEqual(['Pending', 'Ongoing', 'Finished']);
+    expect(total(slices)).toBe(shown('booked', 'confirmed', 'completed'));
+  });
+
+  it('leaves cancelled and no-show out of the chart without losing them', () => {
+    const appointments = session.appointments();
+    const dropped = appointments.filter(
+      (appointment: any) => appointment.status === 'cancelled' || appointment.status === 'no-show',
+    );
+    // The fixture has to contain some, or dropping them proves nothing.
+    expect(dropped.length).toBeGreaterThan(0);
+    expect(total(page().lifecycleSlices()) + dropped.length).toBe(appointments.length);
+  });
+
+  it('draws the stages red, blue and green, in the order the work happens', () => {
+    expect(page().lifecycleSlices().map((slice: any) => slice.color)).toEqual([
+      BADGE_TONE_TOKEN.danger,
+      BADGE_TONE_TOKEN.info,
+      BADGE_TONE_TOKEN.success,
+    ]);
+  });
+
+  it('shows the chart in its own Appointments card beside the activity list', () => {
+    const host = fixture.nativeElement as HTMLElement;
+    const dash = host.querySelector('.dash');
+    expect(dash?.querySelector('.activity')).toBeTruthy();
+
+    const chart = dash?.querySelector('ui-pie-chart');
+    expect(chart).toBeTruthy();
+    const card = chart?.closest('.ui-card') as HTMLElement;
+    expect(card.querySelector('.ui-card__title')?.textContent?.trim()).toBe('Appointments');
+
+    // Zero-count stages are dropped by the component, not drawn as flat arcs.
+    const drawn = page()
+      .lifecycleSlices()
+      .filter((slice: any) => slice.value > 0);
+    expect(chart?.querySelectorAll('.pie__item')).toHaveLength(drawn.length);
   });
 
   it('states plainly that the data is a sample', () => {

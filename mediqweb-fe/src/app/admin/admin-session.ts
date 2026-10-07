@@ -1,5 +1,6 @@
 import { Injectable, computed, signal } from '@angular/core';
 import {
+  MOCK_APPOINTMENTS,
   MOCK_AUDIT_ENTRIES,
   MOCK_DOCTORS,
   MOCK_PATIENTS,
@@ -8,6 +9,7 @@ import {
 } from './admin.mock-data';
 import type {
   AccountStatus,
+  Appointment,
   AuditEntry,
   AuditSeverity,
   PatientAccount,
@@ -62,12 +64,23 @@ export class AdminSession {
   private readonly patientsState = signal<PatientAccount[]>([...MOCK_PATIENTS]);
   private readonly specializationsState = signal<Specialization[]>([...MOCK_SPECIALIZATIONS]);
   private readonly auditState = signal<AuditEntry[]>([...MOCK_AUDIT_ENTRIES]);
+  private readonly appointmentsState = signal<Appointment[]>([...MOCK_APPOINTMENTS]);
 
   readonly doctors = this.doctorsState.asReadonly();
   readonly secretaries = this.secretariesState.asReadonly();
   readonly patients = this.patientsState.asReadonly();
   readonly specializations = this.specializationsState.asReadonly();
   readonly auditEntries = this.auditState.asReadonly();
+  /**
+   * Every appointment in the clinic.
+   *
+   * A signal, unlike the fixtures it starts from, because this is the store's
+   * usual shape rather than because anything writes it yet: the Admin reads the
+   * clinic's appointments but does not book, confirm or cancel them, so the
+   * day one of those becomes an Admin action this does not have to change
+   * shape. The dashboard charts it; nothing else consumes it.
+   */
+  readonly appointments = this.appointmentsState.asReadonly();
 
   // ---------------------------------------------------------------------------
   // Counts for the dashboard

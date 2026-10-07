@@ -39,6 +39,7 @@ export {
 } from './status-badge/status-badge';
 export { Table, type TableColumn, type TableSort, type SortDirection } from './table/table';
 export { TableCell } from './table/table-cell';
+export { PieChart, type PieSlice } from './pie-chart/pie-chart';
 
 // Shared by every staff area that reads a staff or patient record: the same
 // fact/value grid, and one place that decides how an appointment status looks,
