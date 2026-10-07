@@ -33,7 +33,13 @@ const LIVE_STATUSES: readonly AppointmentStatus[] = ['booked', 'confirmed'];
 
 const byStart = (a: Appointment, b: Appointment): number => a.startsAt.localeCompare(b.startsAt);
 
-/** A proposed booking, before it exists as an appointment. */
+/**
+ * A proposed appointment, before it exists as one.
+ *
+ * Not something a Secretary can submit any more — they do not create
+ * appointments. This is the shape whoever does create one works in, and it is
+ * what `bookingRefusal` judges.
+ */
 export interface BookingDraft {
   readonly patientId: string;
   readonly doctorId: string;
@@ -44,16 +50,17 @@ export interface BookingDraft {
 }
 
 /**
- * Why a proposed booking cannot go ahead, or `null` when it can.
+ * Why a proposed appointment cannot go ahead, or `null` when it can.
  *
- * Returned as a sentence rather than a code so the booking form can show it
- * directly — the alternative is a lookup table in the template that will drift
- * out of step with the rules the store enforces.
+ * A code rather than a sentence, because there is no longer a form on this desk
+ * to show one in. Whoever creates an appointment — a patient booking online, an
+ * administrator — gives the code their own wording; returning a sentence from
+ * here would freeze the first form's phrasing into the store.
  *
- * `not-your-doctor` exists because the form no longer offers a doctor at all: the
- * Secretary books for the doctor they are assigned to. It is still refused here,
- * because the store's job is to hold the rule and the form's is to make it
- * hard to break — not the other way round.
+ * `not-your-doctor` exists because the booking form never offered a doctor at
+ * all: the desk is scoped to one. It is still refused, because the store's job is
+ * to hold the rule and a form's is to make it hard to break — not the other way
+ * round.
  */
 export type BookingRefusal =
   | 'no-patient'
@@ -80,12 +87,17 @@ export type BookingRefusal =
  * it, so a screen cannot accidentally read the clinic by going around a filter.
  *
  * What *is* enforced here, besides the scoping, is the set of rules that decide
- * whether a booking is allowed to exist — for the assigned doctor, inside their
- * published hours, not clashing with another of their appointments, and not for a
- * doctor who is inactive. Those rules belong here rather than in a template
- * because they are about the data, not about how it looks: a form that merely
- * turned the submit button grey would still let a caller reach the same result by
- * calling the store.
+ * whether an appointment may change hands: confirming is only ever `booked` to
+ * `confirmed`, cancelling only ever closes a live appointment, and neither will
+ * touch another desk's record. Those rules belong here rather than in a template
+ * because they are about the data, not about how it looks: a view that merely hid
+ * the button would still let a caller reach the same result by calling the store.
+ *
+ * This store creates no appointments. A visit arrives `booked` — from the patient,
+ * or from an administrator — and this desk either confirms it or calls it off.
+ * `bookingRefusal` still holds the rules a proposed appointment has to satisfy, for
+ * whoever creates one, and its tests are what state what the clinic considers
+ * bookable.
  */
 @Injectable()
 export class SecretarySession {
@@ -568,15 +580,20 @@ export class SecretarySession {
   }
 
   /**
-   * Whether a proposed booking is allowed, and why not if it is not.
+   * Whether a proposed appointment is allowed, and why not if it is not.
    *
-   * Shared by the booking form (to disable submit and explain) and by `book`
-   * (which refuses the same way), so the two can never disagree — the alternative
-   * is a form that disables a button for a rule the store does not share, and
-   * the button turns out to be wrong the first time the rule is edited.
+   * The rule set for creating an appointment, kept here rather than in whichever
+   * form asks: these are facts about the clinic's data — inside published hours,
+   * no overlap with the same doctor, that doctor is on this desk and still taking
+   * patients, not in the past — and a form that reimplemented them would be a
+   * second answer to "is this slot free?" that could disagree with the first.
    *
-   * `ignoreId` is the appointment being rescheduled, so moving an appointment
-   * onto its own current slot is not treated as a clash with itself.
+   * No Secretary screen calls this any more, because a Secretary does not book.
+   * It is here for whoever does create an appointment, and its tests are the
+   * statement of what the clinic considers bookable.
+   *
+   * `ignoreId` is an appointment being placed at a time it already occupies, so
+   * proposing a slot against an existing appointment is not a clash with itself.
    */
   bookingRefusal(draft: BookingDraft, ignoreId?: string): BookingRefusal | null {
     if (!draft.patientId || !this.patientById(draft.patientId)) return 'no-patient';
@@ -617,65 +634,31 @@ export class SecretarySession {
   }
 
   /**
-   * Books a new appointment.
+   * Confirms a booked appointment on this desk.
    *
-   * Applies the same rules the booking form checks, so a caller cannot get round
-   * them. Returns the new appointment, or `null` when the booking was refused —
-   * the caller asks `bookingRefusal` for the reason to show.
+   * One of the two statuses a Secretary sets, and the only move forward in the
+   * lifecycle they own: `booked` to `confirmed`, meaning the patient said they are
+   * coming. Everything after that — completing the visit, recording a no-show — is
+   * the doctor's, so there is deliberately no status here that skips ahead of the
+   * appointment actually happening.
+   *
+   * Refuses anything not currently `booked`: an appointment that is already
+   * confirmed has nothing to confirm, and one that is completed, cancelled or a
+   * no-show has ended, so reopening it would rewrite history without anyone asking.
+   * Refuses another desk's appointment too — the list never offers one, but the id
+   * comes from the caller and a store that trusted it would be the one place the
+   * scoping could be undone.
+   *
+   * Returns whether anything changed, so a double click cannot re-confirm.
    */
-  book(draft: BookingDraft): Appointment | null {
-    if (this.bookingRefusal(draft)) return null;
-
-    const appointment: Appointment = {
-      id: this.nextAppointmentId(),
-      patientId: draft.patientId,
-      doctorId: draft.doctorId,
-      startsAt: draft.startsAt,
-      durationMinutes: draft.durationMinutes,
-      // A Secretary creates a booking; confirming it is the patient's or the
-      // doctor's to do, so a new appointment is never born confirmed.
-      status: 'booked',
-      reason: draft.reason.trim(),
-    };
-    this.appointmentState.update((appointments) => [...appointments, appointment]);
-    return appointment;
-  }
-
-  /**
-   * Moves an appointment to a new time, keeping its status.
-   *
-   * Refuses a move into another appointment's slot or outside the doctor's
-   * published hours, on the same terms as a new booking. Cancelled appointments
-   * cannot be moved: their time no longer matters, and reviving one silently
-   * would make a cancellation reversible without anyone saying so.
-   *
-   * Refuses an appointment on another desk too. The list never offers one, but the
-   * id comes from the caller and a store that trusted it would be the one place
-   * the scoping could be undone.
-   */
-  reschedule(id: string, startsAt: string): boolean {
+  confirm(id: string): boolean {
     const current = this.appointmentState().find((appointment) => appointment.id === id);
     if (!current || !this.isOnDesk(current.doctorId)) return false;
-    if (CLOSED_STATUSES.includes(current.status)) return false;
-
-    if (
-      this.bookingRefusal(
-        {
-          patientId: current.patientId,
-          doctorId: current.doctorId,
-          startsAt,
-          durationMinutes: current.durationMinutes,
-          reason: current.reason,
-        },
-        id,
-      )
-    ) {
-      return false;
-    }
+    if (current.status !== 'booked') return false;
 
     this.appointmentState.update((appointments) =>
       appointments.map((appointment) =>
-        appointment.id === id ? { ...appointment, startsAt } : appointment,
+        appointment.id === id ? { ...appointment, status: 'confirmed' as const } : appointment,
       ),
     );
     return true;
@@ -684,11 +667,15 @@ export class SecretarySession {
   /**
    * Cancels an appointment on this desk.
    *
-   * The only status the Secretary sets on an existing appointment: confirming,
-   * completing and recording a no-show are the doctor's to do. Already-cancelled
-   * and already-finished appointments are ignored, so a double click cannot
-   * rewrite history, and so can an id belonging to another desk. Returns whether
-   * anything changed.
+   * The other of the two. Available from `booked` as well as `confirmed`, because a
+   * patient can call off a visit before or after confirming it, and the desk has to
+   * be able to say so either way. Already-cancelled and already-finished
+   * appointments are ignored, so a double click cannot rewrite history, and so can
+   * an id belonging to another desk.
+   *
+   * Cancelling is not deleting: the appointment stays in the history, which is why
+   * a cancellation is reversible by whoever created the appointment rather than by
+   * this desk.
    */
   cancel(id: string): boolean {
     const current = this.appointmentState().find((appointment) => appointment.id === id);
@@ -718,22 +705,6 @@ export class SecretarySession {
       email: draft.email,
       phone: draft.phone,
     }));
-  }
-
-  /**
-   * An id no fixture has taken.
-   *
-   * Sequential and checked against the live list rather than the fixtures, so
-   * deleting an appointment during a session cannot hand out a duplicate.
-   */
-  private nextAppointmentId(): string {
-    const used = this.appointmentState().map((appointment) => appointment.id);
-    let highest = 200;
-    for (const id of used) {
-      const parsed = Number(id.replace('appt-', ''));
-      if (Number.isFinite(parsed) && parsed > highest) highest = parsed;
-    }
-    return `appt-${highest + 1}`;
   }
 }
 

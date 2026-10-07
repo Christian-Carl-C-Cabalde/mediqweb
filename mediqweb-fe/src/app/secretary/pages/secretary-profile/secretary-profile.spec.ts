@@ -38,7 +38,7 @@ describe('SecretaryProfilePage', () => {
   it('shows the desk summary beside the form', () => {
     expect(page().patientCount()).toBe(session.patients().length);
     expect(page().doctorCount()).toBe(session.activeDoctorCount());
-    expect(text()).toContain(`${session.activeDoctorCount()} taking bookings`);
+    expect(text()).toContain(`${session.activeDoctorCount()} taking appointments`);
     expect(text()).toContain('Secretary');
   });
 

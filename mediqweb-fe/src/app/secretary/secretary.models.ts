@@ -29,13 +29,19 @@ export type { AppointmentStatus } from '../shared/domain/appointment-status';
 import type { AppointmentStatus } from '../shared/domain/appointment-status';
 
 /**
- * Statuses a Secretary is allowed to move an appointment into.
+ * The two things a Secretary can do to an existing appointment.
  *
- * The Secretary books (creates as 'booked') and can cancel.
- * Rescheduling keeps the status; moving to confirmed/completed/no-show
- * is the doctor's action.
+ * Confirming moves a `booked` appointment to `confirmed`; cancelling closes it.
+ * Both are administrative — they change whether the patient is expected, never
+ * what happens clinically.
+ *
+ * Notably absent: `book` and `reschedule`. A Secretary does not create
+ * appointments and does not move them; a visit arrives `booked` from the patient
+ * and this desk either confirms it or calls it off. Marking a visit complete and
+ * recording a no-show stay the doctor's, so the two roles between them cover the
+ * whole lifecycle without both being able to do the same thing.
  */
-export type SecretaryAppointmentAction = 'book' | 'reschedule' | 'cancel';
+export type SecretaryAppointmentAction = 'confirm' | 'cancel';
 
 export interface Appointment {
   readonly id: string;

@@ -1,11 +1,6 @@
 import { type ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { localIso, minutesOfDay } from '../../secretary.dates';
-import {
-  MOCK_APPOINTMENTS,
-  MOCK_SCHEDULES,
-  MOCK_SECRETARY_PROFILE,
-} from '../../secretary.mock-data';
+import { MOCK_APPOINTMENTS, MOCK_SECRETARY_PROFILE } from '../../secretary.mock-data';
 import { SecretarySession } from '../../secretary-session';
 import type { Appointment } from '../../secretary.models';
 import { SecretaryAppointments } from './secretary-appointments';
@@ -14,27 +9,8 @@ describe('SecretaryAppointments', () => {
   /** The doctor every row on this page belongs to. */
   const DESK = MOCK_SECRETARY_PROFILE.assignedDoctorId!;
 
-  /** A patient on that doctor's panel. */
-  const DESK_PATIENT = 'pat-205';
   let fixture: ComponentFixture<SecretaryAppointments>;
   let session: SecretarySession;
-
-  /** A future published slot for `doc-003`, as the `date`/`time` pair. */
-  function futureSlot(days = 14): { date: string; time: string } {
-    const date = new Date();
-    date.setHours(0, 0, 0, 0);
-    date.setDate(date.getDate() + days);
-    for (let skip = 0; skip < 14; skip += 1) {
-      if (MOCK_SCHEDULES[DESK][date.getDay()].enabled) break;
-      date.setDate(date.getDate() + 1);
-    }
-    const pad = (n: number) => String(n).padStart(2, '0');
-    const open = minutesOfDay(MOCK_SCHEDULES[DESK][date.getDay()].startTime)!;
-    return {
-      date: `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`,
-      time: `${pad(Math.floor(open / 60))}:${pad(open % 60)}`,
-    };
-  }
 
   beforeEach(async () => {
     TestBed.configureTestingModule({
@@ -61,49 +37,62 @@ describe('SecretaryAppointments', () => {
     return fixture.componentInstance;
   }
 
-  function form(): any {
-    return page().bookingForm;
+  function host(): HTMLElement {
+    return fixture.nativeElement as HTMLElement;
   }
 
   function text(): string {
-    return (fixture.nativeElement as HTMLElement).textContent ?? '';
+    return host().textContent ?? '';
   }
 
   function button(label: string): HTMLButtonElement | undefined {
-    return [...(fixture.nativeElement as HTMLElement).querySelectorAll('button')].find(
-      (b) => b.textContent?.trim() === label,
-    ) as HTMLButtonElement | undefined;
+    return [...host().querySelectorAll('button')].find((b) => b.textContent?.trim() === label) as
+      HTMLButtonElement | undefined;
+  }
+
+  /** Every button in the Actions cell of every rendered row. */
+  function rowActions(): string[] {
+    return [...host().querySelectorAll('tbody tr')].flatMap((row) =>
+      [...row.querySelectorAll('.actions button')].map((b) => b.textContent?.trim() ?? ''),
+    );
+  }
+
+  /**
+   * The Actions cell of one appointment's row.
+   *
+   * By index rather than by searching the DOM for the id: `ui-table` renders
+   * `[rows]` in order, so the row at the appointment's position in the page's own
+   * list is that appointment's row — and asserting on the whole table instead
+   * would miss that *one* row lost its button while the others kept it.
+   */
+  function actionsFor(id: string): string[] {
+    const index = page()
+      .appointments()
+      .findIndex((a: Appointment) => a.id === id);
+    expect(index, `no row for ${id}`).toBeGreaterThanOrEqual(0);
+    const row = [...host().querySelectorAll('tbody tr')][index];
+    return [...row.querySelectorAll('.actions button')].map((b) => b.textContent?.trim() ?? '');
   }
 
   /**
    * The heading of whichever dialog is currently open, or `''`.
    *
-   * Both modals stay in the DOM whether open or closed — a native `<dialog>` is
-   * hidden with the `open` attribute, not removed — so this has to look at the
-   * attribute. Checking page text instead would find "Reschedule" in a table
-   * button and never notice the dialog had closed.
+   * A `<dialog>` is hidden with the `open` attribute, not removed, so this has to
+   * look at the attribute. Checking page text instead would find "Cancel" in a
+   * table button and never notice the dialog had closed.
    */
   function openDialogTitle(): string {
-    const dialog = [...(fixture.nativeElement as HTMLElement).querySelectorAll('dialog')].find(
-      (d) => d.hasAttribute('open'),
-    );
+    const dialog = [...host().querySelectorAll('dialog')].find((d) => d.hasAttribute('open'));
     return dialog?.querySelector('.ui-modal__title')?.textContent ?? '';
-  }
-
-  /** Fills the booking form with a slot the store will accept. */
-  function fillValidBooking(over: Record<string, unknown> = {}): void {
-    form().setValue({
-      patientId: DESK_PATIENT,
-      ...futureSlot(),
-      duration: 30,
-      reason: 'Routine check-up',
-      ...over,
-    });
-    fixture.detectChanges();
   }
 
   function statusOf(id: string): string | undefined {
     return session.appointments().find((a) => a.id === id)?.status;
+  }
+
+  /** A booked appointment on this desk. */
+  function booked(): Appointment {
+    return session.appointments().find((a) => a.status === 'booked')!;
   }
 
   // --- The list
@@ -142,8 +131,6 @@ describe('SecretaryAppointments', () => {
   it('offers no doctor filter, because there is only one doctor to filter by', () => {
     // A dropdown whose every option is the same doctor is a control that can only
     // confuse: it looks like the list can be widened again.
-    expect(page().doctorFilter).toBeUndefined();
-    expect(page().doctorOptions).toBeUndefined();
     expect(text()).not.toContain('Filter by doctor');
   });
 
@@ -164,301 +151,169 @@ describe('SecretaryAppointments', () => {
     expect(text()).toContain('No appointments match your filters');
   });
 
-  it('names the patient on every row, and the doctor once for the page', () => {
-    // The doctor is the same on every row, so the column that repeated one name
-    // is gone and the booking card names them instead.
-    const host = fixture.nativeElement as HTMLElement;
-    expect(host.querySelector('th')?.textContent).not.toContain('Doctor');
+  it('names the patient on every row and the doctor on no row', () => {
+    // The doctor is the same on every row, so the column that repeated one name is
+    // gone — and with the booking card gone there is no longer anywhere on this page
+    // that names them either.
+    expect(host().querySelector('th')?.textContent).not.toContain('Doctor');
     for (const appointment of page().appointments()) {
       expect(page().patientName(appointment)).toBeTruthy();
     }
-    expect(text()).toContain(session.doctors()[0].doctor.name);
+    expect(text()).not.toContain(session.doctors()[0].doctor.name);
   });
 
-  // --- Booking
+  // --- The desk's queue
 
-  it('books for the assigned doctor, without asking which one', () => {
-    // The form has no doctor control: there is one doctor on this desk, and a
-    // select offering a single option is a way to be wrong rather than a choice.
-    const host = fixture.nativeElement as HTMLElement;
-    expect(host.querySelector('#book-doctor')).toBeNull();
-    expect(page().assignedDoctorName()).toBe(session.doctors()[0].doctor.name);
-    expect(text()).toContain(`hours ${session.doctors()[0].doctor.name} published`);
+  it('opens by saying how much is waiting to be confirmed', () => {
+    // With the booking form gone this line is the only thing on the page that says
+    // what the desk is for, and it has to agree with the store the dashboard's own
+    // tile reads from.
+    expect(page().awaitingConfirmationCount()).toBe(session.awaitingConfirmation().length);
+    expect(page().awaitingConfirmationCount()).toBeGreaterThan(0);
+    expect(text()).toContain(`${page().awaitingConfirmationCount()}`);
+    expect(text()).toContain('waiting to be confirmed');
   });
 
-  it('offers only this desk patients in the booking form', () => {
-    const options = [
-      ...(fixture.nativeElement as HTMLElement).querySelectorAll('#book-patient option'),
-    ]
-      .map((option) => option.getAttribute('value'))
-      .filter((value): value is string => !!value);
-
-    expect(options.sort()).toEqual(
-      session
-        .patients()
-        .map((p) => p.patient.id)
-        .sort(),
-    );
-  });
-
-  it('says nothing is wrong with an untouched form', () => {
-    // Nagging before anyone has typed would read as an error rather than a hint.
-    expect(page().bookingProblem()).toBeNull();
-    expect(page().bookingRefusalText()).toBeNull();
-  });
-
-  it('books a valid appointment and adds it to the list', () => {
-    fillValidBooking();
-    expect(page().canSubmitBooking()).toBe(true);
-
-    const before = page().appointments().length;
-    page().submitBooking();
-    fixture.detectChanges();
-
-    expect(page().appointments().length).toBe(before + 1);
-    expect(text()).toContain('is booked with');
-  });
-
-  it('takes the appointment length as a number when the select is used', () => {
-    // Driven through the rendered `<select>` on purpose. Setting the control
-    // directly bypasses the value accessor, which is where a string sneaks in:
-    // `540 + "15"` is far past closing time, so a length picked by hand made every
-    // booking look impossible.
-    const select = (fixture.nativeElement as HTMLElement).querySelector<HTMLSelectElement>(
-      '#book-duration',
-    )!;
-    const slot = futureSlot();
-    form().setValue({
-      patientId: DESK_PATIENT,
-      ...slot,
-      duration: 30,
-      reason: 'Routine check-up',
-    });
-
-    // With `[ngValue]` an option's `value` is an accessor-generated id, so the
-    // option is chosen the way a person does — by what it says.
-    const option = [...select.options].find((o) => o.textContent?.trim().startsWith('15 '))!;
-    option.selected = true;
-    select.value = option.value;
-    select.dispatchEvent(new Event('change'));
-    fixture.detectChanges();
-
-    expect(form().getRawValue().duration).toBe(15);
-    expect(typeof form().getRawValue().duration).toBe('number');
-    expect(page().bookingProblem()).toBeNull();
-    expect(page().canSubmitBooking()).toBe(true);
-  });
-
-  it('books a new appointment as "booked" rather than confirmed', () => {
-    fillValidBooking();
-    page().submitBooking();
-    fixture.detectChanges();
-
-    const latest = session.appointments().at(-1)!;
-    expect(latest.status).toBe('booked');
-  });
-
-  it('clears the form after booking, ready for the next walk-in', () => {
-    fillValidBooking();
-    page().submitBooking();
-    fixture.detectChanges();
-
-    expect(form().getRawValue().patientId).toBe('');
-    expect(form().getRawValue().reason).toBe('');
-  });
-
-  it('refuses a booking that clashes with the doctor, and says why', () => {
-    const existing = session
-      .appointments()
-      .find((a) => a.status === 'booked' || a.status === 'confirmed')!;
-    const at = new Date(existing.startsAt);
-
-    fillValidBooking({
-      date: `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, '0')}-${String(at.getDate()).padStart(2, '0')}`,
-      time: `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`,
-    });
-
-    expect(page().bookingProblem()).toBe('doctor-busy');
-    expect(page().bookingRefusalText()).toBe('The doctor already has an appointment at that time.');
-    expect(page().canSubmitBooking()).toBe(false);
-  });
-
-  it('refuses a booking on a day the doctor does not work', () => {
-    const closed = new Date();
-    while (MOCK_SCHEDULES[DESK][closed.getDay()].enabled) {
-      closed.setDate(closed.getDate() + 1);
+  it('clears the queue line once there is nothing to confirm', () => {
+    // "0 appointments are booked and waiting to be confirmed" is a line
+    // announcing no work, which is noise on an idle desk.
+    for (const appointment of session.awaitingConfirmation()) {
+      session.confirm(appointment.id);
     }
-    fillValidBooking({
-      date: `${closed.getFullYear()}-${String(closed.getMonth() + 1).padStart(2, '0')}-${String(closed.getDate()).padStart(2, '0')}`,
-    });
-    expect(page().bookingProblem()).toBe('day-closed');
-    expect(page().canSubmitBooking()).toBe(false);
-  });
-
-  it('refuses a booking in the past', () => {
-    fillValidBooking({ date: '2020-01-01', time: '09:00' });
-    expect(page().bookingProblem()).toBe('not-in-the-future');
-  });
-
-  it('will not submit an incomplete form', () => {
-    form().setValue({ patientId: '', date: '', time: '', duration: 30, reason: '' });
-    fixture.detectChanges();
-    expect(page().canSubmitBooking()).toBe(false);
-
-    const before = session.appointments().length;
-    page().submitBooking();
-    expect(session.appointments().length).toBe(before);
-  });
-
-  it('marks the fields it wants once they have been touched', () => {
-    form().controls.reason.markAsTouched();
-    form().controls.reason.setValue('ab');
     fixture.detectChanges();
 
-    expect(page().reasonError()).toBe('Use at least 3 characters.');
-    expect(text()).toContain('Use at least 3 characters');
+    expect(page().awaitingConfirmationCount()).toBe(0);
+    expect(host().querySelector('.row-pending')).toBeNull();
   });
 
-  it('does not blame the secretary for a field they have not touched yet', () => {
-    form().patchValue({ reason: '' });
-    fixture.detectChanges();
-    expect(page().reasonError()).toBeNull();
+  // --- What this desk cannot do
+
+  it('offers no way to create an appointment', () => {
+    // Not merely a hidden button: the form, its fields and its submit are all gone,
+    // so there is nothing to fill in and nothing that would create a record.
+    expect(host().querySelector('.book')).toBeNull();
+    expect(host().querySelector('#book-patient')).toBeNull();
+    expect(host().querySelector('#book-date')).toBeNull();
+    expect(host().querySelector('#book-duration')).toBeNull();
+    expect(button('Book appointment')).toBeUndefined();
+    expect(text()).not.toContain('Book an appointment');
+    // The store does not expose a way either, so the absence is not the view's
+    // doing alone.
+    expect((session as unknown as Record<string, unknown>)['book']).toBeUndefined();
   });
 
-  it('disables the submit button while the booking is refused', () => {
-    fillValidBooking({ date: '2020-01-01' });
-    const submit = button('Book appointment');
-    expect(submit?.disabled).toBe(true);
+  it('offers no way to move an appointment to another time', () => {
+    expect(button('Reschedule')).toBeUndefined();
+    expect(rowActions()).not.toContain('Reschedule');
+    expect(text()).not.toContain('Reschedule appointment');
+    expect(text()).not.toContain('Move appointment');
+    expect((session as unknown as Record<string, unknown>)['reschedule']).toBeUndefined();
   });
 
-  // --- Rescheduling
+  it('offers no way to close a visit, which is the doctor recording what happened', () => {
+    expect(button('Complete')).toBeUndefined();
+    expect(text()).not.toContain('Mark no-show');
+  });
 
-  it('opens the reschedule form pre-filled with the appointment own time', () => {
-    const live: Appointment = session
+  it('states the division of labour at the foot of the page', () => {
+    // An absence of controls reads as an oversight unless the page says otherwise.
+    expect(text()).toContain('not actions at this desk');
+    expect(text()).toContain("are the doctor's to");
+  });
+
+  // --- Confirming
+
+  it('offers Confirm only on a booked appointment', () => {
+    for (const status of ['booked'] as const) {
+      expect(page().canConfirm({ status } as Appointment), status).toBe(true);
+    }
+    for (const status of ['confirmed', 'completed', 'cancelled', 'no-show'] as const) {
+      expect(page().canConfirm({ status } as Appointment), status).toBe(false);
+    }
+  });
+
+  it('renders a Confirm button on each booked row and no others', () => {
+    const expected = page()
       .appointments()
-      .find((a) => a.status === 'booked' || a.status === 'confirmed')!;
-    page().openReschedule(live);
-    fixture.detectChanges();
-
-    const at = new Date(live.startsAt);
-    expect(page().rescheduleForm.getRawValue().time).toBe(
-      `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`,
-    );
-    expect(openDialogTitle()).toContain('Reschedule appointment');
+      .filter((a: Appointment) => a.status === 'booked').length;
+    expect(expected).toBeGreaterThan(0);
+    expect(rowActions().filter((label) => label === 'Confirm').length).toBe(expected);
   });
 
-  it('treats an unchanged time as a valid move rather than a clash with itself', () => {
-    const live = session
-      .appointments()
-      .find((a) => a.status === 'booked' || a.status === 'confirmed')!;
-    page().openReschedule(live);
+  it('confirms an appointment and says so', () => {
+    const target = booked();
+    page().confirm(target);
     fixture.detectChanges();
 
-    expect(page().rescheduleProblem()).toBeNull();
-    expect(page().submitReschedule()).toBeUndefined();
-    expect(statusOf(live.id)).not.toBe('cancelled');
+    expect(statusOf(target.id)).toBe('confirmed');
+    expect(text()).toContain('is confirmed');
   });
 
-  it('moves an appointment to a new free slot', () => {
-    // `futureSlot` produces a doc-003 window, so the appointment being moved has
-    // to be a doc-003 one — moving another doctor's on to 09:00 would trip the
-    // hours rule and fail for the wrong reason.
-    const live = session.appointments().find((a) => a.status === 'booked' && a.doctorId === DESK)!;
-    const slot = futureSlot(21);
-    page().openReschedule(live);
-    page().rescheduleForm.setValue(slot);
+  it('takes the Confirm button away once the appointment is confirmed', () => {
+    const target = booked();
+    expect(actionsFor(target.id)).toContain('Confirm');
+
+    page().confirm(target);
     fixture.detectChanges();
 
-    page().submitReschedule();
-    fixture.detectChanges();
-
-    const moved = session.appointments().find((a) => a.id === live.id)!;
-    expect(moved.startsAt.startsWith(slot.date)).toBe(true);
-    expect(text()).toContain('is moved to the new time');
+    expect(actionsFor(target.id)).not.toContain('Confirm');
+    // Cancel is still there: a confirmed appointment can still be called off.
+    expect(actionsFor(target.id)).toContain('Cancel');
   });
 
-  it('confirms a move with the new time, not the one it came from', () => {
-    // The store replaces the appointment with a new object, so a confirmation
-    // built from the pre-move one reads "moved to the new time" beside the old
-    // time. Pin the timestamp in the notice.
-    const live = session.appointments().find((a) => a.status === 'booked' && a.doctorId === DESK)!;
-    const slot = futureSlot(21);
-
-    page().openReschedule(live);
-    page().rescheduleForm.setValue(slot);
-    fixture.detectChanges();
-    page().submitReschedule();
-    fixture.detectChanges();
-
-    const notice = (fixture.nativeElement as HTMLElement).querySelector('.row-notice')!;
-    const when = notice.querySelector('.row-notice__when')!.textContent!.trim();
-    const moved = session.appointments().find((a) => a.id === live.id)!;
-    const at = new Date(moved.startsAt);
-
-    // Same shape the template renders: `MMM d · h:mm a`.
-    const expected = [
-      at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      at.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
-    ].join(' · ');
-    expect(when).toBe(expected);
-    // And it is not the time the appointment came from.
-    expect(when).not.toBe(
-      [
-        new Date(live.startsAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        new Date(live.startsAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
-      ].join(' · '),
-    );
+  it('empties the queue line as the last appointment is confirmed', () => {
+    while (session.awaitingConfirmation().length) {
+      page().confirm(session.awaitingConfirmation()[0]);
+      fixture.detectChanges();
+    }
+    expect(host().querySelector('.row-pending')).toBeNull();
   });
 
-  it('explains a reschedule into a busy slot instead of moving it', () => {
-    const live = session.appointments().find((a) => a.status === 'booked' && a.doctorId === DESK)!;
-    const other = session
-      .appointments()
-      .filter(
-        (a) =>
-          a.id !== live.id &&
-          a.doctorId === DESK &&
-          (a.status === 'booked' || a.status === 'confirmed'),
-      )[0];
-    const at = new Date(other.startsAt);
-
-    page().openReschedule(live);
-    page().rescheduleForm.setValue({
-      date: `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, '0')}-${String(at.getDate()).padStart(2, '0')}`,
-      time: `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`,
-    });
+  it('reports a double-confirm as already confirmed, not as something changing', () => {
+    // A double-click is the ordinary way the store refuses, because the row the
+    // second click was given is already stale. Answering "it may have changed"
+    // would send somebody looking for a problem they caused by being impatient.
+    const target = booked();
+    page().confirm(target);
+    fixture.detectChanges();
+    button('Dismiss')?.click();
     fixture.detectChanges();
 
-    expect(page().rescheduleProblem()).toBe('doctor-busy');
-    expect(text()).toContain('already has an appointment');
-    expect(session.appointments().find((a) => a.id === live.id)!.startsAt).toBe(live.startsAt);
+    page().confirm(target);
+    fixture.detectChanges();
+
+    expect(text()).toContain('is already confirmed');
+    expect(text()).not.toContain('could not be confirmed');
+    expect(statusOf(target.id)).toBe('confirmed');
   });
 
-  it('closes the reschedule form without changing anything', () => {
-    const live = session.appointments().find((a) => a.status === 'booked')!;
-    page().openReschedule(live);
+  it('says what the appointment is instead when it changed to something else', () => {
+    // The other refusal: a stale row whose appointment has been closed. Naming the
+    // status tells the Secretary what actually happened, where "it may have
+    // changed" leaves them to guess.
+    const target = booked();
+    session.cancel(target.id);
     fixture.detectChanges();
-    expect(openDialogTitle()).toContain('Reschedule appointment');
-
-    page().closeReschedule();
+    button('Dismiss')?.click();
     fixture.detectChanges();
 
-    expect(openDialogTitle()).not.toContain('Reschedule');
-    expect(session.appointments().find((a) => a.id === live.id)!.startsAt).toBe(live.startsAt);
-  });
+    page().confirm(target);
+    fixture.detectChanges();
 
-  it('has no reschedule problem to report when nothing is open', () => {
-    expect(page().rescheduleProblem()).toBeNull();
+    expect(text()).toContain('could not be confirmed');
+    expect(text()).toContain('It is now cancelled');
+    expect(text()).not.toContain('is confirmed.');
+    expect(statusOf(target.id)).toBe('cancelled');
   });
 
   // --- Cancelling
 
-  it('offers reschedule and cancel only while the patient is still expected', () => {
+  it('offers Cancel for as long as the patient is still expected', () => {
     for (const status of ['booked', 'confirmed'] as const) {
-      expect(page().canAct({ status } as Appointment)).toBe(true);
+      expect(page().canCancel({ status } as Appointment), status).toBe(true);
     }
     for (const status of ['completed', 'cancelled', 'no-show'] as const) {
-      expect(page().canAct({ status } as Appointment)).toBe(false);
+      expect(page().canCancel({ status } as Appointment), status).toBe(false);
     }
   });
 
@@ -471,12 +326,23 @@ describe('SecretaryAppointments', () => {
     expect(openDialogTitle()).toContain('Cancel appointment');
   });
 
-  it('cancels only once confirmed', () => {
+  it('cancels only once the dialog is answered', () => {
     const live = session.appointments().find((a) => a.status === 'confirmed')!;
     page().requestCancel(live);
     page().confirmCancel();
     fixture.detectChanges();
     expect(statusOf(live.id)).toBe('cancelled');
+  });
+
+  it('leaves the appointment alone when the dialog is dismissed', () => {
+    const live = session.appointments().find((a) => a.status === 'confirmed')!;
+    page().requestCancel(live);
+    page().cancelCancel();
+    page().confirmCancel();
+    fixture.detectChanges();
+
+    expect(openDialogTitle()).not.toContain('Cancel appointment');
+    expect(statusOf(live.id)).toBe('confirmed');
   });
 
   it('keeps the row after cancelling, rather than deleting the history', () => {
@@ -486,6 +352,12 @@ describe('SecretaryAppointments', () => {
     page().confirmCancel();
     fixture.detectChanges();
     expect(page().appointments().length).toBe(before);
+  });
+
+  it('offers no action at all on a completed appointment', () => {
+    const done = session.appointments().find((a) => a.status === 'completed')!;
+    expect(page().canConfirm(done)).toBe(false);
+    expect(page().canCancel(done)).toBe(false);
   });
 
   it('dismisses the confirmation message', () => {
@@ -498,22 +370,6 @@ describe('SecretaryAppointments', () => {
     button('Dismiss')?.click();
     fixture.detectChanges();
     expect(text()).not.toContain('is cancelled');
-  });
-
-  it('offers no action at all on a completed appointment', () => {
-    const done = session.appointments().find((a) => a.status === 'completed')!;
-    expect(page().canAct(done)).toBe(false);
-  });
-
-  // --- Division of labour
-
-  it("does not offer the doctor's decisions, and says who makes them", () => {
-    // Confirming, completing and recording a no-show are clinical decisions. If
-    // this screen offered them, the area would be claiming a scope it does not
-    // have and two people could act on the same appointment.
-    expect(text()).not.toContain('Mark no-show');
-    expect(text()).not.toContain('Complete');
-    expect(text()).toContain("are the doctor's to do");
   });
 
   it('says the data is a sample, so a screenshot is not mistaken for a product', () => {
