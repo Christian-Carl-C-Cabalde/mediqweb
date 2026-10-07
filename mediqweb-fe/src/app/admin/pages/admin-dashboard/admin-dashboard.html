@@ -23,33 +23,46 @@
   </ui-stat-card>
 </div>
 
-<ui-card heading="Recent activity" [headingLevel]="3">
-  <ng-container uiCardHeaderActions>
-    <a class="see-all" routerLink="/admin/audit-logs">View all logs</a>
-  </ng-container>
+<!--
+  Shared two-column dashboard layout rather than a split inside one card:
+  the activity list is one subject and the clinic's appointments are another,
+  and a card headed "Recent activity" cannot honestly carry a chart about
+  appointments. The list keeps the wide column; the chart sits in the side
+  column the Doctor and Secretary dashboards already use for context.
+-->
+<div class="dash">
+  <ui-card heading="Recent activity" [headingLevel]="3">
+    <ng-container uiCardHeaderActions>
+      <a class="see-all" routerLink="/admin/audit-logs">View all logs</a>
+    </ng-container>
 
-  <ul class="activity">
-    @for (entry of activity(); track entry.id) {
-      <li class="activity__item">
-        <!--
-          Severity is a dot, not a filled pill. Six tinted pills stacked down the
-          side of a dashboard read as banners and made the action -- secondary
-          information -- louder than the subject it was describing.
-        -->
-        <span
-          class="activity__dot"
-          [style.background-color]="severityToken(entry.severity)"
-          aria-hidden="true"
-        ></span>
-        <span class="activity__action">{{ entry.action }}</span>
-        <span class="activity__subject">{{ entry.target }}</span>
-        <span class="activity__actor">{{ entry.actor }}</span>
-        <time class="activity__when" [attr.datetime]="entry.at">
-          {{ entry.at | date: 'MMM d, h:mm a' }}
-        </time>
-      </li>
-    } @empty {
-      <li class="activity__empty">Nothing has happened yet.</li>
-    }
-  </ul>
-</ui-card>
+    <ul class="activity">
+      @for (entry of activity(); track entry.id) {
+        <li class="activity__item">
+          <!--
+            Severity is a dot, not a filled pill. Six tinted pills stacked down the
+            side of a dashboard read as banners and made the action -- secondary
+            information -- louder than the subject it was describing.
+          -->
+          <span
+            class="activity__dot"
+            [style.background-color]="severityToken(entry.severity)"
+            aria-hidden="true"
+          ></span>
+          <span class="activity__action">{{ entry.action }}</span>
+          <span class="activity__subject">{{ entry.target }}</span>
+          <span class="activity__actor">{{ entry.actor }}</span>
+          <time class="activity__when" [attr.datetime]="entry.at">
+            {{ entry.at | date: 'MMM d, h:mm a' }}
+          </time>
+        </li>
+      } @empty {
+        <li class="activity__empty">Nothing has happened yet.</li>
+      }
+    </ul>
+  </ui-card>
+
+  <ui-card heading="Appointments" [headingLevel]="3">
+    <ui-pie-chart [slices]="lifecycleSlices()" caption="By status" />
+  </ui-card>
+</div>

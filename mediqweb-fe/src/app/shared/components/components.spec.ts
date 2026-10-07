@@ -6,6 +6,7 @@ import { Card } from './card/card';
 import { Dropdown, type DropdownItem } from './dropdown/dropdown';
 import { FormField } from './form-field/form-field';
 import { Modal } from './modal/modal';
+import { PieChart, type PieSlice } from './pie-chart/pie-chart';
 import { SampleAccounts, type SampleAccount } from './sample-accounts/sample-accounts';
 import { Spinner } from './spinner/spinner';
 import { StatCard } from './stat-card/stat-card';
@@ -481,6 +482,81 @@ describe('MediQ shared components', () => {
       expect(badge?.textContent?.trim()).toBe('Confirmed');
       // "name" has no matching template, so the raw row value is used.
       expect(host.querySelector('tbody tr td')?.textContent?.trim()).toBe('Belen');
+    });
+  });
+
+  describe('PieChart', () => {
+    const slices: PieSlice[] = [
+      { label: 'Routine', value: 4, color: 'var(--color-info)' },
+      { label: 'Problem', value: 2, color: 'var(--color-danger)' },
+    ];
+
+    function render(list: readonly PieSlice[], caption?: string): HTMLElement {
+      const fixture = TestBed.createComponent(PieChart);
+      fixture.componentRef.setInput('slices', list);
+      if (caption !== undefined) fixture.componentRef.setInput('caption', caption);
+      fixture.detectChanges();
+      return fixture.nativeElement as HTMLElement;
+    }
+
+    it('states every slice as a legend row of text', () => {
+      const rows = Array.from(render(slices).querySelectorAll('.pie__item'));
+      expect(rows).toHaveLength(2);
+      expect(rows[0].querySelector('.pie__label')?.textContent?.trim()).toBe('Routine');
+      expect(rows[0].querySelector('.pie__value')?.textContent?.trim()).toBe('4');
+      expect(rows[1].querySelector('.pie__label')?.textContent?.trim()).toBe('Problem');
+      expect(rows[1].querySelector('.pie__value')?.textContent?.trim()).toBe('2');
+    });
+
+    it('keeps the canvas out of the accessibility tree, since the legend already states the data', () => {
+      const canvas = render(slices).querySelector('canvas');
+      expect(canvas).toBeTruthy();
+      expect(canvas?.getAttribute('aria-hidden')).toBe('true');
+    });
+
+    it('drops a slice that has fallen to zero rather than drawing a flat one', () => {
+      const withZero = [...slices, { label: 'Needs attention', value: 0, color: 'var(--color-warning)' }];
+      expect(render(withZero).querySelectorAll('.pie__item')).toHaveLength(2);
+    });
+
+    it('carries the slice colour through as a custom property on the dot', () => {
+      const dot = render(slices).querySelector('.pie__dot') as HTMLElement;
+      expect(dot.style.getPropertyValue('--pie-slice-color')).toBe('var(--color-info)');
+    });
+
+    it('titles itself from the caption, and leaves no figcaption without one', () => {
+      expect(render(slices, 'By severity').querySelector('figcaption')?.textContent?.trim()).toBe(
+        'By severity',
+      );
+      expect(render(slices).querySelector('figcaption')).toBeNull();
+    });
+
+    it('renders no canvas when there is nothing to chart', () => {
+      const host = render([]);
+      expect(host.querySelector('canvas')).toBeNull();
+      expect(host.querySelector('.pie__empty')?.textContent).toContain('No data yet');
+    });
+
+    it('takes a caller-provided empty message', () => {
+      const fixture = TestBed.createComponent(PieChart);
+      fixture.componentRef.setInput('slices', []);
+      fixture.componentRef.setInput('emptyMessage', 'Nothing recorded');
+      fixture.detectChanges();
+      const empty = (fixture.nativeElement as HTMLElement).querySelector('.pie__empty');
+      expect(empty?.textContent).toContain('Nothing recorded');
+    });
+
+    it('refills the legend when the slices change', () => {
+      const fixture = TestBed.createComponent(PieChart);
+      fixture.componentRef.setInput('slices', slices);
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelectorAll('.pie__item')).toHaveLength(2);
+
+      fixture.componentRef.setInput('slices', [slices[1]]);
+      fixture.detectChanges();
+      const rows = fixture.nativeElement.querySelectorAll('.pie__item');
+      expect(rows).toHaveLength(1);
+      expect(rows[0].querySelector('.pie__label')?.textContent?.trim()).toBe('Problem');
     });
   });
 

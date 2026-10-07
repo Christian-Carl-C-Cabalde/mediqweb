@@ -1,6 +1,16 @@
-// The stat card row and the "see all" link are shared with the Doctor
-// dashboard, so they come from one source rather than being copied here.
+// The stat card row, the "see all" link and the `.dash` two-column row are
+// shared with the Doctor and Secretary dashboards, so they come from one source
+// rather than being copied here.
 @use '../../../shared/scss/dashboard';
+
+// The shared row starts its columns at the top, which is right where a column
+// holds a stack of cards of different heights and a ragged bottom edge reads as
+// nothing in particular. Here both columns are a single card, so they stretch
+// to the taller one instead: the activity list and the chart then end on the
+// same line, and the row reads as one band rather than two loose blocks.
+.dash {
+  align-items: stretch;
+}
 
 .activity {
   display: flex;

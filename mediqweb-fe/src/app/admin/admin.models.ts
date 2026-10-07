@@ -15,8 +15,15 @@
  * the existing `admin.models` import sites keep working unchanged.
  */
 export type { AccountStatus } from '../shared/domain/account-status';
+/**
+ * Re-exported for the same reason as `AccountStatus`: the Secretary and Doctor
+ * areas already agree on what a lifecycle stage means, and the Admin area
+ * reading it any other way would be a second definition of the same five.
+ */
+export type { AppointmentStatus } from '../shared/domain/appointment-status';
 
 import type { AccountStatus } from '../shared/domain/account-status';
+import type { AppointmentStatus } from '../shared/domain/appointment-status';
 
 export interface StaffAccount {
   readonly id: string;
@@ -55,6 +62,33 @@ export interface Specialization {
 
 /** How much attention an audit entry deserves. Drives the row's badge tone. */
 export type AuditSeverity = 'info' | 'warning' | 'danger';
+
+/**
+ * A clinic appointment as the Admin area sees it.
+ *
+ * Read-only: the Admin reads the clinic's shape but does not book, confirm or
+ * cancel anything, so this carries no actions — only the fields the dashboard
+ * needs to describe what is happening across the clinic. The ids point at this
+ * area's own patient and staff fixtures, not at the Secretary's cohort, for the
+ * same reason `MOCK_PATIENTS` does.
+ */
+export interface Appointment {
+  readonly id: string;
+  readonly patientId: string;
+  readonly doctorId: string;
+  /**
+   * Local timestamp without a zone, e.g. `2026-10-07T09:00:00`.
+   *
+   * Deliberately not a UTC instant: a clinic's 09:00 is the clinic's 09:00,
+   * and `Date` parses a zone-less string in local time, so the two agree
+   * without a timezone conversion.
+   */
+  readonly startsAt: string;
+  readonly durationMinutes: number;
+  readonly status: AppointmentStatus;
+  /** Why the patient is coming in. Administrative, not clinical. */
+  readonly reason: string;
+}
 
 export interface AuditEntry {
   readonly id: string;
