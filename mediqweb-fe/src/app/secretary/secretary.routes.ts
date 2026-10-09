@@ -70,7 +70,16 @@ export const SECRETARY_ROUTES: Routes = [
       {
         path: 'messages',
         title: 'Messages · Secretary · MediQ',
-        data: { heading: 'Messages' },
+        // No `heading`, so the layout renders no `h1` and no breadcrumb: the thread
+        // header already names whose conversation is open, and a heading reading
+        // "Messages" above a list of people's names repeats what the page shows.
+        // Declaring it absent is the honest way to say so — the layout collapses
+        // that row rather than leaving its margin behind as dead space.
+        //
+        // `fillViewport` asks the shell for exactly one viewport of height, so the
+        // page scrolls its own conversation list and message history rather than
+        // the window scrolling the composer away.
+        data: { fillViewport: true },
         loadComponent: () =>
           import('./pages/secretary-messages/secretary-messages').then((m) => m.SecretaryMessages),
       },
