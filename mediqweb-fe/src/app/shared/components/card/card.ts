@@ -24,6 +24,7 @@ export type CardPadding = 'none' | 'sm' | 'md' | 'lg';
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     '[class.ui-card-host--interactive]': 'interactive()',
+    '[class.ui-card-host--fill]': 'fill()',
   },
 })
 export class Card {
@@ -31,6 +32,19 @@ export class Card {
   readonly padding = input<CardPadding>('md');
   /** Adds hover affordance for clickable cards. */
   readonly interactive = input(false);
+  /**
+   * Makes the card fill its parent and hand the leftover height to the body.
+   *
+   * For a card that is a full-height column in a layout that is itself
+   * viewport-sized — a message thread, a tree, a log. The header and footer keep
+   * their own height and the body takes the rest, so content projected into the
+   * body can scroll in place instead of growing the card.
+   *
+   * Opt-in because it is only correct when the parent has a definite height: in a
+   * normal document flow a filling card would be as tall as the viewport whatever
+   * was projected into it. Off by default, so no existing card changes.
+   */
+  readonly fill = input(false);
   /** Convenience heading; ignore it to project a custom header. */
   readonly heading = input<string | null>(null);
   readonly headingLevel = input<3 | 4>(3);

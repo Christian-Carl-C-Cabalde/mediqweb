@@ -490,4 +490,52 @@ describe('MediQ shared layouts', () => {
       expect(headingRow.contains(card)).toBe(false);
     });
   });
+
+  describe('a page that fills the window', () => {
+    @Component({
+      imports: [Card, StaffLayout],
+      template: `<app-staff-layout [user]="user" [nav]="nav" [fillViewport]="fill">
+        <ui-card>Working surface.</ui-card>
+      </app-staff-layout>`,
+    })
+    class FilledPage {
+      readonly user = DOCTOR;
+      readonly nav: StaffNavEntry[] = ADMIN_NAV;
+      /** A plain field, not an input: the test sets it directly. */
+      fill = false;
+    }
+
+    function build(fill: boolean): ComponentFixture<FilledPage> {
+      const fixture = TestBed.createComponent(FilledPage);
+      fixture.componentInstance.fill = fill;
+      fixture.detectChanges();
+      return fixture;
+    }
+
+    function shellClass(fixture: ComponentFixture<unknown>): string {
+      const layout = (fixture.nativeElement as HTMLElement).querySelector('app-staff-layout');
+      return layout?.className ?? '';
+    }
+
+    it('is off unless a page asks for it', () => {
+      expect(shellClass(build(false))).not.toContain('staff-layout-host--fill');
+    });
+
+    it('marks the shell when the page asks for it', () => {
+      // The class is what the viewport-sized geometry hangs off, so a page that
+      // asks and gets no class would scroll the window instead of its own panels.
+      expect(shellClass(build(true))).toContain('staff-layout-host--fill');
+    });
+
+    it('renders no heading when there is none, and leaves no empty row behind', () => {
+      // A page may declare no heading, as the messages page does. The row owns a
+      // bottom margin, so if it stayed it would leave a band of dead space above
+      // the content — the whole reason for asking for the space in the first place.
+      const host = build(true).nativeElement as HTMLElement;
+
+      expect(host.querySelector('.shell__title')).toBeNull();
+      expect(host.querySelector('.shell__crumbs')).toBeNull();
+      expect(getComputedStyle(host.querySelector('.shell__title-row')!).display).toBe('none');
+    });
+  });
 });

@@ -23,6 +23,9 @@ let nextId = 0;
   templateUrl: './staff-layout.html',
   styleUrl: './staff-layout.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    '[class.staff-layout-host--fill]': 'fillViewport()',
+  },
 })
 export class StaffLayout {
   readonly user = input.required<StaffProfile>();
@@ -32,6 +35,19 @@ export class StaffLayout {
   readonly activeItemId = input<string | null>(null);
   readonly pageTitle = input<string | null>(null);
   readonly breadcrumbs = input<readonly StaffCrumb[]>([]);
+  /**
+   * Makes the shell exactly one viewport tall and hands the leftover height to the
+   * page, so the page scrolls its own panels instead of the window scrolling.
+   *
+   * For a page that is a working surface rather than a document — a message desk,
+   * a calendar, a log — where scrolling the whole window would scroll the
+   * conversation header and the composer off the screen.
+   *
+   * Only applied from `$sidebar-breakpoint` up. Below it the sidebar is a drawer and
+   * the main column is one narrow stack, where a viewport-locked shell would clip
+   * whatever did not fit; those widths scroll the document as usual.
+   */
+  readonly fillViewport = input(false);
   /** Destination for the brand mark. */
   readonly brandLink = input('/');
   readonly showLogout = input(true);

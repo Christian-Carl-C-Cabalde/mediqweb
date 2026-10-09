@@ -116,6 +116,26 @@ export class SecretaryShell {
     return heading ? [{ label: 'Dashboard', route: DASHBOARD_ROUTE }, { label: heading }] : [];
   });
 
+  /**
+   * Whether this page fills the window rather than scrolling the document.
+   *
+   * Declared per route alongside `heading`, so a page asks for the viewport-sized
+   * shell it needs instead of every page being sized to suit the one that wants it.
+   *
+   * Read from the deepest matched route rather than from `deepestRoute()`, which
+   * deliberately skips any route that declares no `heading`. This page is exactly
+   * such a route — it has no heading — so asking the heading-aware walk for it
+   * returned the parent instead and the flag was silently never set.
+   *
+   * The navigation counter is read for the same reason `pageTitle` reads it: the
+   * route snapshot is not a signal, so without it this would be decided once at
+   * construction and never change as the user moves between pages.
+   */
+  protected readonly fillViewport = computed(() => {
+    this.navCount();
+    return this.leafRoute()?.data?.['fillViewport'] === true;
+  });
+
   constructor() {
     // Navigation *end*, not start, so the snapshot already points at the new
     // route by the time the heading is recomputed.
@@ -152,6 +172,21 @@ export class SecretaryShell {
       route = route.firstChild;
     }
     return deepest;
+  }
+
+  /**
+   * The deepest matched route, whatever it declares.
+   *
+   * Distinct from `deepestRoute`, which only returns routes carrying a `heading` so
+   * a parent cannot override a child's. That makes it the wrong walk for anything
+   * read off a route that has no heading — and the messages page is one, by design.
+   */
+  private leafRoute(): ActivatedRouteSnapshot | null {
+    let route = this.router.routerState.snapshot.root.firstChild;
+    while (route?.firstChild) {
+      route = route.firstChild;
+    }
+    return route ?? this.router.routerState.snapshot.root;
   }
 
   /**

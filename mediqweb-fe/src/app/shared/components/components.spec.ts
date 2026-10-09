@@ -207,6 +207,33 @@ describe('MediQ shared components', () => {
       article.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
       expect(clicks).toBe(1);
     });
+
+    it('does not fill its parent unless asked', () => {
+      // Off by default on purpose: a filling card is only correct when the parent
+      // has a definite height, so leaving it on would make every card in a normal
+      // document flow as tall as the viewport.
+      const fixture = TestBed.createComponent(Card);
+      fixture.detectChanges();
+      const host = fixture.nativeElement as HTMLElement;
+      expect(host.classList.contains('ui-card-host--fill')).toBe(false);
+    });
+
+    it('hands its leftover height to the body when filling', () => {
+      // The body is the flex column a scrolling child fills — a list or a thread.
+      // `min-height: 0` on it is the part that actually permits the scroll.
+      const fixture = TestBed.createComponent(Card);
+      fixture.componentRef.setInput('fill', true);
+      fixture.detectChanges();
+      const host = fixture.nativeElement as HTMLElement;
+
+      expect(host.classList.contains('ui-card-host--fill')).toBe(true);
+
+      const body = host.querySelector('.ui-card__body') as HTMLElement;
+      const style = getComputedStyle(body);
+      expect(style.display).toBe('flex');
+      expect(style.flexDirection).toBe('column');
+      expect(style.minHeight).toBe('0px');
+    });
   });
 
   describe('StatCard', () => {
@@ -515,7 +542,10 @@ describe('MediQ shared components', () => {
     });
 
     it('drops a slice that has fallen to zero rather than drawing a flat one', () => {
-      const withZero = [...slices, { label: 'Needs attention', value: 0, color: 'var(--color-warning)' }];
+      const withZero = [
+        ...slices,
+        { label: 'Needs attention', value: 0, color: 'var(--color-warning)' },
+      ];
       expect(render(withZero).querySelectorAll('.pie__item')).toHaveLength(2);
     });
 

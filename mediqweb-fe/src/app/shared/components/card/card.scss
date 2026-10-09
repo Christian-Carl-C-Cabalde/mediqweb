@@ -67,6 +67,23 @@
   min-width: 0;
 }
 
+// A filling card hands the leftover height to its body, so what is projected into
+// it can scroll in place.
+//
+// The `flex` column on the body is what makes a single scrollable child work: the
+// child then fills the body and scrolls inside it, where without it the child would
+// size itself to its own content and the body would grow the card instead.
+//
+// `min-height: 0` is load-bearing. A flex item defaults to `min-height: auto`, which
+// refuses to shrink below its content — so the body would keep its content's
+// height, the card would overflow, and nothing would scroll.
+:host(.ui-card-host--fill) .ui-card__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .ui-card--padding-none .ui-card__body {
   padding: 0;
 }

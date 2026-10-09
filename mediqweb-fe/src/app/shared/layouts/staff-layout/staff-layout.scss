@@ -212,6 +212,14 @@ $sidebar-breakpoint: 1024px;
   gap: var(--space-2);
 }
 
+// A page may declare no heading, in which case this row has nothing to show but
+// still owns a `margin-bottom` — which would leave a band of dead space above the
+// page. `:empty` cannot express that, because the actions wrapper is always in the
+// DOM even when it collapses, so the check is for a heading or a projected action.
+.shell__title-row:not(:has(.shell__title)):not(:has(.shell__actions > *)) {
+  display: none;
+}
+
 // ---------------------------------------------------------------------------
 // ≥ 1024px — permanent sidebar, no drawer
 // ---------------------------------------------------------------------------
@@ -230,6 +238,34 @@ $sidebar-breakpoint: 1024px;
 
   .shell__main {
     padding: var(--space-8);
+  }
+
+  // -------------------------------------------------------------------------
+  // A page that fills the window
+  // -------------------------------------------------------------------------
+  // The shell stops being "at least one viewport" and becomes "exactly one
+  // viewport", and the main column becomes a flex box so the page inside it can
+  // take the height that is left over and scroll its own panels.
+  //
+  // `height` rather than the default `min-height` is the entire point: with
+  // `min-height` a tall page still grows the document and the window scrolls,
+  // which is the one behaviour this is here to remove. `overflow: hidden` on the
+  // main column is what contains the result — it is the box the page lives in, so
+  // it clips rather than pushing the shell's fixed height open. It goes on the main
+  // column and not on `.shell`, because `overflow` on the shell would turn it into
+  // a scroll container and the sticky header and sidebar would then position
+  // against the shell rather than the viewport.
+  :host(.staff-layout-host--fill) .shell {
+    height: 100dvh;
+  }
+
+  :host(.staff-layout-host--fill) .shell__main {
+    display: flex;
+    flex-direction: column;
+    // `min-height: 0` lets the column shrink below its content's height, which is
+    // what lets the page inside it take the leftover space and scroll its own parts.
+    min-height: 0;
+    overflow: hidden;
   }
 }
 

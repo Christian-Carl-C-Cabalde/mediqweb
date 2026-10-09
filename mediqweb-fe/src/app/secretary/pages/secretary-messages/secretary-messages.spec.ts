@@ -203,6 +203,47 @@ describe('SecretaryMessages', () => {
     expect(composer().value).toBe('First line');
   });
 
+  it('marks both panes as filling, so their contents scroll rather than grow', () => {
+    // The layout chain that makes the page fill the window: the card is told to
+    // hand its leftover height to its body, and the body is a flex column so the
+    // single list or thread inside it fills and scrolls. Without the first, the
+    // card grows to fit its content; without the second, the content does not
+    // become the thing that scrolls.
+    //
+    // jsdom has no layout, so this asserts the classes and inputs the chain hangs
+    // off rather than the pixels. The heights themselves were checked in a browser.
+    const panes = [...root().querySelectorAll('ui-card.pane')];
+    expect(panes.length).toBe(2);
+    for (const pane of panes) {
+      expect(pane.classList.contains('ui-card-host--fill')).toBe(true);
+    }
+  });
+
+  it('gives the thread a scrollable region of its own', () => {
+    // The history is a list that can outgrow the space the pane has, so it has to
+    // be the scrolling box rather than something that pushes the page taller.
+    const thread = root().querySelector<HTMLElement>('.thread');
+    expect(thread).not.toBeNull();
+    expect(getComputedStyle(thread!).overflowY).toBe('auto');
+
+    const threads = root().querySelector<HTMLElement>('.threads');
+    expect(threads).not.toBeNull();
+    expect(getComputedStyle(threads!).overflowY).toBe('auto');
+  });
+
+  it('keeps the thread header and the composer outside the scrolling history', () => {
+    // They are siblings of the history inside the card, not children of it, which
+    // is the only reason a long conversation leaves them on screen.
+    const thread = root().querySelector('.thread')!;
+    expect(thread.querySelector('.thread-head')).toBeNull();
+    expect(thread.querySelector('.composer')).toBeNull();
+    expect(thread.querySelectorAll('.bubble').length).toBeGreaterThan(0);
+
+    const card = root().querySelector('ui-card.pane--thread')!;
+    expect(card.querySelector('.thread-head')).not.toBeNull();
+    expect(card.querySelector('.composer')).not.toBeNull();
+  });
+
   it('keeps the reader on the thread they replied to, even as the list reorders', () => {
     // A reply makes that thread the newest, so it jumps to the top of the list.
     // Selection tracked the position rather than the thread, the reader would be

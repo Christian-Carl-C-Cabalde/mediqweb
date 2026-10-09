@@ -3,8 +3,8 @@ import {
   ChangeDetectionStrategy,
   Component,
   ElementRef,
+  afterRenderEffect,
   computed,
-  effect,
   inject,
   signal,
   viewChild,
@@ -117,13 +117,28 @@ export class SecretaryMessages {
   private readonly thread = viewChild<ElementRef<HTMLElement>>('thread');
 
   constructor() {
-    effect(() => {
-      // Reads `threadRows` so the effect re-runs whenever the open thread changes
-      // or a message lands, and not for unrelated renders.
-      const rows = this.threadRows();
-      const element = this.thread()?.nativeElement;
-      if (!element || rows.length === 0) return;
-      element.scrollTop = element.scrollHeight;
+    // Scroll the open thread to the newest message, on opening a thread and on
+    // sending a reply.
+    //
+    // `afterRenderEffect` rather than `effect`, and the reason is specific: with
+    // the thread now a scrolling panel, an ordinary effect measures the element
+    // before the browser has laid the new message out, so it scrolled to the
+    // bottom of the *previous* content — landing exactly one bubble short. That
+    // went unnoticed while the thread was short and `scrollTop` of 0 happened to
+    // be the bottom anyway. Measuring in `earlyRead` and assigning in `write` is
+    // what puts the two in the right order relative to layout.
+    afterRenderEffect({
+      earlyRead: () => {
+        // Read `threadRows` to depend on the open thread and its contents, so this
+        // re-runs when either changes and not on every unrelated render.
+        this.threadRows();
+        const element = this.thread()?.nativeElement;
+        return element ? { element, bottom: element.scrollHeight } : null;
+      },
+      write: (measured) => {
+        const state = measured();
+        if (state) state.element.scrollTop = state.bottom;
+      },
     });
   }
 
