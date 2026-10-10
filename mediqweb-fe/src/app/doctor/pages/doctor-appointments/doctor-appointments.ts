@@ -17,6 +17,7 @@ import {
 } from '../../../shared/components';
 import { formatDuration } from '../../doctor.dates';
 import { DoctorSession } from '../../doctor-session';
+import { ToastService } from '../../../core/services/toast.service';
 import type { Appointment, AppointmentStatus } from '../../doctor.models';
 
 type StatusFilter = 'all' | AppointmentStatus;
@@ -32,18 +33,6 @@ const STATUS_ITEMS: DropdownItem[] = [
 
 /** Cancelling is destructive, so it is the only action that asks first. */
 const CANCELLABLE: readonly AppointmentStatus[] = ['booked', 'confirmed'];
-
-/**
- * A short confirmation after an action.
- *
- * `at` is the raw timestamp rather than a formatted string so the template can
- * render it with the `date` pipe and get locale formatting for free; formatting
- * it in the component would need a second, parallel date formatter.
- */
-interface Notice {
-  readonly text: string;
-  readonly at?: string;
-}
 
 /**
  * The doctor's appointment list.
@@ -76,11 +65,11 @@ interface Notice {
 })
 export class DoctorAppointments {
   private readonly session = inject(DoctorSession);
+  private readonly toasts = inject(ToastService);
 
   protected readonly query = signal('');
   protected readonly statusFilter = signal<StatusFilter>('all');
   protected readonly confirmCancelFor = signal<Appointment | null>(null);
-  protected readonly notice = signal<Notice | null>(null);
 
   protected readonly statusOptions = STATUS_ITEMS;
 
@@ -134,18 +123,33 @@ export class DoctorAppointments {
   }
 
   protected confirm(appointment: Appointment): void {
-    this.session.setAppointmentStatus(appointment.id, 'confirmed');
-    this.announce(`${this.patientName(appointment)} is confirmed.`, appointment);
+    this.report(
+      appointment,
+      'confirmed',
+      'Appointment confirmed',
+      (name) => `${name} is expected.`,
+    );
   }
 
   protected complete(appointment: Appointment): void {
-    this.session.setAppointmentStatus(appointment.id, 'completed');
-    this.announce(`${this.patientName(appointment)} is marked complete.`, appointment);
+    this.report(
+      appointment,
+      'completed',
+      'Visit recorded',
+      (name) => `${name} is marked complete.`,
+    );
   }
 
   protected markNoShow(appointment: Appointment): void {
-    this.session.setAppointmentStatus(appointment.id, 'no-show');
-    this.announce(`${this.patientName(appointment)} is recorded as a no-show.`, appointment);
+    // A warning rather than a success: the recording worked, but it is bad news
+    // about the appointment and reads as a neutral "done" otherwise.
+    this.report(
+      appointment,
+      'no-show',
+      'Recorded as a no-show',
+      (name) => `${name} did not attend.`,
+      'warning',
+    );
   }
 
   protected requestCancel(appointment: Appointment): void {
@@ -159,12 +163,39 @@ export class DoctorAppointments {
   protected confirmCancel(): void {
     const appointment = this.confirmCancelFor();
     if (!appointment) return;
-    this.session.setAppointmentStatus(appointment.id, 'cancelled');
+    const changed = this.session.setAppointmentStatus(appointment.id, 'cancelled');
     this.confirmCancelFor.set(null);
-    this.announce(`${this.patientName(appointment)}'s appointment is cancelled.`, appointment);
+
+    if (changed) {
+      this.toasts.warning(
+        'Appointment cancelled',
+        `${this.patientName(appointment)} will not be seen.`,
+      );
+    } else {
+      this.toasts.error('Not cancelled', 'That appointment could not be updated.');
+    }
   }
 
-  private announce(text: string, appointment: Appointment): void {
-    this.notice.set({ text, at: appointment.startsAt });
+  /**
+   * Moves an appointment along and reports what actually happened.
+   *
+   * One place for the four status changes, because they differ only in their
+   * wording and they must not differ in whether they check. A row whose status was
+   * moved on by something else would otherwise be reported as recorded by this
+   * click, which is the one thing the toast is not allowed to get wrong.
+   */
+  private report(
+    appointment: Appointment,
+    status: AppointmentStatus,
+    title: string,
+    sentence: (name: string) => string,
+    tone: 'success' | 'warning' = 'success',
+  ): void {
+    const name = this.patientName(appointment);
+    if (!this.session.setAppointmentStatus(appointment.id, status)) {
+      this.toasts.error('Not updated', `${name}'s appointment is no longer in a state to change.`);
+      return;
+    }
+    this.toasts.show(tone, title, sentence(name));
   }
 }

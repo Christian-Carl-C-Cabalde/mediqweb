@@ -1,5 +1,10 @@
 import { type ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import {
+  clearToasts,
+  latestToast,
+  toasts,
+} from '../../../core/services/toast.service.spec-helpers';
 import { MOCK_APPOINTMENTS, MOCK_SECRETARY_PROFILE } from '../../secretary.mock-data';
 import { SecretarySession } from '../../secretary-session';
 import type { Appointment } from '../../secretary.models';
@@ -11,6 +16,9 @@ describe('SecretaryAppointments', () => {
 
   let fixture: ComponentFixture<SecretaryAppointments>;
   let session: SecretarySession;
+
+  // Disarms the dismissal timers the toasts arm.
+  afterEach(() => clearToasts());
 
   beforeEach(async () => {
     TestBed.configureTestingModule({
@@ -246,7 +254,9 @@ describe('SecretaryAppointments', () => {
     fixture.detectChanges();
 
     expect(statusOf(target.id)).toBe('confirmed');
-    expect(text()).toContain('is confirmed');
+    expect(latestToast()?.tone).toBe('success');
+    expect(latestToast()?.title).toBe('Appointment confirmed');
+    expect(latestToast()?.message).toContain(session.patientName(target.patientId));
   });
 
   it('takes the Confirm button away once the appointment is confirmed', () => {
@@ -276,14 +286,14 @@ describe('SecretaryAppointments', () => {
     const target = booked();
     page().confirm(target);
     fixture.detectChanges();
-    button('Dismiss')?.click();
-    fixture.detectChanges();
+    toasts().dismissAll();
 
     page().confirm(target);
     fixture.detectChanges();
 
-    expect(text()).toContain('is already confirmed');
-    expect(text()).not.toContain('could not be confirmed');
+    // Info rather than error: nothing went wrong.
+    expect(latestToast()?.tone).toBe('info');
+    expect(latestToast()?.title).toBe('Already confirmed');
     expect(statusOf(target.id)).toBe('confirmed');
   });
 
@@ -294,15 +304,13 @@ describe('SecretaryAppointments', () => {
     const target = booked();
     session.cancel(target.id);
     fixture.detectChanges();
-    button('Dismiss')?.click();
-    fixture.detectChanges();
 
     page().confirm(target);
     fixture.detectChanges();
 
-    expect(text()).toContain('could not be confirmed');
-    expect(text()).toContain('It is now cancelled');
-    expect(text()).not.toContain('is confirmed.');
+    expect(latestToast()?.tone).toBe('error');
+    expect(latestToast()?.title).toBe('Not confirmed');
+    expect(latestToast()?.message).toContain('cancelled');
     expect(statusOf(target.id)).toBe('cancelled');
   });
 
@@ -365,11 +373,11 @@ describe('SecretaryAppointments', () => {
     page().requestCancel(live);
     page().confirmCancel();
     fixture.detectChanges();
-    expect(text()).toContain('is cancelled');
+    expect(latestToast()?.title).toBe('Appointment cancelled');
 
-    button('Dismiss')?.click();
+    toasts().dismiss(latestToast()!.id);
     fixture.detectChanges();
-    expect(text()).not.toContain('is cancelled');
+    expect(latestToast()).toBeNull();
   });
 
   it('says the data is a sample, so a screenshot is not mistaken for a product', () => {

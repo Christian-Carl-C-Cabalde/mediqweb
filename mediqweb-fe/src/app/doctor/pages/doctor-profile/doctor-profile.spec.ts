@@ -1,4 +1,5 @@
 import { type ComponentFixture, TestBed } from '@angular/core/testing';
+import { clearToasts, latestToast } from '../../../core/services/toast.service.spec-helpers';
 import { MOCK_APPOINTMENTS } from '../../doctor.mock-data';
 import { DoctorSession } from '../../doctor-session';
 import { DoctorProfilePage } from './doctor-profile';
@@ -15,6 +16,9 @@ describe('DoctorProfilePage', () => {
     fixture.detectChanges();
     await fixture.whenStable();
   });
+
+  // Disarms the dismissal timers the toasts arm.
+  afterEach(() => clearToasts());
 
   function page(): any {
     return fixture.componentInstance;
@@ -53,7 +57,10 @@ describe('DoctorProfilePage', () => {
     page().form.controls.phone.setValue('+63 917 555 9999');
     page().save();
     fixture.detectChanges();
-    expect(text()).toContain('Reload the page and the old details return');
+    // The store is a fixture, so "updated" has to carry the caveat. A toast
+    // reading only "Saved" would be claiming a persistence that does not exist.
+    expect(latestToast()?.tone).toBe('success');
+    expect(latestToast()?.message).toContain('this session only');
   });
 
   it('refuses an invalid email and says so', () => {

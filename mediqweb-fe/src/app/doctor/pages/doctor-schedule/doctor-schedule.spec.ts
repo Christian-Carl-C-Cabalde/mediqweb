@@ -1,4 +1,5 @@
 import { type ComponentFixture, TestBed } from '@angular/core/testing';
+import { clearToasts, latestToast } from '../../../core/services/toast.service.spec-helpers';
 import { DoctorSession } from '../../doctor-session';
 import { DoctorSchedule } from './doctor-schedule';
 
@@ -13,6 +14,9 @@ describe('DoctorSchedule', () => {
     fixture.detectChanges();
     await fixture.whenStable();
   });
+
+  // Disarms the dismissal timers the toasts arm, so nothing is left pending.
+  afterEach(() => clearToasts());
 
   function page(): any {
     return fixture.componentInstance;
@@ -75,7 +79,11 @@ describe('DoctorSchedule', () => {
     const monday = session.schedule().find((d) => d.dayOfWeek === 1)!;
     expect(monday.startTime).toBe('08:00');
     expect(monday.endTime).toBe('11:00');
-    expect(text()).toContain('Saved');
+    expect(latestToast()?.tone).toBe('success');
+    // The summary is days and hours, not the individual start times.
+    expect(latestToast()?.message).toContain('You now publish');
+    // And it says the store is a fixture rather than claiming it persisted.
+    expect(latestToast()?.message).toContain('this session only');
   });
 
   it('rejects an end time that is not after the start', () => {
@@ -85,7 +93,10 @@ describe('DoctorSchedule', () => {
     fixture.detectChanges();
 
     expect(page().form.invalid).toBe(true);
-    expect(text()).toContain('Fix the highlighted days');
+    // A warning, not a success or an error: nothing was attempted and the store
+    // was never reached. The per-day messages name which rows.
+    expect(latestToast()?.tone).toBe('warning');
+    expect(latestToast()?.title).toContain('Nothing saved');
   });
 
   it('shows the error on a day that was touched, not before', () => {

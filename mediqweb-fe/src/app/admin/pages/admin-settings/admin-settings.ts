@@ -1,6 +1,7 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Button, Card, Dropdown, FormField, type DropdownItem } from '../../../shared/components';
+import { ToastService } from '../../../core/services/toast.service';
 
 /** A configurable clinic preference. */
 interface Choice {
@@ -67,14 +68,13 @@ const RETENTION_PERIODS: Choice[] = [
 })
 export class AdminSettings {
   private readonly fb = inject(FormBuilder);
+  private readonly toasts = inject(ToastService);
 
   protected readonly slotLengths = SLOT_LENGTHS;
   protected readonly bookingWindows = BOOKING_WINDOWS;
   protected readonly reminderLeadTimes = REMINDER_LEAD_TIMES;
   protected readonly sessionTimeouts = SESSION_TIMEOUTS;
   protected readonly retentionPeriods = RETENTION_PERIODS;
-
-  protected readonly notice = signal<string | null>(null);
 
   protected readonly form = this.fb.nonNullable.group({
     clinicName: ['MediQ Clinic', [Validators.required, Validators.maxLength(80)]],
@@ -102,7 +102,6 @@ export class AdminSettings {
   /** Applies a dropdown selection to its form control. */
   protected pick(control: keyof AdminSettings['form']['controls'], item: DropdownItem): void {
     this.form.controls[control].setValue(item.id);
-    this.notice.set(null);
   }
 
   protected selectedOf(control: keyof AdminSettings['form']['controls']): string {
@@ -112,10 +111,19 @@ export class AdminSettings {
   protected save(): void {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
-      this.notice.set('Fix the highlighted fields before saving.');
+      // A warning: nothing was attempted, the form was incomplete. The field
+      // messages say which fields.
+      this.toasts.warning('Nothing saved', 'Fix the highlighted fields, then save again.');
       return;
     }
-    // No service to call yet. Say so rather than pretending the save worked.
-    this.notice.set('Settings are not connected yet, so nothing was saved.');
+
+    // There is no service to call, so there is nothing to have succeeded. An
+    // error rather than a warning, and never a success: the one unforgivable
+    // mistake here is telling an administrator their clinic settings are saved
+    // when they are not.
+    this.toasts.error(
+      'Nothing was saved',
+      'Settings are not connected yet. This form cannot write anywhere until the API lands.',
+    );
   }
 }

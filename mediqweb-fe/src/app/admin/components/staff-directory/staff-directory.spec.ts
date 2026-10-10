@@ -1,10 +1,18 @@
 import { type ComponentFixture, TestBed } from '@angular/core/testing';
+import { clearToasts, latestToast } from '../../../core/services/toast.service.spec-helpers';
 import { AdminSession } from '../../admin-session';
 import { StaffDirectory } from './staff-directory';
 
 describe('StaffDirectory', () => {
   let fixture: ComponentFixture<StaffDirectory>;
   let session: AdminSession;
+
+  // Disarms the dismissal timers the toasts arm. Before every test rather than
+  // after one, because `render` resets the TestBed and a toast raised under the
+  // previous module's injector would otherwise still be on the stack.
+  beforeEach(() => clearToasts());
+
+  afterEach(() => clearToasts());
 
   async function render(kind: 'doctor' | 'secretary'): Promise<ComponentFixture<StaffDirectory>> {
     TestBed.resetTestingModule();
@@ -254,8 +262,23 @@ describe('StaffDirectory', () => {
       const created = session.doctors().find((d) => d.email === 'ana.reyes@mediq.ph');
       expect(created?.status).toBe('inactive');
       expect(created?.username).toBe('areyes');
-      expect(dir['notice']()).toContain('Ana Reyes');
+      expect(latestToast()?.tone).toBe('success');
+      expect(latestToast()?.message).toContain('Ana Reyes');
+      // Closed before the toast is raised, so it is not behind the dialog's
+      // backdrop while it is on screen.
       expect(dir['createOpen']()).toBe(false);
+    });
+
+    it('warns rather than errors when the form is incomplete', () => {
+      const dir = fixture.componentInstance as any;
+      dir['form'].patchValue({ ...validDoctor, licenseNumber: '' });
+      dir['submit']();
+      fixture.detectChanges();
+
+      // Nothing was attempted and nothing failed: the form was not filled in. The
+      // field-level messages below say which fields.
+      expect(latestToast()?.tone).toBe('warning');
+      expect(session.doctors().some((d) => d.email === 'ana.reyes@mediq.ph')).toBe(false);
     });
 
     it('opens the dialog with a clean form, defaulting to active', () => {

@@ -9,13 +9,6 @@
   <ui-button variant="primary" (click)="openCreate()">Add specialty</ui-button>
 </ui-filter-bar>
 
-@if (notice(); as message) {
-  <p class="row-notice" role="status">
-    {{ message }}
-    <ui-button variant="ghost" size="sm" (click)="notice.set(null)">Dismiss</ui-button>
-  </p>
-}
-
 <div class="grid">
   @for (specialization of specializations(); track specialization.id) {
     <ui-card>

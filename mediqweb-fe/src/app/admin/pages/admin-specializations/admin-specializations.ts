@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Button, Card, FilterBar, FormField, Modal, MockNotice } from '../../../shared/components';
 import { AdminSession } from '../../admin-session';
+import { ToastService } from '../../../core/services/toast.service';
 import type { Specialization } from '../../admin.models';
 
 /**
@@ -25,11 +26,11 @@ import type { Specialization } from '../../admin.models';
 export class AdminSpecializations {
   private readonly fb = inject(FormBuilder);
   private readonly session = inject(AdminSession);
+  private readonly toasts = inject(ToastService);
 
   protected readonly query = signal('');
   protected readonly editorOpen = signal(false);
   protected readonly editing = signal<Specialization | null>(null);
-  protected readonly notice = signal<string | null>(null);
 
   protected readonly form = this.fb.nonNullable.group({
     name: ['', [Validators.required, Validators.maxLength(60)]],
@@ -91,20 +92,26 @@ export class AdminSpecializations {
   protected submit(): void {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
+      // A warning, not an error: nothing was attempted, the form was incomplete.
+      // The field messages below name which fields.
+      this.toasts.warning('Check the form', 'A name and a description are both needed.');
       return;
     }
 
     const { name, description } = this.form.getRawValue();
     const current = this.editing();
+    const label = name.trim();
 
     if (current) {
       this.session.updateSpecialization(current.id, name, description);
-      this.notice.set(`Updated ${name.trim()}.`);
+      this.toasts.success('Specialization updated', `${label} now reads "${description.trim()}".`);
     } else {
       this.session.addSpecialization(name, description);
-      this.notice.set(`Added ${name.trim()}.`);
+      this.toasts.success('Specialization added', `${label} is now available to assign.`);
     }
 
+    // Closed before the toast, so the notification is not behind the dialog's
+    // backdrop while it is on screen.
     this.editorOpen.set(false);
   }
 }

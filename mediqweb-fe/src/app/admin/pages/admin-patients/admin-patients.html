@@ -15,13 +15,6 @@
   />
 </ui-filter-bar>
 
-@if (notice(); as message) {
-  <p class="row-notice" role="status">
-    {{ message }}
-    <ui-button variant="ghost" size="sm" (click)="notice.set(null)">Dismiss</ui-button>
-  </p>
-}
-
 <ui-card padding="none">
   <ui-table
     [columns]="columns"

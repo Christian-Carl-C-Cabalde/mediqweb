@@ -16,6 +16,7 @@ import {
   type TableColumn,
 } from '../../../shared/components';
 import { AdminSession } from '../../admin-session';
+import { ToastService } from '../../../core/services/toast.service';
 import type { AccountStatus, PatientAccount } from '../../admin.models';
 
 type StatusFilter = 'all' | AccountStatus;
@@ -55,11 +56,11 @@ const STATUS_FILTER_ITEMS: DropdownItem[] = [
 })
 export class AdminPatients {
   private readonly session = inject(AdminSession);
+  private readonly toasts = inject(ToastService);
 
   protected readonly query = signal('');
   protected readonly statusFilter = signal<StatusFilter>('all');
   protected readonly confirmDisableFor = signal<PatientAccount | null>(null);
-  protected readonly notice = signal<string | null>(null);
 
   protected readonly statusOptions = STATUS_FILTER_ITEMS;
 
@@ -111,13 +112,21 @@ export class AdminPatients {
   protected confirmDisable(): void {
     const patient = this.confirmDisableFor();
     if (!patient) return;
-    this.session.setPatientStatus(patient.id, 'inactive');
+    const changed = this.session.setPatientStatus(patient.id, 'inactive');
     this.confirmDisableFor.set(null);
-    this.notice.set(`${patient.name} can no longer book appointments.`);
+
+    if (changed) {
+      this.toasts.warning(`${patient.name} was disabled`, 'They can no longer book appointments.');
+    } else {
+      this.toasts.error('Not disabled', `${patient.name} could not be updated.`);
+    }
   }
 
   protected enable(patient: PatientAccount): void {
-    this.session.setPatientStatus(patient.id, 'active');
-    this.notice.set(`${patient.name} can book appointments again.`);
+    if (this.session.setPatientStatus(patient.id, 'active')) {
+      this.toasts.success(`${patient.name} was re-enabled`, 'They can book appointments again.');
+    } else {
+      this.toasts.error('Not re-enabled', `${patient.name} could not be updated.`);
+    }
   }
 }

@@ -1,10 +1,5 @@
 @use '../../../shared/scss/listing';
 
-.row-notice__when {
-  font-variant-numeric: tabular-nums;
-  color: var(--color-text-muted);
-}
-
 // Buttons in a table cell: a single row until the cell gets crowded, then
 // they wrap rather than widening the table.
 .actions {

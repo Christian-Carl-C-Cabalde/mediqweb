@@ -35,20 +35,10 @@
   gap: var(--space-4);
 }
 
-// Save-time confirmation, using the primary tint so it reads as "done" even
-// when what it is really saying is that nothing was persisted.
-.notice {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin: 0;
-  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
-  color: var(--color-text-secondary);
-  background-color: var(--color-primary-light);
-  border: var(--border-width) solid
-    color-mix(in srgb, var(--color-primary) 30%, var(--color-surface));
-  border-radius: var(--radius-md);
-}
+// `.notice` used to live here for the save-time confirmation. It is gone: both
+// profiles report through the app-wide toast stack instead, so the wording, the
+// timing and the dismissal all live in one place rather than being re-declared
+// per profile page.
 
 .form__actions {
   display: flex;

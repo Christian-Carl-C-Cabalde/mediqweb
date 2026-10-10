@@ -163,11 +163,17 @@ export class AdminSession {
   /**
    * Flips an account between usable and not, recording the change. Disabling
    * rather than deleting keeps the record of the account intact.
+   *
+   * Returns whether anything changed, so a caller can report the real outcome
+   * rather than assume one. An account that does not exist, or is already in the
+   * state asked for, is a `false` — and a screen that announced "disabled" for
+   * either would be reporting a change it did not make. Same contract as the
+   * Secretary area's `confirm` and `cancel`.
    */
-  setStaffStatus(kind: StaffKind, id: string, status: AccountStatus): void {
+  setStaffStatus(kind: StaffKind, id: string, status: AccountStatus): boolean {
     const target = kind === 'doctor' ? this.doctorsState : this.secretariesState;
     const existing = target().find((a) => a.id === id);
-    if (!existing || existing.status === status) return;
+    if (!existing || existing.status === status) return false;
 
     target.update((list) => list.map((a) => (a.id === id ? { ...a, status } : a)));
     this.record(
@@ -175,11 +181,13 @@ export class AdminSession {
       existing.name,
       status === 'active' ? 'info' : 'warning',
     );
+    return true;
   }
 
-  setPatientStatus(id: string, status: AccountStatus): void {
+  /** Whether anything changed. See `setStaffStatus` for why this reports. */
+  setPatientStatus(id: string, status: AccountStatus): boolean {
     const existing = this.patientsState().find((p) => p.id === id);
-    if (!existing || existing.status === status) return;
+    if (!existing || existing.status === status) return false;
 
     this.patientsState.update((list) => list.map((p) => (p.id === id ? { ...p, status } : p)));
     this.record(
@@ -187,6 +195,7 @@ export class AdminSession {
       existing.name,
       status === 'active' ? 'info' : 'warning',
     );
+    return true;
   }
 
   addSpecialization(name: string, description: string): Specialization {
