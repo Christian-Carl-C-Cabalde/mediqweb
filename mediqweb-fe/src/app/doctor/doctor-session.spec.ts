@@ -86,10 +86,18 @@ describe('DoctorSession', () => {
     });
 
     it('never points at a cancelled appointment', () => {
-      for (const appointment of session.appointments()) {
-        session.setAppointmentStatus(appointment.id, 'cancelled');
+      // Over the fixtures rather than by manufacturing cancellations: this store
+      // cannot cancel anything, so a test that needed it to would be asking for
+      // the capability this area does not have. The assertion is that no cancelled
+      // appointment is ever the answer — which holds for every row, not just one.
+      expect(session.appointments().some((a) => a.status === 'cancelled')).toBe(true);
+
+      for (const summary of session.patients()) {
+        if (summary.nextVisit) expect(summary.nextVisit.status).not.toBe('cancelled');
       }
-      expect(session.nextAppointment()).toBeNull();
+
+      const next = session.nextAppointment();
+      if (next) expect(next.status).not.toBe('cancelled');
     });
   });
 
@@ -100,27 +108,56 @@ describe('DoctorSession', () => {
     });
   });
 
-  describe('setAppointmentStatus', () => {
-    it('moves an appointment forward', () => {
+  describe('recordOutcome', () => {
+    it('marks a confirmed visit complete', () => {
+      const confirmed = session.appointments().find((a) => a.status === 'confirmed')!;
+      expect(session.recordOutcome(confirmed.id, 'completed')).toBe(true);
+      expect(session.appointments().find((a) => a.id === confirmed.id)?.status).toBe('completed');
+    });
+
+    it('records a no-show', () => {
+      const confirmed = session.appointments().find((a) => a.status === 'confirmed')!;
+      expect(session.recordOutcome(confirmed.id, 'no-show')).toBe(true);
+      expect(session.appointments().find((a) => a.id === confirmed.id)?.status).toBe('no-show');
+    });
+
+    it('refuses a booking the front desk has not confirmed', () => {
+      // The precondition that makes `confirmed` the handover point. Without it a
+      // doctor could close a booking nobody approved, which is skipping the
+      // Secretary's step rather than describing a visit.
       const booked = session.appointments().find((a) => a.status === 'booked')!;
-      expect(session.setAppointmentStatus(booked.id, 'confirmed')).toBe(true);
-      expect(session.appointments().find((a) => a.id === booked.id)?.status).toBe('confirmed');
+      expect(session.recordOutcome(booked.id, 'completed')).toBe(false);
+      expect(session.appointments().find((a) => a.id === booked.id)?.status).toBe('booked');
     });
 
     it('reports no change for an unknown id', () => {
-      expect(session.setAppointmentStatus('appt-999', 'confirmed')).toBe(false);
+      expect(session.recordOutcome('appt-999', 'completed')).toBe(false);
     });
 
-    it('reports no change when the status already holds, so a double click is harmless', () => {
+    it('reports no change once an outcome is recorded, so a double click is harmless', () => {
       const confirmed = session.appointments().find((a) => a.status === 'confirmed')!;
-      expect(session.setAppointmentStatus(confirmed.id, 'confirmed')).toBe(false);
-      expect(session.appointments().filter((a) => a.id === confirmed.id).length).toBe(1);
+      expect(session.recordOutcome(confirmed.id, 'completed')).toBe(true);
+      // Second click: the appointment is no longer `confirmed`, so it refuses
+      // rather than overwriting what the first one recorded.
+      expect(session.recordOutcome(confirmed.id, 'no-show')).toBe(false);
+      expect(session.appointments().find((a) => a.id === confirmed.id)?.status).toBe('completed');
     });
 
     it("leaves another doctor's appointment alone", () => {
-      const foreign = MOCK_APPOINTMENTS.find((a) => a.doctorId !== SIGNED_IN_DOCTOR_ID)!;
-      expect(session.setAppointmentStatus(foreign.id, 'completed')).toBe(false);
+      const foreign = MOCK_APPOINTMENTS.find(
+        (a) => a.doctorId !== SIGNED_IN_DOCTOR_ID && a.status === 'confirmed',
+      )!;
+      expect(session.recordOutcome(foreign.id, 'completed')).toBe(false);
       expect(MOCK_APPOINTMENTS.find((a) => a.id === foreign.id)!.status).not.toBe('completed');
+    });
+
+    it('offers no way to confirm or cancel, only to record an outcome', () => {
+      // The capability is a type now, so there is nothing to call for the two
+      // moves the Secretary owns. Asserted on the store rather than the buttons
+      // because a hidden button is not what forbids them.
+      const store = session as unknown as Record<string, unknown>;
+      expect(store['setAppointmentStatus']).toBeUndefined();
+      expect(typeof session.recordOutcome).toBe('function');
     });
   });
 
@@ -144,12 +181,18 @@ describe('DoctorSession', () => {
       expect(cancelled.visitCount).toBe(0);
     });
 
-    it('drops a cancelled booking from the next visit', () => {
-      const before = session.patients().find((s) => s.patient.id === 'pat-108')!;
-      expect(before.nextVisit?.id).toBe('appt-115');
+    it('offers a confirmed booking as the next visit, and skips the cancelled one', () => {
+      // pat-108 has both: a cancelled visit in the past and a confirmed one due.
+      // The confirmed one is what the desk should be shown, so this also guards
+      // against the cancelled filter over-reaching and hiding real appointments.
+      const pat = session.patients().find((s) => s.patient.id === 'pat-108')!;
 
-      session.setAppointmentStatus('appt-115', 'cancelled');
-      expect(session.patients().find((s) => s.patient.id === 'pat-108')!.nextVisit).toBeNull();
+      expect(
+        MOCK_APPOINTMENTS.find((a) => a.id === 'appt-108')!.status,
+        'the past visit is the cancelled one',
+      ).toBe('cancelled');
+      expect(pat.nextVisit?.id).toBe('appt-115');
+      expect(pat.nextVisit?.status).toBe('confirmed');
     });
   });
 

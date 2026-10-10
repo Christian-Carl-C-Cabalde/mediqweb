@@ -15,6 +15,7 @@ import type {
   PatientSummary,
   ProfileDraft,
   ScheduleDay,
+  VisitOutcome,
 } from './doctor.models';
 
 /** A status that ends an appointment's life, so it can no longer be acted on. */
@@ -189,22 +190,37 @@ export class DoctorSession {
   }
 
   /**
-   * Moves an appointment to a new status.
+   * Records what happened at a visit the doctor has now seen.
    *
-   * Ignores an unknown id, another doctor's appointment, and a status the
-   * appointment already holds — so a double click cannot append a duplicate
-   * row, and a caller cannot reach across the scoping rule by guessing an id.
-   * Returns whether anything changed, which is what the caller uses to decide
-   * to show a confirmation.
+   * The Doctor area's entire authority over an appointment, and deliberately the
+   * only lever this store offers over one. It was `setAppointmentStatus(id,
+   * status)` taking any status, which meant the buttons on screen were the *only*
+   * thing stopping a doctor confirming their own booking or calling one off — and
+   * a view that merely hides a control still lets a caller reach the same result.
+   * Naming the two outcomes instead of the five statuses makes the capability a
+   * type rather than a convention.
+   *
+   * Refuses an appointment that is not `confirmed`, because that step belongs to
+   * the front desk: a doctor recording an outcome on a booking nobody has approved
+   * would skip past the approval rather than record anything.
+   *
+   * That precondition also covers the double click on its own, so there is no
+   * separate "already holds this status" check: a `confirmed` appointment can
+   * never already be `completed` or `no-show`, and TypeScript says so.
+   *
+   * Also ignores an unknown id and another doctor's appointment, so a guessed id
+   * cannot reach across the scoping rule. Returns whether anything changed, which
+   * is what the caller reports from.
    */
-  setAppointmentStatus(id: string, status: AppointmentStatus): boolean {
+  recordOutcome(id: string, outcome: VisitOutcome): boolean {
     const current = this.appointmentState().find(
       (appointment) => appointment.id === id && appointment.doctorId === this.doctorId,
     );
-    if (!current || current.status === status) return false;
+    if (!current || current.status !== 'confirmed') return false;
+
     this.appointmentState.update((appointments) =>
       appointments.map((appointment) =>
-        appointment.id === id ? { ...appointment, status } : appointment,
+        appointment.id === id ? { ...appointment, status: outcome } : appointment,
       ),
     );
     return true;

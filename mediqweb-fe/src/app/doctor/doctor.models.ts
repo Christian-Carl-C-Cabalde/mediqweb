@@ -27,6 +27,21 @@ export type { AppointmentStatus } from '../shared/domain/appointment-status';
 
 import type { AppointmentStatus } from '../shared/domain/appointment-status';
 
+/**
+ * The two things a doctor can say about a visit that has now happened.
+ *
+ * The whole of the Doctor area's authority over an appointment. A doctor cannot
+ * approve one — that is the front desk's, and it means the patient has said they
+ * are coming — and cannot call one off, which is an administrative decision about
+ * a booking rather than a record of a consultation. What only the doctor can say
+ * is whether the patient was seen or did not turn up.
+ *
+ * Deliberately a closed union rather than `AppointmentStatus`: naming the two
+ * outcomes is what stops a handler from being handed `cancelled` and passing it
+ * straight through.
+ */
+export type VisitOutcome = Extract<AppointmentStatus, 'completed' | 'no-show'>;
+
 export interface Appointment {
   readonly id: string;
   readonly patientId: string;

@@ -81,12 +81,16 @@ describe('DoctorDashboard', () => {
     expect([...times].sort()).toEqual(times);
   });
 
-  it('reacts to an appointment being confirmed elsewhere', () => {
-    const before = page().awaitingCount();
-    const booked = session.appointments().find((a: any) => a.status === 'booked')!;
-    session.setAppointmentStatus(booked.id, 'confirmed');
+  it('reacts to a visit being recorded', () => {
+    // Driven through an action the doctor actually owns. It used to confirm a
+    // booking to move the figure, which is no longer something this area can do —
+    // and a test that needed a removed capability was a test asserting the wrong
+    // division of labour.
+    const before = page().completedThisWeek();
+    const confirmed = session.appointments().find((a: any) => a.status === 'confirmed')!;
+    session.recordOutcome(confirmed.id, 'completed');
     fixture.detectChanges();
-    expect(page().awaitingCount()).toBe(before - 1);
+    expect(page().completedThisWeek()).toBe(before + 1);
   });
 
   it('says the data is a sample, so a screenshot is not mistaken for a product', () => {

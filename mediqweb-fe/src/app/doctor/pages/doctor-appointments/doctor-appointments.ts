@@ -18,7 +18,7 @@ import {
 import { formatDuration } from '../../doctor.dates';
 import { DoctorSession } from '../../doctor-session';
 import { ToastService } from '../../../core/services/toast.service';
-import type { Appointment, AppointmentStatus } from '../../doctor.models';
+import type { Appointment, AppointmentStatus, VisitOutcome } from '../../doctor.models';
 
 type StatusFilter = 'all' | AppointmentStatus;
 
@@ -31,17 +31,22 @@ const STATUS_ITEMS: DropdownItem[] = [
   { id: 'no-show', label: 'No-show' },
 ];
 
-/** Cancelling is destructive, so it is the only action that asks first. */
-const CANCELLABLE: readonly AppointmentStatus[] = ['booked', 'confirmed'];
-
 /**
  * The doctor's appointment list.
  *
- * Reading and moving appointments along their lifecycle: confirm a booking,
- * close it after the consultation, or record a no-show. Creating and
- * rescheduling are absent on purpose — a Secretary at the front desk owns the
- * diary, and inventing a booking form here would put two sources of truth on
- * the same schedule.
+ * Reading the diary and recording what happened at it. Two actions, and the page
+ * is built around how few they are: mark a visit **complete**, or record a
+ * **no-show** for a patient who was not there in the booked time. Both say what
+ * occurred, and neither is available until the appointment has been confirmed —
+ * because the front desk confirms first, and a doctor recording an outcome on a
+ * booking nobody approved would skip that step rather than describe anything.
+ *
+ * Everything else in the lifecycle is absent on purpose, and it is the store that
+ * refuses it rather than the template that hides it. A doctor cannot approve their
+ * own booking — that is the Secretary's, and it means the patient said they were
+ * coming — cannot cancel one, which is an administrative decision about a booking
+ * rather than a record of a consultation, and cannot create or move one. See
+ * `DoctorSession.recordOutcome`, which is the only lever the store offers.
  */
 @Component({
   selector: 'app-doctor-appointments',
@@ -54,7 +59,6 @@ const CANCELLABLE: readonly AppointmentStatus[] = ['booked', 'confirmed'];
     Dropdown,
     FilterBar,
     MockNotice,
-    Modal,
     Table,
     TableCell,
     AppointmentStatusBadge,
@@ -69,7 +73,6 @@ export class DoctorAppointments {
 
   protected readonly query = signal('');
   protected readonly statusFilter = signal<StatusFilter>('all');
-  protected readonly confirmCancelFor = signal<Appointment | null>(null);
 
   protected readonly statusOptions = STATUS_ITEMS;
 
@@ -118,17 +121,16 @@ export class DoctorAppointments {
     return formatDuration(appointment.durationMinutes);
   }
 
-  protected canCancel(appointment: Appointment): boolean {
-    return CANCELLABLE.includes(appointment.status);
-  }
-
-  protected confirm(appointment: Appointment): void {
-    this.report(
-      appointment,
-      'confirmed',
-      'Appointment confirmed',
-      (name) => `${name} is expected.`,
-    );
+  /**
+   * Whether an outcome can be recorded against this appointment.
+   *
+   * Mirrors the store's rule rather than restating it in the template, and says
+   * the same thing the store does: only an appointment the front desk has
+   * confirmed has had a visit to describe. A `booked` row shows no action at all,
+   * which is the honest answer — there is nothing yet to report about it.
+   */
+  protected canRecord(appointment: Appointment): boolean {
+    return appointment.status === 'confirmed';
   }
 
   protected complete(appointment: Appointment): void {
@@ -152,48 +154,25 @@ export class DoctorAppointments {
     );
   }
 
-  protected requestCancel(appointment: Appointment): void {
-    this.confirmCancelFor.set(appointment);
-  }
-
-  protected cancelCancel(): void {
-    this.confirmCancelFor.set(null);
-  }
-
-  protected confirmCancel(): void {
-    const appointment = this.confirmCancelFor();
-    if (!appointment) return;
-    const changed = this.session.setAppointmentStatus(appointment.id, 'cancelled');
-    this.confirmCancelFor.set(null);
-
-    if (changed) {
-      this.toasts.warning(
-        'Appointment cancelled',
-        `${this.patientName(appointment)} will not be seen.`,
-      );
-    } else {
-      this.toasts.error('Not cancelled', 'That appointment could not be updated.');
-    }
-  }
-
   /**
-   * Moves an appointment along and reports what actually happened.
+   * Records an outcome and reports what actually happened.
    *
-   * One place for the four status changes, because they differ only in their
-   * wording and they must not differ in whether they check. A row whose status was
-   * moved on by something else would otherwise be reported as recorded by this
-   * click, which is the one thing the toast is not allowed to get wrong.
+   * One place for the two, because they differ only in their wording and they must
+   * not differ in whether they check. A row whose status had already moved on —
+   * by another session, or by a second click — would otherwise be reported as
+   * recorded by this one, which is the single thing the toast is not allowed to
+   * get wrong.
    */
   private report(
     appointment: Appointment,
-    status: AppointmentStatus,
+    outcome: VisitOutcome,
     title: string,
     sentence: (name: string) => string,
     tone: 'success' | 'warning' = 'success',
   ): void {
     const name = this.patientName(appointment);
-    if (!this.session.setAppointmentStatus(appointment.id, status)) {
-      this.toasts.error('Not updated', `${name}'s appointment is no longer in a state to change.`);
+    if (!this.session.recordOutcome(appointment.id, outcome)) {
+      this.toasts.error('Not recorded', `${name}'s appointment is no longer one you can close.`);
       return;
     }
     this.toasts.show(tone, title, sentence(name));
