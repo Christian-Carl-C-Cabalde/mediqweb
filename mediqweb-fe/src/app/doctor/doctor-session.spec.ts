@@ -235,12 +235,17 @@ describe('DoctorSession', () => {
       session.updateProfile({
         name: 'R. Santos',
         email: 'new@mediq.ph',
-        phone: '+63 900',
         bio: 'Hi',
       });
       expect(session.profile().name).toBe('R. Santos');
       expect(session.profile().licenseNumber).toBe(licence);
       expect(session.profile().specialization).toBe('Orthopedics');
+    });
+
+    it('holds no contact number for the doctor at all', () => {
+      // The removal is only real if it reaches the record. A form-only change would
+      // leave the value here with nothing able to read or change it.
+      expect(Object.keys(session.profile())).not.toContain('phone');
     });
   });
 });

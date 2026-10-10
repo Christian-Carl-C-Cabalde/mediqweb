@@ -76,8 +76,14 @@ export interface PatientSummary {
 export interface DoctorProfile {
   readonly id: string;
   readonly name: string;
+  /**
+   * How the clinic reaches this doctor.
+   *
+   * The only channel, and deliberately the only one: a published email address is
+   * the address a patient already has for their appointments, and a second
+   * contact route for a clinician is a number on a website that is out of date.
+   */
   readonly email: string;
-  readonly phone: string;
   readonly specialization: string;
   /** Issued by the regulator, not editable here — the Admin owns it. */
   readonly licenseNumber: string;
@@ -97,5 +103,10 @@ export interface ScheduleDay {
   readonly endTime: string;
 }
 
-/** Fields the Profile page is allowed to change. */
-export type ProfileDraft = Pick<DoctorProfile, 'name' | 'email' | 'phone' | 'bio'>;
+/**
+ * Fields the Profile page is allowed to change.
+ *
+ * Three, and the type says which: specialization, licence number and the joined
+ * date are not in it, so a caller cannot hand them over and be believed.
+ */
+export type ProfileDraft = Pick<DoctorProfile, 'name' | 'email' | 'bio'>;

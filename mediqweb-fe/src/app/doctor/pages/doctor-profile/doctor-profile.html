@@ -22,8 +22,8 @@
 
   <ui-card heading="Your details" [headingLevel]="3" padding="lg">
     <p class="lede">
-      These four fields are yours to keep current. Your specialization and license number are set by
-      an administrator, so they are read-only here.
+      These three fields are yours to keep current, and they are how the clinic reaches you. Your
+      specialization and license number are set by an administrator, so they are read-only here.
     </p>
 
     <form class="form" [formGroup]="form" (ngSubmit)="save()">
@@ -31,17 +31,8 @@
         <input id="profile-name" type="text" formControlName="name" autocomplete="name" />
       </ui-form-field>
 
-      <ui-form-field
-        label="Email address"
-        controlId="profile-email"
-        hint="Used for sign-in and clinic notices."
-        [error]="emailError()"
-      >
+      <ui-form-field label="Email address" controlId="profile-email" [error]="emailError()">
         <input id="profile-email" type="email" formControlName="email" autocomplete="email" />
-      </ui-form-field>
-
-      <ui-form-field label="Contact number" controlId="profile-phone" [error]="phoneError()">
-        <input id="profile-phone" type="tel" formControlName="phone" autocomplete="tel" />
       </ui-form-field>
 
       <ui-form-field

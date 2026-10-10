@@ -215,8 +215,21 @@ export class DoctorSession {
     this.scheduleState.set(days.map((day) => ({ ...day })));
   }
 
-  /** Applies the fields the Profile page is allowed to change. */
+  /**
+   * Applies the fields the Profile page is allowed to change.
+   *
+   * Named field by field rather than spread, so a caller handing over a whole
+   * profile object cannot reassign the doctor through it. The type already limits
+   * `ProfileDraft` to three fields, but a spread would make that a compile-time
+   * suggestion rather than a rule — and it is the same reasoning that took the
+   * contact number out in the first place.
+   */
   updateProfile(draft: ProfileDraft): void {
-    this.profileState.update((profile) => ({ ...profile, ...draft }));
+    this.profileState.update((profile) => ({
+      ...profile,
+      name: draft.name,
+      email: draft.email,
+      bio: draft.bio,
+    }));
   }
 }
