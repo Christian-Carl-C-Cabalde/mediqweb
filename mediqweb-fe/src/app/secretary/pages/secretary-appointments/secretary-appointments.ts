@@ -17,6 +17,7 @@ import {
 } from '../../../shared/components';
 import { formatDuration } from '../../secretary.dates';
 import { SecretarySession } from '../../secretary-session';
+import { ToastService } from '../../../core/services/toast.service';
 import type { Appointment, AppointmentStatus } from '../../secretary.models';
 
 type StatusFilter = 'all' | AppointmentStatus;
@@ -32,18 +33,6 @@ const STATUS_ITEMS: DropdownItem[] = [
 
 /** An appointment can still be called off while the patient is expected. */
 const LIVE: readonly AppointmentStatus[] = ['booked', 'confirmed'];
-
-/**
- * A short confirmation after an action.
- *
- * `at` is the raw timestamp rather than a formatted string so the template can
- * render it with the `date` pipe and get locale formatting for free; formatting
- * it in the component would need a second, parallel date formatter.
- */
-interface Notice {
-  readonly text: string;
-  readonly at?: string;
-}
 
 /**
  * Appointment management: the Secretary's main screen.
@@ -86,11 +75,11 @@ interface Notice {
 })
 export class SecretaryAppointments {
   private readonly session = inject(SecretarySession);
+  private readonly toasts = inject(ToastService);
 
   protected readonly query = signal('');
   protected readonly statusFilter = signal<StatusFilter>('all');
   protected readonly confirmCancelFor = signal<Appointment | null>(null);
-  protected readonly notice = signal<Notice | null>(null);
 
   protected readonly statusOptions = STATUS_ITEMS;
 
@@ -185,16 +174,21 @@ export class SecretaryAppointments {
    * *other* than confirmed is genuinely a change worth reporting.
    */
   protected confirm(appointment: Appointment): void {
+    const name = this.patientName(appointment);
     if (!this.session.confirm(appointment.id)) {
       const current = this.session.appointments().find((a) => a.id === appointment.id);
-      this.announce(
-        current?.status === 'confirmed'
-          ? `${this.patientName(appointment)} is already confirmed.`
-          : `That appointment could not be confirmed. It is now ${current?.status ?? 'gone'}.`,
-      );
+      if (current?.status === 'confirmed') {
+        // A double-click, the ordinary way this happens: not an error.
+        this.toasts.info('Already confirmed', `${name} was confirmed a moment ago.`);
+      } else {
+        this.toasts.error(
+          'Not confirmed',
+          `That appointment is now ${current?.status ?? 'gone'}, so it cannot be confirmed.`,
+        );
+      }
       return;
     }
-    this.announce(`${this.patientName(appointment)} is confirmed.`, appointment);
+    this.toasts.success('Appointment confirmed', `${name} is expected.`);
   }
 
   protected requestCancel(appointment: Appointment): void {
@@ -208,12 +202,16 @@ export class SecretaryAppointments {
   protected confirmCancel(): void {
     const appointment = this.confirmCancelFor();
     if (!appointment) return;
-    this.session.cancel(appointment.id);
+    const changed = this.session.cancel(appointment.id);
     this.confirmCancelFor.set(null);
-    this.announce(`${this.patientName(appointment)}'s appointment is cancelled.`, appointment);
-  }
 
-  private announce(text: string, appointment?: Appointment): void {
-    this.notice.set({ text, at: appointment?.startsAt });
+    if (changed) {
+      this.toasts.warning(
+        'Appointment cancelled',
+        `${this.patientName(appointment)} will not be seen. The visit stays in the history.`,
+      );
+    } else {
+      this.toasts.error('Not cancelled', 'That appointment could not be updated.');
+    }
   }
 }

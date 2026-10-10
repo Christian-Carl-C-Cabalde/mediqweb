@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Button, Card, DetailList, FormField, MockNotice } from '../../../shared/components';
 import { DoctorSession } from '../../doctor-session';
+import { ToastService } from '../../../core/services/toast.service';
 
 /**
  * The doctor's own profile.
@@ -14,7 +15,8 @@ import { DoctorSession } from '../../doctor-session';
  * simply not there.
  *
  * Saving writes to the mock store, which the header reads, so the name in the
- * top right updates. Nothing is persisted, and the notice says so.
+ * top right updates. Nothing is persisted, and the notification says so rather
+ * than claiming the change was saved.
  */
 @Component({
   selector: 'app-doctor-profile',
@@ -26,8 +28,7 @@ import { DoctorSession } from '../../doctor-session';
 export class DoctorProfilePage {
   private readonly session = inject(DoctorSession);
   private readonly fb = inject(FormBuilder).nonNullable;
-
-  protected readonly notice = signal<string | null>(null);
+  private readonly toasts = inject(ToastService);
 
   protected readonly profile = this.session.profile;
 
@@ -48,12 +49,19 @@ export class DoctorProfilePage {
   protected save(): void {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
-      this.notice.set('Fix the highlighted fields before saving.');
+      // A warning: nothing was attempted, the form was incomplete. The field
+      // messages below name which fields.
+      this.toasts.warning('Nothing saved', 'Fix the highlighted fields, then save again.');
       return;
     }
 
     this.session.updateProfile(this.form.getRawValue());
-    this.notice.set('Saved in this session only. Reload the page and the old details return.');
+    // Names what happened and what it did not do. "Saved" alone would imply the
+    // change survives a reload, and it does not while this is a fixture store.
+    this.toasts.success(
+      'Profile updated',
+      'Held in this session only — reload the page and the old details return.',
+    );
   }
 
   protected resetForm(): void {
@@ -61,7 +69,6 @@ export class DoctorProfilePage {
     this.form.setValue({ name, email, phone, bio });
     this.form.markAsPristine();
     this.form.markAsUntouched();
-    this.notice.set(null);
   }
 
   protected nameError(): string | null {

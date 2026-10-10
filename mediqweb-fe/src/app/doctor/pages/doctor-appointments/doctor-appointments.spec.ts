@@ -1,5 +1,10 @@
 import { type ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import {
+  clearToasts,
+  latestToast,
+  toasts,
+} from '../../../core/services/toast.service.spec-helpers';
 import { MOCK_APPOINTMENTS } from '../../doctor.mock-data';
 import { DoctorSession } from '../../doctor-session';
 import { DoctorAppointments } from './doctor-appointments';
@@ -21,6 +26,9 @@ describe('DoctorAppointments', () => {
     fixture.detectChanges();
     await fixture.whenStable();
   });
+
+  // Disarms the dismissal timers the toasts arm.
+  afterEach(() => clearToasts());
 
   function page(): any {
     return fixture.componentInstance;
@@ -81,7 +89,8 @@ describe('DoctorAppointments', () => {
     page().confirm(booked);
     fixture.detectChanges();
     expect(statusOf(booked.id)).toBe('confirmed');
-    expect(text()).toContain('is confirmed');
+    expect(latestToast()?.tone).toBe('success');
+    expect(latestToast()?.message).toContain(session.patientName(booked.patientId));
   });
 
   it('completes a confirmed appointment', () => {
@@ -89,6 +98,7 @@ describe('DoctorAppointments', () => {
     page().complete(confirmed);
     fixture.detectChanges();
     expect(statusOf(confirmed.id)).toBe('completed');
+    expect(latestToast()?.title).toBe('Visit recorded');
   });
 
   it('records a no-show', () => {
@@ -96,6 +106,9 @@ describe('DoctorAppointments', () => {
     page().markNoShow(confirmed);
     fixture.detectChanges();
     expect(statusOf(confirmed.id)).toBe('no-show');
+    // A warning rather than a success: the write worked, but it is bad news about
+    // the appointment and would otherwise read as a neutral "done".
+    expect(latestToast()?.tone).toBe('warning');
   });
 
   it('asks before cancelling, and cancelling does not happen on its own', () => {
@@ -105,6 +118,8 @@ describe('DoctorAppointments', () => {
 
     expect(statusOf(confirmed.id)).toBe('confirmed');
     expect(text()).toContain('Cancel appointment');
+    // Opening a dialog is not an outcome, so nothing has been reported yet.
+    expect(latestToast()).toBeNull();
   });
 
   it('cancels only once confirmed', () => {
@@ -113,6 +128,7 @@ describe('DoctorAppointments', () => {
     page().confirmCancel();
     fixture.detectChanges();
     expect(statusOf(confirmed.id)).toBe('cancelled');
+    expect(latestToast()?.title).toBe('Appointment cancelled');
   });
 
   it('keeps the row after cancelling, rather than deleting the history', () => {
@@ -133,10 +149,11 @@ describe('DoctorAppointments', () => {
     const booked = session.appointments().find((a) => a.status === 'booked')!;
     page().confirm(booked);
     fixture.detectChanges();
-    expect(text()).toContain('is confirmed');
+    expect(latestToast()).not.toBeNull();
 
-    clickButton('Dismiss');
-    expect(text()).not.toContain('is confirmed');
+    toasts().dismiss(latestToast()!.id);
+    fixture.detectChanges();
+    expect(latestToast()).toBeNull();
   });
 
   it('says who books appointments, so the missing create button is not a gap', () => {

@@ -1,4 +1,5 @@
 import { type ComponentFixture, TestBed } from '@angular/core/testing';
+import { clearToasts, latestToast } from '../../../core/services/toast.service.spec-helpers';
 import { AdminSession } from '../../admin-session';
 import { AdminSpecializations } from './admin-specializations';
 
@@ -13,6 +14,9 @@ describe('AdminSpecializations', () => {
     fixture.detectChanges();
     await fixture.whenStable();
   });
+
+  // Disarms the dismissal timers the toasts arm.
+  afterEach(() => clearToasts());
 
   function text(): string {
     return (fixture.nativeElement as HTMLElement).textContent ?? '';
@@ -59,7 +63,10 @@ describe('AdminSpecializations', () => {
     page().submit();
     fixture.detectChanges();
     expect(session.specializations().some((s) => s.name === 'Neurology')).toBe(true);
-    expect(page().notice()).toContain('Neurology');
+    expect(latestToast()?.tone).toBe('success');
+    expect(latestToast()?.message).toContain('Neurology');
+    // Closed before the toast is raised, so it is not behind the dialog's
+    // backdrop while it is on screen.
     expect(page().editorOpen()).toBe(false);
   });
 

@@ -25,20 +25,9 @@
   white-space: nowrap;
 }
 
-// Confirmation shown after a change. Uses the primary tint so it reads as
-// "done" rather than as a warning.
-.row-notice {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-bottom: var(--space-4);
-  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
-  color: var(--color-text-secondary);
-  background-color: var(--color-primary-light);
-  border: var(--border-width) solid
-    color-mix(in srgb, var(--color-primary) 30%, var(--color-surface));
-  border-radius: var(--radius-md);
-}
+// Confirmation shown after a change. Removed: every action that used to raise
+// one now reports through the app-wide toast stack, so the wording, the timing
+// and the dismissal live in one place instead of being declared per list page.
 
 // Status filter sitting in the filter bar's second column.
 .row-filter {

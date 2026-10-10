@@ -18,6 +18,7 @@ import {
   type TableColumn,
 } from '../../../shared/components';
 import { AdminSession, type StaffKind } from '../../admin-session';
+import { ToastService } from '../../../core/services/toast.service';
 import type { AccountStatus, StaffAccount } from '../../admin.models';
 
 type StatusFilter = 'all' | AccountStatus;
@@ -62,6 +63,7 @@ const STATUS_FILTER_ITEMS: DropdownItem[] = [
 export class StaffDirectory {
   private readonly fb = inject(FormBuilder);
   protected readonly session = inject(AdminSession);
+  private readonly toasts = inject(ToastService);
 
   readonly kind = input.required<StaffKind>();
 
@@ -70,7 +72,6 @@ export class StaffDirectory {
   protected readonly createOpen = signal(false);
   protected readonly saving = signal(false);
   protected readonly confirmDisableFor = signal<StaffAccount | null>(null);
-  protected readonly notice = signal<string | null>(null);
 
   // ---------------------------------------------------------------------------
   // Wording — everything role-specific is derived from `kind`
@@ -308,6 +309,12 @@ export class StaffDirectory {
       mismatched
     ) {
       this.form.markAllAsTouched();
+      // A warning rather than an error: nothing was attempted and nothing failed,
+      // the form was not filled in. The field-level messages say which fields.
+      this.toasts.warning(
+        'Check the form',
+        `${this.singular() === 'doctor' ? 'A doctor' : 'A secretary'} account needs the highlighted fields before it can be created.`,
+      );
       return;
     }
 
@@ -329,7 +336,12 @@ export class StaffDirectory {
 
     this.saving.set(false);
     this.createOpen.set(false);
-    this.notice.set(`Created ${created.name}'s ${this.singular()} account.`);
+    // Announced after the dialog closes, so the toast is not behind a modal
+    // backdrop while it is still on screen.
+    this.toasts.success(
+      `Account created`,
+      `${created.name} was added as a ${this.singular()}. Returning to the list.`,
+    );
   }
 
   protected requestDisable(account: StaffAccount): void {
@@ -343,13 +355,24 @@ export class StaffDirectory {
   protected confirmDisable(): void {
     const account = this.confirmDisableFor();
     if (!account) return;
-    this.session.setStaffStatus(this.kind(), account.id, 'inactive');
+    const changed = this.session.setStaffStatus(this.kind(), account.id, 'inactive');
     this.confirmDisableFor.set(null);
-    this.notice.set(`${account.name} can no longer sign in.`);
+
+    // The store's answer decides the tone. Telling somebody an account is locked
+    // when it is not would be the worst thing this screen could say.
+    if (changed) {
+      this.toasts.warning(`${account.name} was disabled`, 'They can no longer sign in.');
+    } else {
+      this.toasts.error('Not disabled', `${account.name} could not be updated.`);
+    }
   }
 
   protected enable(account: StaffAccount): void {
-    this.session.setStaffStatus(this.kind(), account.id, 'active');
-    this.notice.set(`${account.name} can sign in again.`);
+    const changed = this.session.setStaffStatus(this.kind(), account.id, 'active');
+    if (changed) {
+      this.toasts.success(`${account.name} was re-enabled`, 'They can sign in again.');
+    } else {
+      this.toasts.error('Not re-enabled', `${account.name} could not be updated.`);
+    }
   }
 }

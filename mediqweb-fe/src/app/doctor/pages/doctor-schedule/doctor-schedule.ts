@@ -12,6 +12,7 @@ import {
 import { Button, Card, FormField, MockNotice } from '../../../shared/components';
 import { formatDuration, minutesOfDay } from '../../doctor.dates';
 import { DoctorSession } from '../../doctor-session';
+import { ToastService } from '../../../core/services/toast.service';
 import type { ScheduleDay } from '../../doctor.models';
 
 /** Sunday first, matching `Date.prototype.getDay()` and the fixture order. */
@@ -72,8 +73,7 @@ const startBeforeEnd: ValidatorFn = (control): ValidationErrors | null => {
 export class DoctorSchedule {
   private readonly session = inject(DoctorSession);
   private readonly fb = inject(FormBuilder).nonNullable;
-
-  protected readonly notice = signal<string | null>(null);
+  private readonly toasts = inject(ToastService);
 
   protected readonly dayNames = DAY_NAMES;
 
@@ -190,14 +190,13 @@ export class DoctorSchedule {
 
   protected reset(): void {
     this.fillFromStore();
-    this.notice.set(null);
   }
 
   protected save(): void {
     if (this.form.invalid) {
       // Touch every row so the messages appear, rather than silently refusing.
       this.days.markAllAsTouched();
-      this.notice.set('Fix the highlighted days before saving.');
+      this.toasts.warning('Nothing saved', 'Fix the highlighted days before saving your hours.');
       return;
     }
 
@@ -212,7 +211,13 @@ export class DoctorSchedule {
         endTime: group.get('endTime')!.value,
       })),
     );
-    this.notice.set(`Saved. You now publish ${this.draftSummary()}.`);
+    // Says "in this session" rather than "saved", because the store is a fixture:
+    // the doctor's published hours revert on reload, and a toast that said only
+    // "saved" would be claiming a persistence that does not exist.
+    this.toasts.success(
+      'Hours updated',
+      `You now publish ${this.draftSummary()}. Held in this session only.`,
+    );
   }
 
   private buildDays(): DayForm[] {

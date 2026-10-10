@@ -10,6 +10,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { Avatar, Button, Card, MockNotice, StatusBadge } from '../../../shared/components';
+import { ToastService } from '../../../core/services/toast.service';
 import { dayLabel, relativeStamp } from '../../secretary.dates';
 import { SecretarySession } from '../../secretary-session';
 import type { Conversation, ConversationMessage } from '../../secretary.models';
@@ -58,6 +59,7 @@ type ThreadRow = DayDivider | MessageRow;
 })
 export class SecretaryMessages {
   private readonly session = inject(SecretarySession);
+  private readonly toasts = inject(ToastService);
 
   /**
    * The open thread, defaulting to the most recently active one.
@@ -172,17 +174,33 @@ export class SecretaryMessages {
   }
 
   /**
-   * Appends the draft to the open thread.
+   * Appends the draft to the open thread and confirms it landed.
    *
    * The draft is only cleared when the store accepted it, so a refused send does
-   * not throw away what somebody typed.
+   * not throw away what somebody typed. The confirmation is gated on that same
+   * answer for the same reason: an empty body or a thread that is not there is a
+   * refusal, and saying "Message sent" over one would be the one claim in this
+   * screen that could be checked and found untrue.
+   *
+   * `info` rather than `success`, because the bubble appearing directly under the
+   * cursor is the confirmation and a toast repeating it is noise. It is the one
+   * place on this page a notification is worth the interruption.
    */
   protected send(): void {
     const summary = this.selected();
     if (!summary) return;
-    if (this.session.sendMessage(summary.conversation.id, this.draft())) {
-      this.draft.set('');
+
+    const sent = this.session.sendMessage(summary.conversation.id, this.draft());
+    if (!sent) {
+      this.toasts.warning('Nothing sent', 'Write a message before pressing send.');
+      return;
     }
+
+    this.draft.set('');
+    this.toasts.info(
+      'Message sent',
+      `Added to your reply to ${summary.name}. Nothing is delivered yet — see the note below.`,
+    );
   }
 
   /** Relative stamp for a list row: "12 min ago", "Yesterday", "4 Mar". */
