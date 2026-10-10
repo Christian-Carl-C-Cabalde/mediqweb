@@ -7,6 +7,12 @@
  * area would mean a `no-show` rendering in a different colour depending on which
  * side of the desk you were sitting on.
  *
+ * The two roles meet at `confirmed`, and that is load-bearing rather than
+ * incidental: it is the state the Secretary hands over in, and the precondition
+ * for a doctor recording anything. `DoctorSession.recordOutcome` refuses
+ * anything not `confirmed`, so a doctor cannot skip the approval by closing a
+ * booking the front desk never approved.
+ *
  * Note who is *not* here: nothing in the app creates an appointment. The patient
  * asks for a visit and the appointment arrives `booked`, which is what the
  * Secretary then confirms. Booking and moving a booked visit are therefore not

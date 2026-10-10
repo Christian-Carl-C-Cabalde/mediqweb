@@ -38,13 +38,28 @@ describe('DoctorAppointments', () => {
     return (fixture.nativeElement as HTMLElement).textContent ?? '';
   }
 
-  function clickButton(label: string): void {
-    const button = [...(fixture.nativeElement as HTMLElement).querySelectorAll('button')].find(
+  function host(): HTMLElement {
+    return fixture.nativeElement as HTMLElement;
+  }
+
+  function button(label: string): HTMLButtonElement | undefined {
+    return [...host().querySelectorAll<HTMLButtonElement>('button')].find(
       (b) => b.textContent?.trim() === label,
     );
-    expect(button).toBeTruthy();
-    button!.click();
+  }
+
+  function clickButton(label: string): void {
+    const found = button(label);
+    expect(found).toBeTruthy();
+    found!.click();
     fixture.detectChanges();
+  }
+
+  /** Every button in the Actions cell of every rendered row. */
+  function rowActions(): string[] {
+    return [...host().querySelectorAll('tbody tr')].flatMap((row) =>
+      [...row.querySelectorAll('.actions button')].map((b) => b.textContent?.trim() ?? ''),
+    );
   }
 
   function statusOf(id: string): string | undefined {
@@ -84,15 +99,6 @@ describe('DoctorAppointments', () => {
     expect(text()).toContain('No appointments match your filters');
   });
 
-  it('confirms a booked appointment', () => {
-    const booked = session.appointments().find((a) => a.status === 'booked')!;
-    page().confirm(booked);
-    fixture.detectChanges();
-    expect(statusOf(booked.id)).toBe('confirmed');
-    expect(latestToast()?.tone).toBe('success');
-    expect(latestToast()?.message).toContain(session.patientName(booked.patientId));
-  });
-
   it('completes a confirmed appointment', () => {
     const confirmed = session.appointments().find((a) => a.status === 'confirmed')!;
     page().complete(confirmed);
@@ -111,43 +117,20 @@ describe('DoctorAppointments', () => {
     expect(latestToast()?.tone).toBe('warning');
   });
 
-  it('asks before cancelling, and cancelling does not happen on its own', () => {
+  it('records an outcome immediately, with no confirmation dialog', () => {
     const confirmed = session.appointments().find((a) => a.status === 'confirmed')!;
-    page().requestCancel(confirmed);
+    page().complete(confirmed);
     fixture.detectChanges();
 
-    expect(statusOf(confirmed.id)).toBe('confirmed');
-    expect(text()).toContain('Cancel appointment');
-    // Opening a dialog is not an outcome, so nothing has been reported yet.
-    expect(latestToast()).toBeNull();
-  });
-
-  it('cancels only once confirmed', () => {
-    const confirmed = session.appointments().find((a) => a.status === 'confirmed')!;
-    page().requestCancel(confirmed);
-    page().confirmCancel();
-    fixture.detectChanges();
-    expect(statusOf(confirmed.id)).toBe('cancelled');
-    expect(latestToast()?.title).toBe('Appointment cancelled');
-  });
-
-  it('keeps the row after cancelling, rather than deleting the history', () => {
-    const confirmed = session.appointments().find((a) => a.status === 'confirmed')!;
-    const before = page().appointments().length;
-    page().requestCancel(confirmed);
-    page().confirmCancel();
-    fixture.detectChanges();
-    expect(page().appointments().length).toBe(before);
-  });
-
-  it('offers no forward action on a completed appointment', () => {
-    const completed = session.appointments().find((a) => a.status === 'completed')!;
-    expect(page().canCancel(completed)).toBe(false);
+    // Recording an outcome is immediate, with no confirmation dialog: it is a
+    // record of something the doctor just saw, not a decision to be asked about.
+    expect(statusOf(confirmed.id)).toBe('completed');
+    expect(host().querySelector('dialog')).toBeNull();
   });
 
   it('dismisses the confirmation', () => {
-    const booked = session.appointments().find((a) => a.status === 'booked')!;
-    page().confirm(booked);
+    const confirmed = session.appointments().find((a) => a.status === 'confirmed')!;
+    page().complete(confirmed);
     fixture.detectChanges();
     expect(latestToast()).not.toBeNull();
 
@@ -156,7 +139,48 @@ describe('DoctorAppointments', () => {
     expect(latestToast()).toBeNull();
   });
 
-  it('says who books appointments, so the missing create button is not a gap', () => {
-    expect(text()).toContain('booked and rescheduled by a Secretary');
+  // --- What this desk is not allowed to do
+
+  it('offers no Confirm, because only a Secretary approves an appointment', () => {
+    const booked = session.appointments().find((a) => a.status === 'booked')!;
+    expect(page().canRecord(booked)).toBe(false);
+    expect(button('Confirm')).toBeUndefined();
+    expect(text()).not.toContain('Confirm');
+  });
+
+  it('offers no Cancel, because calling a booking off is the front desk decision', () => {
+    // The handler and its dialog are gone with it, not merely unreachable.
+    expect(page().requestCancel).toBeUndefined();
+    expect(page().confirmCancel).toBeUndefined();
+    expect(page().canCancel).toBeUndefined();
+    expect(host().querySelector('dialog')).toBeNull();
+    expect(button('Cancel appointment')).toBeUndefined();
+  });
+
+  it('shows only Complete and No-show, and only on a confirmed appointment', () => {
+    const labels = rowActions();
+    expect(new Set(labels)).toEqual(new Set(['Complete', 'No-show']));
+
+    // One pair per confirmed appointment, and no other row carries an action.
+    const confirmed = page()
+      .appointments()
+      .filter((a: any) => a.status === 'confirmed').length;
+    expect(labels.length).toBe(confirmed * 2);
+  });
+
+  it('refuses to record an outcome on a booking the front desk never confirmed', () => {
+    // Defence in depth behind the hidden buttons: the rule lives in the store, so
+    // reaching past the template still gets a refusal rather than a write.
+    const booked = session.appointments().find((a) => a.status === 'booked')!;
+    expect(session.recordOutcome(booked.id, 'completed')).toBe(false);
+    expect(statusOf(booked.id)).toBe('booked');
+  });
+
+  it('says which decisions belong to the Secretary', () => {
+    // The absence of Confirm and Cancel reads as a gap unless the page says
+    // otherwise. This is the sentence that stops that.
+    expect(text()).toContain(
+      'A Secretary at the front desk confirms an appointment and calls it off',
+    );
   });
 });

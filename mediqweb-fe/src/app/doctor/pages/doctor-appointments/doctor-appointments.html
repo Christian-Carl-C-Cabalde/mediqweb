@@ -49,19 +49,22 @@
       <ui-appointment-status [status]="row.status" />
     </ng-template>
 
+    <!--
+      Two actions, and only on an appointment the front desk has confirmed.
+
+      No Confirm and no Cancel: approving a booking means the patient said they were
+      coming, and calling one off is an administrative decision about a booking —
+      both are the Secretary's. What only the doctor can say is whether the patient
+      was seen, or was not there in the booked time.
+
+      A `booked` row therefore shows nothing at all. That is not a missing button;
+      there is no visit to report on until the desk has confirmed it.
+    -->
     <ng-template uiTableCell="actions" let-row>
       <div class="actions">
-        @switch (row.status) {
-          @case ('booked') {
-            <ui-button size="sm" (click)="confirm(row)">Confirm</ui-button>
-          }
-          @case ('confirmed') {
-            <ui-button size="sm" (click)="complete(row)">Complete</ui-button>
-            <ui-button variant="ghost" size="sm" (click)="markNoShow(row)">No-show</ui-button>
-          }
-        }
-        @if (canCancel(row)) {
-          <ui-button variant="ghost" size="sm" (click)="requestCancel(row)">Cancel</ui-button>
+        @if (canRecord(row)) {
+          <ui-button size="sm" (click)="complete(row)">Complete</ui-button>
+          <ui-button variant="ghost" size="sm" (click)="markNoShow(row)">No-show</ui-button>
         }
       </div>
     </ng-template>
@@ -69,26 +72,7 @@
 </ui-card>
 
 <p class="row-footnote">
-  Appointments are booked and rescheduled by a Secretary at the front desk. A doctor confirms,
-  completes or cancels them.
+  A Secretary at the front desk confirms an appointment and calls it off; only then can you record
+  what happened — complete if the visit went ahead, no-show if the patient was not there in the
+  booked time.
 </p>
-
-<ui-modal
-  [open]="!!confirmCancelFor()"
-  size="sm"
-  title="Cancel appointment"
-  (closed)="cancelCancel()"
->
-  @if (confirmCancelFor(); as appointment) {
-    <p class="row-confirm">
-      The appointment with <strong>{{ patientName(appointment) }}</strong> on
-      <strong>{{ appointment.startsAt | date: 'MMM d · h:mm a' }}</strong> will be cancelled. It
-      stays in the history, and the patient can be booked again.
-    </p>
-  }
-
-  <ng-container modalFooter>
-    <ui-button (click)="cancelCancel()">Keep it</ui-button>
-    <ui-button variant="danger" (click)="confirmCancel()">Cancel appointment</ui-button>
-  </ng-container>
-</ui-modal>
