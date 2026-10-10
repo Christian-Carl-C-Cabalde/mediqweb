@@ -44,7 +44,6 @@ export const MOCK_DOCTOR_PROFILE: DoctorProfile = {
   id: SIGNED_IN_DOCTOR_ID,
   name: 'Rafael Santos',
   email: 'rafael.santos@mediq.ph',
-  phone: '+63 917 555 0281',
   specialization: 'Orthopedics',
   licenseNumber: 'PRC-120913',
   joinedOn: '2026-01-19',

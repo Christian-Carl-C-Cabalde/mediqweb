@@ -29,8 +29,35 @@ describe('DoctorProfilePage', () => {
   }
 
   it('fills the form from the signed-in doctor', () => {
-    const { name, email, phone, bio } = session.profile();
-    expect(page().form.getRawValue()).toEqual({ name, email, phone, bio });
+    const { name, email, bio } = session.profile();
+    expect(page().form.getRawValue()).toEqual({ name, email, bio });
+  });
+
+  it('offers no contact number anywhere on the page', () => {
+    // The whole point of the change, asserted where it would come back: not on the
+    // form, not in the store's profile, and not in the wording of the form.
+    const ids = [...(fixture.nativeElement as HTMLElement).querySelectorAll('input, textarea')].map(
+      (el) => el.getAttribute('id'),
+    );
+    expect(ids).not.toContain('profile-phone');
+    expect(page().form.contains('phone')).toBe(false);
+    expect(text()).not.toContain('Contact number');
+
+    // Nor on the record itself: a form-only removal would leave the value in the
+    // store with nothing able to read or change it.
+    expect(Object.keys(session.profile())).not.toContain('phone');
+  });
+
+  it('says how many fields the doctor can change, and counts them right', () => {
+    // The lede says "three", so it has to stay true. If a field is added back
+    // without the sentence being updated, this is what notices.
+    expect(text()).toContain('These three fields');
+    const editable = [
+      ...(fixture.nativeElement as HTMLElement).querySelectorAll('[formControlName]'),
+    ]
+      .map((el) => el.getAttribute('formControlName'))
+      .filter((name): name is string => !!name);
+    expect(editable).toEqual(['name', 'email', 'bio']);
   });
 
   it('shows the practice details the Admin owns', () => {
@@ -54,7 +81,7 @@ describe('DoctorProfilePage', () => {
   });
 
   it('says the change is not persisted, rather than implying it was', () => {
-    page().form.controls.phone.setValue('+63 917 555 9999');
+    page().form.controls.name.setValue('Rafael M. Santos');
     page().save();
     fixture.detectChanges();
     // The store is a fixture, so "updated" has to carry the caveat. A toast
@@ -91,11 +118,11 @@ describe('DoctorProfilePage', () => {
   });
 
   it('restores the stored details on discard', () => {
-    const before = session.profile().phone;
-    page().form.controls.phone.setValue('+63 900 000 0000');
+    const before = session.profile().name;
+    page().form.controls.name.setValue('Someone Else');
     page().resetForm();
     fixture.detectChanges();
-    expect(page().form.controls.phone.value).toBe(before);
+    expect(page().form.controls.name.value).toBe(before);
   });
 
   it('leaves the store alone when the form is discarded', () => {

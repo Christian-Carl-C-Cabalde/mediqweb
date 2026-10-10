@@ -74,7 +74,6 @@ describe('DoctorShell', () => {
     session.updateProfile({
       name: 'R. Santos',
       email: 'rafael.santos@mediq.ph',
-      phone: '+63 917 555 0281',
       bio: '',
     });
     fixture.detectChanges();

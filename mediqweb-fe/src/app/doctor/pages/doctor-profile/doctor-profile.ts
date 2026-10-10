@@ -10,9 +10,12 @@ import { ToastService } from '../../../core/services/toast.service';
  *
  * Split into a read-only summary of the fields the Admin owns — specialization
  * and licence number — and an editable set the doctor controls. A doctor who
- * could edit their own licence number could also edit their own credentials,
- * so those two fields are not on the form and are not marked disabled: they are
- * simply not there.
+ * could edit their own licence number could also edit their own credentials, so
+ * those two fields are not on the form and are not marked disabled: they are
+ * simply not there. Same reasoning removed the contact number: it is not on the
+ * form, not on the profile, and not in the store, because a published email is
+ * how the clinic already reaches a doctor and a second number is one more thing
+ * that goes out of date.
  *
  * Saving writes to the mock store, which the header reads, so the name in the
  * top right updates. Nothing is persisted, and the notification says so rather
@@ -38,7 +41,6 @@ export class DoctorProfilePage {
   protected readonly form = this.fb.group({
     name: this.fb.control('', [Validators.required, Validators.minLength(2)]),
     email: this.fb.control('', [Validators.required, Validators.email]),
-    phone: this.fb.control('', [Validators.required]),
     bio: this.fb.control('', [Validators.maxLength(280)]),
   });
 
@@ -65,8 +67,8 @@ export class DoctorProfilePage {
   }
 
   protected resetForm(): void {
-    const { name, email, phone, bio } = this.session.profile();
-    this.form.setValue({ name, email, phone, bio });
+    const { name, email, bio } = this.session.profile();
+    this.form.setValue({ name, email, bio });
     this.form.markAsPristine();
     this.form.markAsUntouched();
   }
@@ -85,11 +87,6 @@ export class DoctorProfilePage {
     if (control.hasError('required')) return 'Enter an email address.';
     if (control.hasError('email')) return 'Enter a valid email address, e.g. name@clinic.ph';
     return null;
-  }
-
-  protected phoneError(): string | null {
-    const control = this.form.controls.phone;
-    return control.touched && control.hasError('required') ? 'Enter a contact number.' : null;
   }
 
   protected bioError(): string | null {
