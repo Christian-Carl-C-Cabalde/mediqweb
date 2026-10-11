@@ -62,6 +62,13 @@ export const DOCTOR_ROUTES: Routes = [
           import('./pages/doctor-schedule/doctor-schedule').then((m) => m.DoctorSchedule),
       },
       {
+        path: 'history',
+        title: 'Visit History · Doctor · MediQ',
+        data: { heading: 'Visit History' },
+        loadComponent: () =>
+          import('./pages/doctor-history/doctor-history').then((m) => m.DoctorHistory),
+      },
+      {
         path: 'profile',
         title: 'My Profile · Doctor · MediQ',
         data: { heading: 'My Profile' },

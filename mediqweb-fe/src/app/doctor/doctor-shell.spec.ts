@@ -49,7 +49,33 @@ describe('DoctorShell', () => {
     const labels = nav.flatMap((entry) =>
       'items' in entry ? entry.items.map((i) => i.label) : [entry.label],
     );
-    expect(labels).toEqual(['Dashboard', 'Appointments', 'Patients', 'Schedule', 'Profile']);
+    expect(labels).toEqual([
+      'Dashboard',
+      'Appointments',
+      'Patients',
+      'Schedule',
+      'Visit History',
+      'Profile',
+    ]);
+  });
+
+  it('puts Visit History above Profile, because it is work and not a setting', () => {
+    const nav = layout().nav();
+    const labels = nav.flatMap((entry) =>
+      'items' in entry ? entry.items.map((i) => i.label) : [entry.label],
+    );
+    expect(labels.indexOf('Visit History')).toBe(labels.indexOf('Profile') - 1);
+  });
+
+  it('gives Visit History its own icon, not one already in use', () => {
+    // Appointments is a calendar and Schedule is a clipboard. A third
+    // time-shaped icon that matched either would be a coin toss at 20px.
+    const nav = layout().nav();
+    const history = nav
+      .flatMap((entry) => ('items' in entry ? entry.items : [entry]))
+      .find((item) => item.label === 'Visit History');
+    expect(history?.route).toBe('/doctor/history');
+    expect(history?.icon).toBe('history');
   });
 
   it('sends the brand mark to the doctor dashboard, not the sign-in page', () => {
