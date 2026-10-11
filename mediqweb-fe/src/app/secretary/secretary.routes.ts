@@ -84,6 +84,16 @@ export const SECRETARY_ROUTES: Routes = [
           import('./pages/secretary-messages/secretary-messages').then((m) => m.SecretaryMessages),
       },
       {
+        // "Appointment History", not "Visit History" as the Doctor area calls its
+        // own: this record holds cancellations that never became visits. Same
+        // words for different contents would be its own kind of confusion.
+        path: 'history',
+        title: 'Appointment History · Secretary · MediQ',
+        data: { heading: 'Appointment History' },
+        loadComponent: () =>
+          import('./pages/secretary-history/secretary-history').then((m) => m.SecretaryHistory),
+      },
+      {
         path: 'profile',
         title: 'My Profile · Secretary · MediQ',
         data: { heading: 'My Profile' },

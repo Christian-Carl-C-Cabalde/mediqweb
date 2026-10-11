@@ -482,6 +482,64 @@ describe('SecretarySession', () => {
     });
   });
 
+  describe('deskHistory', () => {
+    it('holds every closed appointment on the desk', () => {
+      expect(session.deskHistory().length).toBeGreaterThan(0);
+      for (const entry of session.deskHistory()) {
+        expect(['completed', 'cancelled', 'no-show']).toContain(entry.status);
+      }
+    });
+
+    it('includes cancellations and no-shows as well as completions', () => {
+      // All three are answers this desk has to be able to give: a patient turned
+      // away, a patient seen, and a patient who never arrived.
+      const statuses = new Set(session.deskHistory().map((a) => a.status));
+      expect(statuses.has('cancelled')).toBe(true);
+      expect(statuses.has('completed')).toBe(true);
+      expect(statuses.has('no-show')).toBe(true);
+    });
+
+    it('includes cancellations, unlike the Doctor area`s visit history', () => {
+      // The difference is deliberate and documented on the member: a doctor
+      // records what happened at a visit, and a cancelled booking is nobody being
+      // seen. This desk's record is what it did to a booking, and a front desk
+      // that cancelled a visit and kept no record could not answer a patient
+      // asking why they were turned away.
+      expect(session.deskHistory().some((a) => a.status === 'cancelled')).toBe(true);
+    });
+
+    it('excludes appointments still to happen', () => {
+      const ids = session.deskHistory().map((a) => a.id);
+      for (const appointment of session.appointments()) {
+        if (['completed', 'cancelled', 'no-show'].includes(appointment.status)) continue;
+        expect(ids).not.toContain(appointment.id);
+      }
+    });
+
+    it('is newest first', () => {
+      const times = session.deskHistory().map((a) => a.startsAt);
+      expect([...times].sort().reverse()).toEqual(times);
+    });
+
+    it('cannot hold an appointment the scoped desk list does not', () => {
+      // Pinned on the derived list rather than the fixtures: `isOnDesk` is
+      // private, so an assertion written only against the seeded records would
+      // pass whether or not the scope were applied here at all.
+      const desk = new Set(session.appointments().map((a) => a.id));
+      for (const entry of session.deskHistory()) expect(desk.has(entry.id)).toBe(true);
+    });
+
+    it('records a cancellation the moment the desk makes one', () => {
+      const live = session.appointments().find((a) => a.status === 'booked')!;
+      const before = session.deskHistory().length;
+
+      expect(session.cancel(live.id)).toBe(true);
+
+      expect(session.deskHistory().length).toBe(before + 1);
+      expect(session.deskHistory()[0].id).toBe(live.id);
+    });
+  });
+
   describe('the doctor and their schedule', () => {
     it('lists the assigned doctor and nobody else', () => {
       expect(session.doctors().map((s) => s.doctor.id)).toEqual([DESK]);

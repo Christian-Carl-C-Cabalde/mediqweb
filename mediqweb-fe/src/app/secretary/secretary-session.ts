@@ -33,6 +33,9 @@ const LIVE_STATUSES: readonly AppointmentStatus[] = ['booked', 'confirmed'];
 
 const byStart = (a: Appointment, b: Appointment): number => a.startsAt.localeCompare(b.startsAt);
 
+/** Most recent first, for a record of what has already been dealt with. */
+const byStartNewest = (a: Appointment, b: Appointment): number => byStart(b, a);
+
 /**
  * A proposed appointment, before it exists as one.
  *
@@ -221,6 +224,35 @@ export class SecretarySession {
         appointment.status === 'completed' && new Date(appointment.startsAt).getTime() >= since,
     );
   });
+
+  /**
+   * Appointments this desk has closed, newest first.
+   *
+   * Every closed appointment on the assigned doctor's book: cancelled,
+   * completed, and no-show. `booked` and `confirmed` are still to happen and
+   * belong on the working list, not on a record.
+   *
+   * Read through `appointments`, so everything here is already scoped to the
+   * assigned doctor — a history that leaked another desk's cancellations would be
+   * worse than no history at all.
+   *
+   * `CLOSED_STATUSES` rather than a hand-written list of three, so this stays
+   * "everything that is finished" as statuses are added, instead of quietly
+   * dropping the next one.
+   *
+   * This is deliberately *not* the Doctor area's visit history with a different
+   * label. That one holds `completed` and `no-show` only, because it records what
+   * happened at a visit and a cancelled booking is nobody being seen. This desk's
+   * record is what was done with a booking and how it turned out, so a
+   * cancellation belongs here: calling an appointment off is the Secretary's own
+   * action, and a front desk that cancelled a visit and kept no record of it
+   * could not answer a patient asking why they were turned away.
+   */
+  readonly deskHistory = computed(() =>
+    this.appointments()
+      .filter((appointment) => CLOSED_STATUSES.includes(appointment.status))
+      .sort(byStartNewest),
+  );
 
   /**
    * The assigned doctor's patients, with their visit figures.
