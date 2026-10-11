@@ -26,6 +26,9 @@ const LIVE_STATUSES: readonly AppointmentStatus[] = ['booked', 'confirmed'];
 
 const byStart = (a: Appointment, b: Appointment): number => a.startsAt.localeCompare(b.startsAt);
 
+/** Most recent first, for a record of what has already happened. */
+const byStartNewest = (a: Appointment, b: Appointment): number => byStart(b, a);
+
 /**
  * In-memory stand-in for the Doctor API.
  *
@@ -79,6 +82,24 @@ export class DoctorSession {
         !CLOSED_STATUSES.includes(appointment.status),
     );
   });
+
+  /**
+   * Visits this doctor has already recorded: completed and no-show, newest first.
+   *
+   * `cancelled` is deliberately absent even though it shares `CLOSED_STATUSES`
+   * with the other two. Nobody was seen and nobody failed to attend — a cancelled
+   * booking is an administrative event, not a visit, and counting one as a
+   * consultation would overstate the work this doctor has done. The rule lives
+   * here rather than in the History page so the page and any future report
+   * cannot disagree about what a visit was.
+   */
+  readonly visitHistory = computed(() =>
+    this.appointments()
+      .filter(
+        (appointment) => appointment.status === 'completed' || appointment.status === 'no-show',
+      )
+      .sort(byStartNewest),
+  );
 
   /** The next appointment still to happen, or `null` when the list is clear. */
   readonly nextAppointment = computed(() => {

@@ -108,6 +108,59 @@ describe('DoctorSession', () => {
     });
   });
 
+  describe('visitHistory', () => {
+    it('holds completed and no-show visits only', () => {
+      expect(session.visitHistory().length).toBeGreaterThan(0);
+      for (const visit of session.visitHistory()) {
+        expect(['completed', 'no-show']).toContain(visit.status);
+      }
+    });
+
+    it('excludes a cancelled appointment, because nobody was seen', () => {
+      // `cancelled` shares `CLOSED_STATUSES` with the two outcomes, so reusing
+      // that list would put a booking that never happened into the record of
+      // visits and overstate the work the doctor has done.
+      const cancelled = session.appointments().find((a) => a.status === 'cancelled')!;
+      expect(cancelled).toBeTruthy();
+      expect(session.visitHistory().some((a) => a.id === cancelled.id)).toBe(false);
+    });
+
+    it('excludes appointments still to happen', () => {
+      const ids = session.visitHistory().map((a) => a.id);
+      for (const appointment of session.appointments()) {
+        if (appointment.status === 'completed' || appointment.status === 'no-show') continue;
+        expect(ids).not.toContain(appointment.id);
+      }
+    });
+
+    it('is newest first', () => {
+      const times = session.visitHistory().map((a) => a.startsAt);
+      expect([...times].sort().reverse()).toEqual(times);
+    });
+
+    it('cannot hold a visit the scoped appointment list does not', () => {
+      // The privacy boundary, pinned on the derived list rather than on the
+      // fixtures. `appt-117` belongs to another doctor but is `booked`, so no
+      // other doctor's *visit* exists in the fixtures and an assertion written
+      // against them would pass whether or not the scope were applied here.
+      const scoped = new Set(session.appointments().map((a) => a.id));
+      for (const visit of session.visitHistory()) {
+        expect(scoped.has(visit.id)).toBe(true);
+        expect(visit.doctorId).toBe(SIGNED_IN_DOCTOR_ID);
+      }
+    });
+
+    it('gains a visit the moment one is recorded, and loses nothing else', () => {
+      const confirmed = session.appointments().find((a) => a.status === 'confirmed')!;
+      const before = session.visitHistory().length;
+
+      session.recordOutcome(confirmed.id, 'completed');
+
+      expect(session.visitHistory().length).toBe(before + 1);
+      expect(session.visitHistory()[0].id).toBe(confirmed.id);
+    });
+  });
+
   describe('recordOutcome', () => {
     it('marks a confirmed visit complete', () => {
       const confirmed = session.appointments().find((a) => a.status === 'confirmed')!;

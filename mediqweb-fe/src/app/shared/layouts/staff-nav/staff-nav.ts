@@ -25,6 +25,10 @@ const ICON_PATHS: Record<StaffNavIcon, string> = {
   // at a glance, and only one of them is a queue somebody works through.
   messages:
     'M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM22 6l-10 7L2 6',
+  // A clock face with a rewind arrow, not a plain clock: `calendar` and
+  // `clipboard` already mean Appointments and Schedule, and a bare circle with
+  // hands beside those would be a coin toss at 20px.
+  history: 'M12 7.5V12l3.5 2M3.4 10.2A9 9 0 1 0 4.6 4.7L1.5 8h5',
 };
 
 /**
