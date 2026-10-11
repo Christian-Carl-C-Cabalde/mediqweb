@@ -34,6 +34,9 @@ const SECRETARY_NAV: readonly StaffNavItem[] = [
   { id: 'patients', label: 'Patients', icon: 'users', route: '/secretary/patients' },
   { id: 'schedules', label: 'Schedules', icon: 'clipboard', route: '/secretary/schedules' },
   { id: 'messages', label: 'Messages', icon: 'messages', route: '/secretary/messages' },
+  // Above Profile, like the Doctor area's. The icon is the one added for the
+  // Doctor history, so the two records read as the same idea in two places.
+  { id: 'history', label: 'History', icon: 'history', route: '/secretary/history' },
   { id: 'profile', label: 'Profile', icon: 'settings', route: '/secretary/profile' },
 ];
 
