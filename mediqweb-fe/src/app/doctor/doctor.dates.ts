@@ -56,6 +56,55 @@ export function minutesOfDay(time: string): number | null {
   return hours * 60 + minutes;
 }
 
+/**
+ * A `Date` at local midnight on a `YYYY-MM-DD` day, or `null` if it is not one.
+ *
+ * Built from the parts rather than handed to `new Date(string)`: that parses a
+ * bare `YYYY-MM-DD` as UTC, so a doctor east of Greenwich asking for the 1st
+ * would get the 31st of the previous month. Same reason `dayKey` avoids
+ * `toISOString()`.
+ *
+ * The round-trip is what rejects an impossible day. `new Date(2026, 1, 31)` is
+ * not an error — it is 3 March — so a caller offering 31 February would otherwise
+ * be given a date that quietly means something else.
+ */
+export function parseDayKey(key: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key);
+  if (!match) return null;
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  return Number.isNaN(date.getTime()) || dayKey(date) !== key ? null : date;
+}
+
+/**
+ * Minutes a block covers, or `null` when its hours do not make sense.
+ *
+ * `null` rather than zero for an invalid block, because zero is a real answer
+ * — a day can be published with no hours at all — and folding "unusable" into
+ * "empty" would let a broken block quietly shrink a doctor's published week.
+ */
+export function blockMinutes(block: { startTime: string; endTime: string }): number | null {
+  const start = minutesOfDay(block.startTime);
+  const end = minutesOfDay(block.endTime);
+  if (start === null || end === null || end <= start) return null;
+  return end - start;
+}
+
+/**
+ * The blocks that describe real, usable hours, in clock order.
+ *
+ * Used wherever hours are counted or displayed, so a malformed block is dropped
+ * in exactly the same way by the weekly total, a dated entry and the booking
+ * rules. Accepts the two shapes that carry blocks — a week and a single date —
+ * which is why it is keyed structurally rather than on `ScheduleBlock[]`.
+ */
+export function usableBlocks(
+  blocks: readonly { startTime: string; endTime: string }[],
+): { startTime: string; endTime: string }[] {
+  return blocks
+    .filter((block) => blockMinutes(block) !== null)
+    .sort((a, b) => minutesOfDay(a.startTime)! - minutesOfDay(b.startTime)!);
+}
+
 /** `150` -> `2h 30m`. Used for durations and for weekly availability totals. */
 export function formatDuration(minutes: number): string {
   const hours = Math.floor(minutes / 60);

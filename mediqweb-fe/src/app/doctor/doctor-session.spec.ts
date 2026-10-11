@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { dayKey } from './doctor.dates';
+import { dayKey, parseDayKey } from './doctor.dates';
 import { MOCK_APPOINTMENTS, MOCK_PATIENTS, SIGNED_IN_DOCTOR_ID } from './doctor.mock-data';
 import { DoctorSession } from './doctor-session';
 
@@ -286,38 +286,336 @@ describe('DoctorSession', () => {
       expect(session.schedule()[0].dayOfWeek).toBe(0);
     });
 
-    it('totals only the days that are open', () => {
-      const open = session.schedule().filter((d) => d.enabled);
-      const expected = open.reduce((total, day) => {
-        const [sh, sm] = day.startTime.split(':').map(Number);
-        const [eh, em] = day.endTime.split(':').map(Number);
-        return total + (eh * 60 + em - (sh * 60 + sm));
-      }, 0);
+    it('starts from a week that actually has split days in it', () => {
+      // A fixture where every day was a single block would leave the whole
+      // split-session path unexercised, which is how a feature ends up looking
+      // finished while working on no real data.
+      const split = session.schedule().filter((day) => day.sessions.length > 1);
+      expect(split.length).toBeGreaterThan(0);
+      expect(session.schedule().some((day) => day.sessions.length === 0)).toBe(true);
+    });
+
+    it('counts a day as working only when it has at least one session', () => {
+      expect(session.workingDayCount()).toBe(
+        session.schedule().filter((day) => day.sessions.length > 0).length,
+      );
+    });
+
+    it('totals every session, so a split day contributes both halves', () => {
+      const expected = session
+        .schedule()
+        .flatMap((day) => day.sessions)
+        .reduce((total, block) => {
+          const [sh, sm] = block.startTime.split(':').map(Number);
+          const [eh, em] = block.endTime.split(':').map(Number);
+          return total + (eh * 60 + em - (sh * 60 + sm));
+        }, 0);
       expect(session.weeklyMinutes()).toBe(expected);
     });
 
-    it('ignores a day whose end is not after its start', () => {
-      const broken = session
-        .schedule()
-        .map((day, i) =>
-          i === 0 ? { ...day, enabled: true, startTime: '17:00', endTime: '09:00' } : day,
-        );
-      session.saveSchedule(broken);
-      const withBadDay = session.weeklyMinutes();
-      const good = broken
-        .filter((d, i) => i !== 0)
-        .reduce((total, day) => {
-          const [sh, sm] = day.startTime.split(':').map(Number);
-          const [eh, em] = day.endTime.split(':').map(Number);
-          return total + (eh * 60 + em - (sh * 60 + sm));
-        }, 0);
-      expect(withBadDay).toBe(good);
+    it('drops a session whose end is not after its start rather than counting it backwards', () => {
+      session.saveSchedule([
+        { dayOfWeek: 1, sessions: [{ startTime: '09:00', endTime: '12:00' }] },
+        { dayOfWeek: 2, sessions: [{ startTime: '17:00', endTime: '09:00' }] },
+      ]);
+      expect(session.weeklyMinutes()).toBe(180);
     });
 
     it('replaces the published week on save', () => {
-      session.saveSchedule([{ dayOfWeek: 1, enabled: true, startTime: '10:00', endTime: '13:00' }]);
+      session.saveSchedule([
+        { dayOfWeek: 1, sessions: [{ startTime: '10:00', endTime: '13:00' }] },
+      ]);
       expect(session.schedule().length).toBe(1);
       expect(session.weeklyMinutes()).toBe(180);
+    });
+
+    it('keeps a split day split when it is saved', () => {
+      session.saveSchedule([
+        {
+          dayOfWeek: 1,
+          sessions: [
+            { startTime: '05:00', endTime: '12:00' },
+            { startTime: '13:00', endTime: '20:00' },
+          ],
+        },
+      ]);
+      expect(session.schedule()[0].sessions).toHaveLength(2);
+      expect(session.weeklyMinutes()).toBe(840);
+    });
+  });
+
+  describe('fitting a booking into a session', () => {
+    beforeEach(() => {
+      // Monday is published 05:00–12:00 and 13:00–20:00 in the fixtures.
+      session.now.set(new Date());
+    });
+
+    function nextMonday(): Date {
+      for (let i = 1; i <= 7; i += 1) {
+        const date = new Date();
+        date.setDate(date.getDate() + i);
+        if (date.getDay() === 1) return date;
+      }
+      throw new Error('no Monday within a week');
+    }
+
+    const at = (hour: number, minute = 0): number => hour * 60 + minute;
+
+    it('accepts a visit inside either session', () => {
+      const monday = nextMonday();
+      expect(session.fitsInSession(monday, at(5), 30)).toBe(true);
+      expect(session.fitsInSession(monday, at(14), 60)).toBe(true);
+    });
+
+    it('refuses a visit that straddles the gap between the two sessions', () => {
+      // The bug this shape exists to fix. With one closing time per day, an
+      // appointment at 12:30 on a split Monday was measured against 12:00 and
+      // refused as outside-hours, even though the afternoon was wide open.
+      const monday = nextMonday();
+      expect(session.fitsInSession(monday, at(12, 30), 30)).toBe(false);
+    });
+
+    it('refuses a visit that runs past the end of its own session', () => {
+      const monday = nextMonday();
+      expect(session.fitsInSession(monday, at(11, 45), 30)).toBe(false);
+      expect(session.fitsInSession(monday, at(19, 45), 30)).toBe(false);
+    });
+
+    it('allows a visit that starts as one session opens and ends as another closes', () => {
+      // Half-open, so there is no off-by-one making the edges unbookable.
+      const monday = nextMonday();
+      expect(session.fitsInSession(monday, at(5), 420)).toBe(true);
+      expect(session.fitsInSession(monday, at(19), 60)).toBe(true);
+    });
+
+    it('refuses every time on a day with no sessions', () => {
+      let saturday = new Date();
+      for (let i = 1; i <= 7; i += 1) {
+        const date = new Date();
+        date.setDate(date.getDate() + i);
+        if (date.getDay() === 6) {
+          saturday = date;
+          break;
+        }
+      }
+      expect(session.fitsInSession(saturday, at(9), 30)).toBe(false);
+    });
+  });
+
+  describe('dated availability', () => {
+    beforeEach(() => {
+      // The dated fixtures are relative to import, and these tests are about
+      // dates relative to "now", so the clock is unpinned back to the wall clock.
+      // Left on the pinned appointment date, `on(0)` would be a fixture day that
+      // has nothing to do with what the store seeded.
+      session.now.set(new Date());
+    });
+
+    /** A `days` days from now, as `YYYY-MM-DD`. */
+    function on(days: number): string {
+      const date = new Date();
+      date.setDate(date.getDate() + days);
+      return dayKey(date);
+    }
+
+    /** The next date falling on `weekday`, searching forward from `on(1)`. */
+    function nextWeekday(weekday: number): string {
+      for (let i = 1; i <= 7; i += 1) {
+        const key = on(i);
+        if (parseDayKey(key)!.getDay() === weekday) return key;
+      }
+      throw new Error(`no ${weekday} within a week of ${on(1)}`);
+    }
+
+    it('starts from the sample exceptions', () => {
+      expect(session.datedAvailability().length).toBeGreaterThan(0);
+      // Sorted soonest first, because that is the order a clinician reads them.
+      const dates = session.datedAvailability().map((e) => e.date);
+      expect([...dates].sort()).toEqual(dates);
+    });
+
+    it('starts from examples covering every kind of exception', () => {
+      const all = session.datedAvailability();
+      expect(all.some((e) => e.sessions.length === 0)).toBe(true);
+      expect(all.some((e) => e.sessions.length === 1)).toBe(true);
+      expect(all.some((e) => e.sessions.length > 1)).toBe(true);
+    });
+
+    it('falls back to the weekly pattern for a date with no exception', () => {
+      // Found rather than assumed, because a test that hard-codes `on(21)` would
+      // silently start testing a different weekday the day the fixtures were
+      // written.
+      const key = nextWeekday(3);
+      const weekly = session.schedule().find((d) => d.dayOfWeek === 3)!;
+      expect(session.sessionsOn(parseDayKey(key)!)).toEqual(weekly.sessions);
+    });
+
+    it('lets an exception replace that weekday for its own date only', () => {
+      const key = nextWeekday(3);
+      const weekly = session.schedule().find((d) => d.dayOfWeek === 3)!;
+      session.saveDatedAvailability({
+        date: key,
+        sessions: [{ startTime: '18:00', endTime: '21:00' }],
+      });
+
+      expect(session.sessionsOn(parseDayKey(key)!)).toEqual([
+        { startTime: '18:00', endTime: '21:00' },
+      ]);
+      // The week itself is untouched, and so is another day of that weekday.
+      expect(session.schedule().find((d) => d.dayOfWeek === 3)!.sessions).toEqual(weekly.sessions);
+    });
+
+    it('can close a date the weekly pattern opens', () => {
+      // The point of an override rather than an addition: a holiday on a day the
+      // doctor normally works cannot be expressed by adding hours to the week.
+      const key = nextWeekday(1);
+      expect(session.sessionsOn(parseDayKey(key)!).length).toBeGreaterThan(0);
+
+      // A closed date is an entry with no sessions at all, not a deleted one —
+      // otherwise a working weekday would look open.
+      expect(session.saveDatedAvailability({ date: key, sessions: [] })).toBeNull();
+      expect(session.sessionsOn(parseDayKey(key)!)).toEqual([]);
+    });
+
+    it('can open a date the weekly pattern closes', () => {
+      // And the other direction: a Sunday the doctor normally has off, worked
+      // once because a patient can only come then.
+      const key = nextWeekday(0);
+      expect(session.sessionsOn(parseDayKey(key)!)).toEqual([]);
+
+      session.saveDatedAvailability({
+        date: key,
+        sessions: [{ startTime: '10:00', endTime: '12:00' }],
+      });
+      expect(session.sessionsOn(parseDayKey(key)!)).toHaveLength(1);
+    });
+
+    it('can publish a split date, the way a split week is published', () => {
+      const key = nextWeekday(1);
+      session.saveDatedAvailability({
+        date: key,
+        sessions: [
+          { startTime: '09:00', endTime: '12:00' },
+          { startTime: '13:00', endTime: '17:00' },
+        ],
+      });
+      expect(session.sessionsOn(parseDayKey(key)!)).toHaveLength(2);
+    });
+
+    it('refuses a date that has already passed', () => {
+      const refusal = session.saveDatedAvailability({
+        date: on(-1),
+        sessions: [{ startTime: '09:00', endTime: '12:00' }],
+      });
+      expect(refusal).toBe('in-the-past');
+      expect(session.datedAvailability().some((e) => e.date === on(-1))).toBe(false);
+    });
+
+    it('accepts today, since a doctor can close a day part-way through it', () => {
+      expect(
+        session.saveDatedAvailability({
+          date: on(0),
+          sessions: [{ startTime: '09:00', endTime: '12:00' }],
+        }),
+      ).toBeNull();
+    });
+
+    it('refuses a session whose hours run backwards', () => {
+      expect(
+        session.saveDatedAvailability({
+          date: on(5),
+          sessions: [{ startTime: '15:00', endTime: '09:00' }],
+        }),
+      ).toBe('bad-session');
+    });
+
+    it('refuses two sessions that claim the same time', () => {
+      expect(
+        session.saveDatedAvailability({
+          date: on(5),
+          sessions: [
+            { startTime: '09:00', endTime: '13:00' },
+            { startTime: '12:00', endTime: '17:00' },
+          ],
+        }),
+      ).toBe('overlapping-sessions');
+    });
+
+    it('allows the ordinary split pair that merely touches', () => {
+      // Half-open, so a morning ending at 12:00 and an afternoon starting at
+      // 12:00 must not be treated as a clash — that is the normal case.
+      expect(
+        session.saveDatedAvailability({
+          date: on(5),
+          sessions: [
+            { startTime: '09:00', endTime: '12:00' },
+            { startTime: '12:00', endTime: '17:00' },
+          ],
+        }),
+      ).toBeNull();
+    });
+
+    it('refuses a date that is not one, rather than reading it as something near', () => {
+      // `new Date(2026, 1, 31)` is 3 March, so a store that did not check would
+      // quietly publish an exception on the wrong day.
+      const sessions = [{ startTime: '09:00', endTime: '12:00' }];
+      expect(session.saveDatedAvailability({ date: '2026-02-31', sessions })).toBe('invalid-date');
+      expect(session.saveDatedAvailability({ date: 'next Tuesday', sessions })).toBe(
+        'invalid-date',
+      );
+    });
+
+    it('replaces an exception on the same date rather than keeping two', () => {
+      // Two records for one date would leave "which hours apply" ambiguous, and
+      // a correction that appeared to do nothing is worse than no correction.
+      const key = on(8);
+      session.saveDatedAvailability({
+        date: key,
+        sessions: [{ startTime: '09:00', endTime: '12:00' }],
+      });
+      session.saveDatedAvailability({
+        date: key,
+        sessions: [{ startTime: '14:00', endTime: '18:00' }],
+      });
+
+      expect(session.datedAvailability().filter((e) => e.date === key).length).toBe(1);
+      expect(session.sessionsOn(parseDayKey(key)!)[0].startTime).toBe('14:00');
+    });
+
+    it('puts a date back on the weekly pattern when an exception is withdrawn', () => {
+      const key = on(10);
+      const weekly = session.sessionsOn(parseDayKey(key)!);
+      session.saveDatedAvailability({ date: key, sessions: [] });
+      expect(session.sessionsOn(parseDayKey(key)!)).toEqual([]);
+
+      expect(session.clearDatedAvailability(key)).toBe(true);
+      expect(session.sessionsOn(parseDayKey(key)!)).toEqual(weekly);
+    });
+
+    it('reports no change when withdrawing a date that was never there', () => {
+      // So a double click cannot report having done something twice.
+      expect(session.clearDatedAvailability(on(60))).toBe(false);
+    });
+
+    it('leaves the weekly total alone, because a dated hour is not a weekly one', () => {
+      // "6 days · 19h a week" must not start counting one-off clinics, or the
+      // summary would describe a pattern that no longer exists.
+      const before = session.weeklyMinutes();
+      session.saveDatedAvailability({
+        date: on(6),
+        sessions: [{ startTime: '18:00', endTime: '22:00' }],
+      });
+      expect(session.weeklyMinutes()).toBe(before);
+    });
+
+    it('does not move an appointment booked on a date that is later closed', () => {
+      // The same rule the weekly form follows: changing your hours is not the
+      // same decision as moving a patient's visit.
+      const future = on(3);
+      const booked = session.appointments().find((a) => dayKey(new Date(a.startsAt)) === future);
+      if (!booked) return; // No fixture on that date; nothing to protect.
+      session.saveDatedAvailability({ date: future, sessions: [] });
+      expect(session.appointments().find((a) => a.id === booked.id)!.status).toBe(booked.status);
     });
   });
 

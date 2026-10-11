@@ -108,14 +108,72 @@ export interface DoctorProfile {
   readonly bio: string;
 }
 
-/** One day of the repeating weekly availability a doctor publishes. */
-export interface ScheduleDay {
-  /** 0 = Sunday … 6 = Saturday, matching `Date.prototype.getDay()`. */
-  readonly dayOfWeek: number;
-  readonly enabled: boolean;
+/**
+ * One continuous run of consulting hours within a day.
+ *
+ * A range, not an hour count, because a booking has to fall entirely inside one
+ * of these — a 14:00 appointment that straddles the end of a morning session is
+ * not bookable, and no amount of counting makes it so.
+ */
+export interface ScheduleBlock {
   /** `HH:MM` on a 24-hour clock, e.g. `09:00`. */
   readonly startTime: string;
   readonly endTime: string;
+}
+
+/**
+ * The sessions a doctor works in a day, and the most any day may hold.
+ *
+ * Named rather than an open list because the form is a fixed pair, and a fixed
+ * pair is the right amount of structure here: a clinic day is a morning and an
+ * afternoon, and letting a doctor add a third block would mean inventing rules
+ * for a shape nobody has asked for.
+ */
+export const SESSION_LABELS = ['Morning', 'Afternoon'] as const;
+
+/** How many sessions a day may carry. Enforced by the form, not the type. */
+export const MAX_SESSIONS_PER_DAY = SESSION_LABELS.length;
+
+/**
+ * One day of the repeating weekly availability a doctor publishes.
+ *
+ * A *list* of sessions rather than one open/close pair, because most doctors
+ * work a split day and one pair cannot express it. That was not only a display
+ * limitation: with a single `close` time, every afternoon booking on a split day
+ * was refused as outside-hours, because 14:00 is past the end of the morning.
+ *
+ * A day with no sessions is closed, so there is no separate `enabled` flag that
+ * could disagree with the sessions it claims to switch on.
+ */
+export interface ScheduleDay {
+  /** 0 = Sunday … 6 = Saturday, matching `Date.prototype.getDay()`. */
+  readonly dayOfWeek: number;
+  /** In clock order. Empty means the doctor does not work that day. */
+  readonly sessions: readonly ScheduleBlock[];
+}
+
+/**
+ * Availability for one specific calendar date.
+ *
+ * An *override*, not an addition. It replaces the repeating weekly pattern for
+ * that one date and leaves every other date alone, which is what a single
+ * exception actually needs to say: a Christmas closure, a one-off evening clinic,
+ * a half-day for a conference. Adding hours to the week instead would produce a
+ * doctor who is open on Christmas because he is open on Thursdays, and a booking
+ * that has to consult two records to know whether it may happen.
+ *
+ * Carries sessions for the same reason `ScheduleDay` does, so a split week and a
+ * split exception are described in the same words and cannot drift apart.
+ *
+ * Deliberately free of any restriction drawn from the week. An override that
+ * could only narrow the pattern could not open a day the week has closed, which
+ * is half of what these are for.
+ */
+export interface DatedAvailability {
+  /** `YYYY-MM-DD` in local time — the same key `dayKey` produces. */
+  readonly date: string;
+  /** In clock order. Empty means the doctor does not work that date at all. */
+  readonly sessions: readonly ScheduleBlock[];
 }
 
 /**

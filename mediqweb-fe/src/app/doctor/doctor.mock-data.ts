@@ -1,5 +1,11 @@
-import { localIso } from './doctor.dates';
-import type { Appointment, DoctorProfile, Patient, ScheduleDay } from './doctor.models';
+import { dayKey, localIso } from './doctor.dates';
+import type {
+  Appointment,
+  DatedAvailability,
+  DoctorProfile,
+  Patient,
+  ScheduleDay,
+} from './doctor.models';
 
 /**
  * Sample data standing in for the Doctor API.
@@ -349,13 +355,79 @@ export const MOCK_APPOINTMENTS: readonly Appointment[] = [
   },
 ];
 
-/** Monday–Friday mornings and afternoons, plus a Saturday morning clinic. */
+/**
+ * A week with real split days, which is the point of the shape.
+ *
+ * The doctor opens at 05:00 and works to 20:00, with an hour off over the middle
+ * of the day — so Monday, Tuesday, Thursday and Friday are worked morning and
+ * afternoon, Wednesday is an afternoon-only clinic day, and the weekend is
+ * closed. A fixture where every day was a single block would leave the split
+ * path unexercised, which is how a whole feature ends up looking finished and
+ * working on no real data.
+ */
 export const MOCK_SCHEDULE: readonly ScheduleDay[] = [
-  { dayOfWeek: 0, enabled: false, startTime: '09:00', endTime: '12:00' },
-  { dayOfWeek: 1, enabled: true, startTime: '09:00', endTime: '12:00' },
-  { dayOfWeek: 2, enabled: true, startTime: '09:00', endTime: '12:00' },
-  { dayOfWeek: 3, enabled: true, startTime: '13:00', endTime: '17:00' },
-  { dayOfWeek: 4, enabled: true, startTime: '09:00', endTime: '12:00' },
-  { dayOfWeek: 5, enabled: true, startTime: '09:00', endTime: '12:00' },
-  { dayOfWeek: 6, enabled: true, startTime: '08:00', endTime: '11:00' },
+  { dayOfWeek: 0, sessions: [] },
+  {
+    dayOfWeek: 1,
+    sessions: [
+      { startTime: '05:00', endTime: '12:00' },
+      { startTime: '13:00', endTime: '20:00' },
+    ],
+  },
+  {
+    dayOfWeek: 2,
+    sessions: [
+      { startTime: '05:00', endTime: '12:00' },
+      { startTime: '13:00', endTime: '20:00' },
+    ],
+  },
+  { dayOfWeek: 3, sessions: [{ startTime: '13:00', endTime: '20:00' }] },
+  {
+    dayOfWeek: 4,
+    sessions: [
+      { startTime: '05:00', endTime: '12:00' },
+      { startTime: '13:00', endTime: '20:00' },
+    ],
+  },
+  {
+    dayOfWeek: 5,
+    sessions: [
+      { startTime: '05:00', endTime: '12:00' },
+      { startTime: '13:00', endTime: '20:00' },
+    ],
+  },
+  { dayOfWeek: 6, sessions: [] },
+];
+
+/** A `YYYY-MM-DD` day key `daysFromToday` days from now. */
+function dayKeyFrom(daysFromToday: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() + daysFromToday);
+  return dayKey(date);
+}
+
+/**
+ * Exceptions to the weekly pattern, for the sample data to have something to
+ * show.
+ *
+ * Three, deliberately different in kind, because the page has to handle all of
+ * them: an afternoon that runs an hour later than usual, a Saturday the week has
+ * shut worked morning and afternoon, and a holiday with no sessions at all.
+ * Relative to import like `MOCK_APPOINTMENTS`, so they are always in the future —
+ * the store refuses a past date, and a fixture the store would reject would be a
+ * fixture that only worked on the day it was written.
+ */
+export const MOCK_DATED_AVAILABILITY: readonly DatedAvailability[] = [
+  // An afternoon running past the usual 20:00 close, on a day already worked.
+  { date: dayKeyFrom(9), sessions: [{ startTime: '13:00', endTime: '21:00' }] },
+  // A Saturday worked morning and afternoon, on a day the week has closed.
+  {
+    date: dayKeyFrom(16),
+    sessions: [
+      { startTime: '05:00', endTime: '12:00' },
+      { startTime: '13:00', endTime: '20:00' },
+    ],
+  },
+  // A holiday: no sessions at all, even on a weekday the week says is working.
+  { date: dayKeyFrom(23), sessions: [] },
 ];

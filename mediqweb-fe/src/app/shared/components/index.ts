@@ -23,6 +23,9 @@ export {
   type DropdownPlacement,
   type DropdownSize,
 } from './dropdown/dropdown';
+// Exists because the browser's own date popup cannot be styled and cannot show
+// which dates already carry an entry — see the component for the full reason.
+export { DatePicker, type DatePickerDay } from './date-picker/date-picker';
 
 // Listing chrome. Shared because every area that shows a filtered list needs
 // the same search-and-filter bar, and because keeping one copy is what stops
