@@ -1,7 +1,16 @@
 import { Injectable, computed, signal } from '@angular/core';
-import { isSameDay, minutesOfDay, startOfDay } from './doctor.dates';
+import {
+  blockMinutes,
+  dayKey,
+  isSameDay,
+  minutesOfDay,
+  parseDayKey,
+  startOfDay,
+  usableBlocks,
+} from './doctor.dates';
 import {
   MOCK_APPOINTMENTS,
+  MOCK_DATED_AVAILABILITY,
   MOCK_DOCTOR_PROFILE,
   MOCK_PATIENTS,
   MOCK_SCHEDULE,
@@ -10,10 +19,12 @@ import {
 import type {
   Appointment,
   AppointmentStatus,
+  DatedAvailability,
   DoctorProfile,
   Patient,
   PatientSummary,
   ProfileDraft,
+  ScheduleBlock,
   ScheduleDay,
   VisitOutcome,
 } from './doctor.models';
@@ -24,7 +35,45 @@ const CLOSED_STATUSES: readonly AppointmentStatus[] = ['completed', 'cancelled',
 /** Statuses that mean the patient is expected to turn up. */
 const LIVE_STATUSES: readonly AppointmentStatus[] = ['booked', 'confirmed'];
 
+/**
+ * Why a dated override was not published, or `null` when it was.
+ *
+ * A reason rather than a boolean, for the same reason `BookingRefusal` is: the
+ * page has to say *why* nothing was saved, and "no" is not a sentence. Kept as
+ * data so the wording lives with the rule and a new refusal cannot be added
+ * without the page being forced to handle it.
+ */
+export type DatedAvailabilityRefusal =
+  'invalid-date' | 'in-the-past' | 'bad-session' | 'overlapping-sessions';
+
 const byStart = (a: Appointment, b: Appointment): number => a.startsAt.localeCompare(b.startsAt);
+
+/** Minutes across a set of sessions, ignoring any block that cannot be used. */
+function sumMinutes(blocks: readonly ScheduleBlock[]): number {
+  return blocks.reduce((total, block) => total + (blockMinutes(block) ?? 0), 0);
+}
+
+/**
+ * Whether two sessions in a day claim the same time.
+ *
+ * Half-open, so a session ending at 12:00 and one starting at 12:00 do not
+ * overlap — they are the two halves of a split day, and treating them as a clash
+ * would make the ordinary case unsavable.
+ *
+ * Only worth asking once there is more than one session per day, which is exactly
+ * what the split-day shape introduced.
+ */
+function sessionsOverlap(sessions: readonly ScheduleBlock[]): boolean {
+  return sessions.some((block, i) =>
+    sessions.slice(i + 1).some((other) => {
+      const aStart = minutesOfDay(block.startTime)!;
+      const aEnd = minutesOfDay(block.endTime)!;
+      const bStart = minutesOfDay(other.startTime)!;
+      const bEnd = minutesOfDay(other.endTime)!;
+      return aStart < bEnd && bStart < aEnd;
+    }),
+  );
+}
 
 /**
  * In-memory stand-in for the Doctor API.
@@ -46,6 +95,9 @@ export class DoctorSession {
   private readonly appointmentState = signal<Appointment[]>([...MOCK_APPOINTMENTS]);
   private readonly patientState = signal<Patient[]>([...MOCK_PATIENTS]);
   private readonly scheduleState = signal<ScheduleDay[]>(MOCK_SCHEDULE.map((day) => ({ ...day })));
+  private readonly datedAvailabilityState = signal<DatedAvailability[]>(
+    MOCK_DATED_AVAILABILITY.map((entry) => ({ ...entry })),
+  );
   private readonly profileState = signal<DoctorProfile>({ ...MOCK_DOCTOR_PROFILE });
 
   /**
@@ -148,15 +200,20 @@ export class DoctorSession {
     [...this.scheduleState()].sort((a, b) => a.dayOfWeek - b.dayOfWeek),
   );
 
-  /** Minutes the doctor publishes per week, for the schedule summary. */
+  /** Days the doctor publishes any hours for, for the schedule summary. */
+  readonly workingDayCount = computed(
+    () => this.scheduleState().filter((day) => day.sessions.length > 0).length,
+  );
+
+  /**
+   * Minutes the doctor publishes per week, for the schedule summary.
+   *
+   * Sums every session, so a split day contributes both of its halves. A day
+   * that is closed contributes nothing, which is now simply what an empty
+   * session list means.
+   */
   readonly weeklyMinutes = computed(() =>
-    this.scheduleState().reduce((total, day) => {
-      if (!day.enabled) return total;
-      const start = minutesOfDay(day.startTime);
-      const end = minutesOfDay(day.endTime);
-      if (start === null || end === null || end <= start) return total;
-      return total + (end - start);
-    }, 0),
+    this.scheduleState().reduce((total, day) => total + sumMinutes(day.sessions), 0),
   );
 
   /** Patient lookup that tolerates a bad route param instead of throwing. */
@@ -226,9 +283,120 @@ export class DoctorSession {
     return true;
   }
 
-  /** Replaces the published availability with a saved week. */
+  /**
+   * Replaces the published availability with a saved week.
+   *
+   * Drops any session that cannot be used, and keeps days whose sessions do not
+   * overlap. The form validates both before it gets here; this is the store
+   * refusing to publish a schedule that could not be booked against, which is the
+   * same reason the page's checks are not the only line of defence.
+   */
   saveSchedule(days: readonly ScheduleDay[]): void {
-    this.scheduleState.set(days.map((day) => ({ ...day })));
+    this.scheduleState.set(
+      days.map((day) => ({ dayOfWeek: day.dayOfWeek, sessions: usableBlocks(day.sessions) })),
+    );
+  }
+
+  /**
+   * Dated overrides, soonest first.
+   *
+   * Sorted by date rather than by insertion order because that is the order a
+   * clinician reads them in: the exceptions nearest today are the ones about to
+   * matter, and an unsorted list would bury a closure under next year's.
+   */
+  readonly datedAvailability = computed(() =>
+    [...this.datedAvailabilityState()].sort((a, b) => a.date.localeCompare(b.date)),
+  );
+
+  /**
+   * The sessions in force on one date, in clock order.
+   *
+   * The single answer to "is the doctor working on this day, and when". A dated
+   * entry wins over the weekly pattern for its own date and no other, so the
+   * answer to that question lives in one place instead of being re-derived by
+   * every screen that needs it — the kind of duplication that produces a booking
+   * form disagreeing with the schedule it is supposedly enforcing.
+   *
+   * Falls back to the week's entry, which is what makes an override mean
+   * "replaces the pattern for that day" rather than "adds to it".
+   */
+  sessionsOn(date: Date): readonly ScheduleBlock[] {
+    const key = dayKey(date);
+    const override = this.datedAvailabilityState().find((entry) => entry.date === key);
+    const weekly = this.scheduleState().find((day) => day.dayOfWeek === date.getDay());
+    return usableBlocks(override ? override.sessions : (weekly?.sessions ?? []));
+  }
+
+  /**
+   * Whether an appointment may be booked into a session.
+   *
+   * `durationMinutes` is checked against the session's own end rather than the
+   * day's, which is the whole reason this takes a session: a 30 minute
+   * appointment starting at 09:45 must be refused by the morning block even
+   * though the afternoon block would have had room, and a day's single `close`
+   * could not tell the difference.
+   *
+   * The session must contain the visit entirely — half-open at the boundaries,
+   * so a booking may start exactly when a session opens and end exactly when one
+   * closes, but never straddle the gap between two sessions.
+   */
+  fitsInSession(date: Date, startMinutes: number, durationMinutes: number): boolean {
+    const endMinutes = startMinutes + durationMinutes;
+    return this.sessionsOn(date).some((block) => {
+      const open = minutesOfDay(block.startTime);
+      const close = minutesOfDay(block.endTime);
+      if (open === null || close === null) return false;
+      return startMinutes >= open && endMinutes <= close;
+    });
+  }
+
+  /**
+   * Publishes one dated override.
+   *
+   * Rejects a date that has already passed, and an entry whose sessions overlap
+   * or run backwards, reporting which rather than returning a bare false — the
+   * page needs to say *why* nothing was saved, and "no" is not a sentence.
+   *
+   * An entry with no sessions is a closed date and is allowed: a holiday is a
+   * real thing to publish, and refusing it would leave a working weekday looking
+   * open.
+   *
+   * An existing entry for the same date is replaced rather than refused. Two
+   * records for one date would leave "which hours apply" ambiguous, and silently
+   * keeping the older one would mean a correction appeared to do nothing.
+   *
+   * This method does not touch appointments already booked on that date. The
+   * same reason the weekly form does not: moving a doctor's hours is not the
+   * same decision as moving a patient's visit, and only a Secretary at the desk
+   * can do the second.
+   */
+  saveDatedAvailability(entry: DatedAvailability): DatedAvailabilityRefusal | null {
+    const date = parseDayKey(entry.date);
+    if (!date) return 'invalid-date';
+    if (date.getTime() < startOfDay(this.now()).getTime()) return 'in-the-past';
+
+    const sessions = usableBlocks(entry.sessions);
+    if (sessions.length !== entry.sessions.length) return 'bad-session';
+    if (sessionsOverlap(sessions)) return 'overlapping-sessions';
+
+    const key = dayKey(date);
+    this.datedAvailabilityState.update((entries) => [
+      ...entries.filter((existing) => existing.date !== key),
+      { date: key, sessions },
+    ]);
+    return null;
+  }
+
+  /**
+   * Withdraws a dated override, putting that date back on the weekly pattern.
+   *
+   * Reports whether one was removed, so a caller that guessed a date — or double
+   * clicked — is not told it withdrew something that was not there.
+   */
+  clearDatedAvailability(date: string): boolean {
+    const before = this.datedAvailabilityState().length;
+    this.datedAvailabilityState.update((entries) => entries.filter((e) => e.date !== date));
+    return this.datedAvailabilityState().length !== before;
   }
 
   /**
