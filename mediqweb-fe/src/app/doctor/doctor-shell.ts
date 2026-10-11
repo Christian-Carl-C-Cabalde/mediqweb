@@ -22,6 +22,11 @@ const DOCTOR_NAV: readonly StaffNavEntry[] = [
   { id: 'appointments', label: 'Appointments', icon: 'calendar', route: '/doctor/appointments' },
   { id: 'patients', label: 'Patients', icon: 'users', route: '/doctor/patients' },
   { id: 'schedule', label: 'Schedule', icon: 'clipboard', route: '/doctor/schedule' },
+  // Above Profile, because it is a place to work rather than a setting about the
+  // account. The icon is a clock with a rewind arrow, kept distinct from
+  // `calendar` (Appointments) and `clipboard` (Schedule) — all three are about
+  // time and a plain clock beside those two would be a coin toss.
+  { id: 'history', label: 'Visit History', icon: 'history', route: '/doctor/history' },
   { id: 'profile', label: 'Profile', icon: 'settings', route: '/doctor/profile' },
 ];
 
