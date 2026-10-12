@@ -5,6 +5,7 @@ import { Router, RouterOutlet, provideRouter, type Routes } from '@angular/route
 import { ageFrom } from '../../secretary.dates';
 import { MOCK_APPOINTMENTS } from '../../secretary.mock-data';
 import { SecretarySession } from '../../secretary-session';
+import { pinToDeskDay } from '../../secretary.spec-helpers';
 import { SecretaryPatientDetails } from './secretary-patient-details';
 
 const ROUTES: Routes = [{ path: 'secretary/patients/:id', component: SecretaryPatientDetails }];
@@ -39,17 +40,10 @@ describe('SecretaryPatientDetails', () => {
       providers: [SecretarySession, provideRouter(ROUTES)],
     });
     session = TestBed.inject(SecretarySession);
-    const today = MOCK_APPOINTMENTS.find((a) => a.startsAt.slice(0, 10) === dayKeyNow());
-    session.now.set(new Date(today?.startsAt ?? MOCK_APPOINTMENTS[0].startsAt));
+    pinToDeskDay(session);
     router = TestBed.inject(Router);
     fixture = TestBed.createComponent(TestHost);
   });
-
-  function dayKeyNow(): string {
-    const now = new Date();
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-  }
 
   async function open(id: string): Promise<void> {
     await router.navigateByUrl(`/secretary/patients/${id}`);

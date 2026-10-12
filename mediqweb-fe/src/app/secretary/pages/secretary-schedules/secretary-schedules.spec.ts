@@ -1,7 +1,8 @@
 import { type ComponentFixture, TestBed } from '@angular/core/testing';
 import { DAY_NAMES, formatDuration } from '../../secretary.dates';
-import { MOCK_APPOINTMENTS, MOCK_DOCTORS, MOCK_SECRETARY_PROFILE } from '../../secretary.mock-data';
+import { MOCK_DOCTORS, MOCK_SECRETARY_PROFILE } from '../../secretary.mock-data';
 import { SecretarySession } from '../../secretary-session';
+import { pinToDeskDay } from '../../secretary.spec-helpers';
 import { SecretarySchedules } from './secretary-schedules';
 
 describe('SecretarySchedules', () => {
@@ -17,18 +18,11 @@ describe('SecretarySchedules', () => {
       providers: [SecretarySession],
     });
     session = TestBed.inject(SecretarySession);
-    const today = MOCK_APPOINTMENTS.find((a) => a.startsAt.slice(0, 10) === dayKeyNow());
-    session.now.set(new Date(today?.startsAt ?? MOCK_APPOINTMENTS[0].startsAt));
+    pinToDeskDay(session);
     fixture = TestBed.createComponent(SecretarySchedules);
     fixture.detectChanges();
     await fixture.whenStable();
   });
-
-  function dayKeyNow(): string {
-    const now = new Date();
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-  }
 
   function page(): any {
     return fixture.componentInstance;

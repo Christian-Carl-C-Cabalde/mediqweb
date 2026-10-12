@@ -10,23 +10,13 @@ import {
 } from './secretary.mock-data';
 import type { Appointment } from './secretary.models';
 import { SecretarySession } from './secretary-session';
+import { pinToDeskDay } from './secretary.spec-helpers';
 
 /** The doctor the signed-in sample Secretary is assigned to. */
 const DESK = MOCK_SECRETARY_PROFILE.assignedDoctorId!;
 
 /** A patient on that doctor's panel, so booking tests are not refused on the patient. */
 const DESK_PATIENT = MOCK_PATIENTS.find((p) => p.doctorId === DESK)!.id;
-
-/**
- * Pins the session clock to the first *today* fixture, so the day-scoped
- * computeds are deterministic. The fixtures are relative to the day the module
- * was imported, which is what keeps the dashboard populated without a clock —
- * so the test moves to a known appointment rather than asserting absolute dates.
- */
-function pinToToday(session: SecretarySession): void {
-  const today = MOCK_APPOINTMENTS.find((a) => a.startsAt.slice(0, 10) === dayKey(new Date()));
-  session.now.set(new Date(today?.startsAt ?? MOCK_APPOINTMENTS[0].startsAt));
-}
 
 /**
  * Puts the session on a different doctor's desk.
@@ -89,7 +79,7 @@ describe('SecretarySession', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({ providers: [SecretarySession] });
     session = TestBed.inject(SecretarySession);
-    pinToToday(session);
+    pinToDeskDay(session);
   });
 
   describe('the assigned desk', () => {
@@ -253,11 +243,33 @@ describe('SecretarySession', () => {
       }
     });
 
+    it('has nothing to show on a day the doctor does not work', () => {
+      // Why this suite used to fail every Monday. `atOpen(doctorId, 0, …)` means
+      // "the doctor's first working day at or after today", not "today", so on a
+      // day off every "today" fixture had landed on the next working day while
+      // this list stayed scoped to the real today — and came back empty.
+      //
+      // The empty list was never the bug. A Secretary whose doctor is off today
+      // genuinely has nothing to show today, and that is what the page should
+      // say. Pinned here so the next person to find it treats it as the answer
+      // rather than as a defect in the store.
+      const off = new Date();
+      while (MOCK_SCHEDULES[DESK][off.getDay()].enabled) {
+        off.setDate(off.getDate() + 1);
+      }
+      off.setHours(10, 0, 0, 0);
+      session.now.set(off);
+
+      expect(session.todaysAppointments()).toEqual([]);
+      // The desk is not empty — the appointments are just not on this day.
+      expect(session.appointments().length).toBeGreaterThan(0);
+    });
+
     it('drops a cancelled appointment from the day plan', () => {
       // Behaviour, not fixture luck: whether any *given* day happens to contain a
       // cancellation depends on the weekday the suite runs on, so this cancels a
       // fixture appointment rather than asserting the sample data is arranged
-      // favourably. `pinToToday` guarantees `todaysAppointments` is populated.
+      // favourably. `pinToDeskDay` guarantees `todaysAppointments` is populated.
       const today = session.todaysAppointments()[0];
       expect(today).toBeTruthy();
 
