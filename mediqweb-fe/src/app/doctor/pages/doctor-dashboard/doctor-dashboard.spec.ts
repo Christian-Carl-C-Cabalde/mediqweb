@@ -34,6 +34,17 @@ describe('DoctorDashboard', () => {
     expect(page().todayCount()).toBe(session.todaysAppointments().length);
   });
 
+  it('tags the agenda card so the shared empty state keeps its inset', () => {
+    // The card turns its own padding off so the rows' dividers run to the card
+    // edges, which leaves the empty state with nothing carrying the heading's
+    // horizontal inset. The shared partial insets it again through
+    // `.agenda-card`, and that rule reaches the card only while the template
+    // still carries the class — which nothing else would notice if it stopped.
+    const host = (fixture.nativeElement as HTMLElement).querySelector('ui-card.agenda-card');
+    expect(host).not.toBeNull();
+    expect(host!.querySelector('.ui-card--padding-none')).not.toBeNull();
+  });
+
   it('counts the appointments still waiting on a decision', () => {
     expect(page().awaitingCount()).toBe(
       session.appointments().filter((a) => a.status === 'booked').length,

@@ -61,16 +61,34 @@
   list-style: none;
 }
 
+// `--space-5`, not `--space-4`: the card header pads its own content to
+// `--space-5`, so anything else in the same card reads as a second, sloppier
+// left edge. The rows' dividers still run the full width of the card — only
+// their content is inset.
 .agenda__item {
   display: flex;
   align-items: center;
   gap: var(--space-4);
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-3) var(--space-5);
   border-bottom: var(--border-width) solid var(--color-border);
 }
 
 .agenda__item:last-child {
   border-bottom: 0;
+}
+
+// The agenda card turns its own padding off, so the rows can bleed to the card
+// edges and their dividers run unbroken. The empty state has no row to inherit
+// that inset from and no divider of its own, so with nothing to carry it it sat
+// flush against the card border — 20px out of line with the heading sitting
+// directly above it, and flush to the top under the header's divider.
+//
+// Given the same horizontal inset the rows use, and room above and below so the
+// card reads as a deliberate empty state rather than as text that ran out. The
+// same values `ui-table` gives its own empty row, which is the convention for
+// this in a card that has turned its padding off.
+.agenda-card .empty {
+  padding: var(--space-6) var(--space-5);
 }
 
 // Fixed-width so the times line up as a column, which is the whole point of a
