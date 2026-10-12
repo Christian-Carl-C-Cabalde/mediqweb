@@ -493,8 +493,16 @@ describe('MediQ shared layouts', () => {
 
   describe('a page that fills the window', () => {
     @Component({
-      imports: [Card, StaffLayout],
-      template: `<app-staff-layout [user]="user" [nav]="nav" [fillViewport]="fill">
+      imports: [Button, Card, StaffLayout],
+      template: `<app-staff-layout
+        [user]="user"
+        [nav]="nav"
+        [fillViewport]="fill"
+        [pageTitle]="title"
+      >
+        @if (withAction) {
+          <button staffPageActions>New account</button>
+        }
         <ui-card>Working surface.</ui-card>
       </app-staff-layout>`,
     })
@@ -503,11 +511,21 @@ describe('MediQ shared layouts', () => {
       readonly nav: StaffNavEntry[] = ADMIN_NAV;
       /** A plain field, not an input: the test sets it directly. */
       fill = false;
+      /** A heading and a projected action, so the heading row's two inputs can
+       *  be exercised without needing a second host component. */
+      title: string | null = null;
+      withAction = false;
     }
 
-    function build(fill: boolean): ComponentFixture<FilledPage> {
+    function build(
+      fill: boolean,
+      title: string | null = null,
+      withAction = false,
+    ): ComponentFixture<FilledPage> {
       const fixture = TestBed.createComponent(FilledPage);
       fixture.componentInstance.fill = fill;
+      fixture.componentInstance.title = title;
+      fixture.componentInstance.withAction = withAction;
       fixture.detectChanges();
       return fixture;
     }
@@ -531,11 +549,44 @@ describe('MediQ shared layouts', () => {
       // A page may declare no heading, as the messages page does. The row owns a
       // bottom margin, so if it stayed it would leave a band of dead space above
       // the content — the whole reason for asking for the space in the first place.
+      //
+      // Asserted on the bound class rather than on `:has()`. The rule used to be
+      // `:not(:has(.shell__title)):not(:has(.shell__actions > *))`, which jsdom
+      // matches unreliably — this assertion failed about one full run in six with
+      // nothing else in the suite changed, and the failure was invisible in any
+      // browser.
       const host = build(true).nativeElement as HTMLElement;
 
       expect(host.querySelector('.shell__title')).toBeNull();
       expect(host.querySelector('.shell__crumbs')).toBeNull();
-      expect(getComputedStyle(host.querySelector('.shell__title-row')!).display).toBe('none');
+      const row = host.querySelector('.shell__title-row')!;
+      expect(row.classList.contains('shell__title-row--untitled')).toBe(true);
+      expect(getComputedStyle(row).marginBottom).toBe('0px');
+      // The actions wrapper collapses on its own, so the row takes no height.
+      expect(getComputedStyle(host.querySelector('.shell__actions')!).display).toBe('none');
+    });
+
+    it('keeps the row’s spacing when the page does declare a heading', () => {
+      const host = build(true, 'Accounts').nativeElement as HTMLElement;
+      const row = host.querySelector('.shell__title-row')!;
+
+      expect(row.classList.contains('shell__title-row--untitled')).toBe(false);
+      // jsdom reports a declaration as written — `var(--space-6)`, not a resolved
+      // 24px — so this asserts that the modifier's `0` is not the one applying,
+      // rather than pinning a number this environment cannot compute.
+      expect(getComputedStyle(row).marginBottom).not.toBe('0px');
+    });
+
+    it('still shows a projected action when the page declares no heading', () => {
+      // The row is what holds the action, so dropping its margin must not be
+      // mistaken for dropping the row. This is why the fix trims the margin
+      // rather than hiding the element.
+      const host = build(true, null, true).nativeElement as HTMLElement;
+      const row = host.querySelector('.shell__title-row')!;
+
+      expect(row.classList.contains('shell__title-row--untitled')).toBe(true);
+      expect(row.textContent).toContain('New account');
+      expect(getComputedStyle(host.querySelector('.shell__actions')!).display).not.toBe('none');
     });
   });
 });
