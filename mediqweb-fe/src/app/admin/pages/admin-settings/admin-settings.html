@@ -47,41 +47,6 @@
       </div>
     </ui-card>
 
-    <ui-card heading="Appointments" [headingLevel]="3">
-      <p class="section-hint">
-        Defaults a Secretary sees when booking. Individual bookings can differ.
-      </p>
-
-      <div class="fields">
-        <ui-form-field label="Default slot length" controlId="setting-slot">
-          <ui-dropdown
-            id="setting-slot"
-            [items]="slotLengths"
-            [selected]="selectedOf('slotLength')"
-            (selectionChange)="pick('slotLength', $event)"
-          />
-        </ui-form-field>
-
-        <ui-form-field label="How far ahead patients may book" controlId="setting-window">
-          <ui-dropdown
-            id="setting-window"
-            [items]="bookingWindows"
-            [selected]="selectedOf('bookingWindow')"
-            (selectionChange)="pick('bookingWindow', $event)"
-          />
-        </ui-form-field>
-
-        <ui-form-field label="Reminder lead time" controlId="setting-reminder">
-          <ui-dropdown
-            id="setting-reminder"
-            [items]="reminderLeadTimes"
-            [selected]="selectedOf('reminderLeadTime')"
-            (selectionChange)="pick('reminderLeadTime', $event)"
-          />
-        </ui-form-field>
-      </div>
-    </ui-card>
-
     <ui-card heading="Security and records" [headingLevel]="3">
       <p class="section-hint">Applies to every staff member. Both need a server to enforce them.</p>
 

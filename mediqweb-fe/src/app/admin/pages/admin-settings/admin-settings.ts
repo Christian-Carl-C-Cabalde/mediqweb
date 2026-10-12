@@ -9,28 +9,6 @@ interface Choice {
   label: string;
 }
 
-const SLOT_LENGTHS: Choice[] = [
-  { id: '15', label: '15 minutes' },
-  { id: '20', label: '20 minutes' },
-  { id: '30', label: '30 minutes' },
-  { id: '45', label: '45 minutes' },
-  { id: '60', label: '60 minutes' },
-];
-
-const BOOKING_WINDOWS: Choice[] = [
-  { id: '7', label: '1 week ahead' },
-  { id: '14', label: '2 weeks ahead' },
-  { id: '30', label: '1 month ahead' },
-  { id: '90', label: '3 months ahead' },
-];
-
-const REMINDER_LEAD_TIMES: Choice[] = [
-  { id: '0', label: 'At the time of booking' },
-  { id: '2', label: '2 hours before' },
-  { id: '24', label: '1 day before' },
-  { id: '48', label: '2 days before' },
-];
-
 const SESSION_TIMEOUTS: Choice[] = [
   { id: '15', label: '15 minutes' },
   { id: '30', label: '30 minutes' },
@@ -70,9 +48,6 @@ export class AdminSettings {
   private readonly fb = inject(FormBuilder);
   private readonly toasts = inject(ToastService);
 
-  protected readonly slotLengths = SLOT_LENGTHS;
-  protected readonly bookingWindows = BOOKING_WINDOWS;
-  protected readonly reminderLeadTimes = REMINDER_LEAD_TIMES;
   protected readonly sessionTimeouts = SESSION_TIMEOUTS;
   protected readonly retentionPeriods = RETENTION_PERIODS;
 
@@ -81,9 +56,6 @@ export class AdminSettings {
     address: ['12 Katipunan Avenue, Quezon City', [Validators.required]],
     contactEmail: ['hello@mediq.ph', [Validators.required, Validators.email]],
     contactNumber: ['+63 2 8555 0100', [Validators.required]],
-    slotLength: ['30'],
-    bookingWindow: ['30'],
-    reminderLeadTime: ['24'],
     sessionTimeout: ['30'],
     retentionPeriod: ['1095'],
   });
