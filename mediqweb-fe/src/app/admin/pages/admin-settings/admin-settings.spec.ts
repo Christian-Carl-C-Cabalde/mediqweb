@@ -65,8 +65,34 @@ describe('AdminSettings', () => {
   });
 
   it('applies a dropdown choice to its form control', () => {
-    page().pick('slotLength', { id: '45', label: '45 minutes' });
-    expect(page().selectedOf('slotLength')).toBe('45');
+    // Uses a control that still exists. This was pinned on `slotLength`, which
+    // went with the Appointments card; had it not been moved, removing the card
+    // would have failed on a test that had stopped describing the page.
+    page().pick('sessionTimeout', { id: '45', label: '45 minutes' });
+    expect(page().selectedOf('sessionTimeout')).toBe('45');
+  });
+
+  it('offers no Appointments settings', () => {
+    // The card held slot length, the booking window and the reminder lead time.
+    // None of them fed anything: the hint claimed the Secretary saw these when
+    // booking, and no other page in the app ever read them. So removing the card
+    // removed a claim the page could not keep, not a setting that was in use.
+    //
+    // Asserted on the absence of both the heading and the controls, so the card
+    // cannot come back with different wording and pass.
+    const body = text();
+    expect(body).not.toContain('Default slot length');
+    expect(body).not.toContain('How far ahead patients may book');
+    expect(body).not.toContain('Reminder lead time');
+    expect(body).not.toContain('Appointments');
+    expect(Object.keys(page().form.controls)).toEqual([
+      'clinicName',
+      'address',
+      'contactEmail',
+      'contactNumber',
+      'sessionTimeout',
+      'retentionPeriod',
+    ]);
   });
 
   it('offers no boolean toggles, which the design system has no control for', () => {
