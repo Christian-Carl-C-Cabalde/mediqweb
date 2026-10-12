@@ -113,3 +113,11 @@ export function formatDuration(minutes: number): string {
   if (!rest) return `${hours}h`;
   return `${hours}h ${rest}m`;
 }
+
+/**
+ * `(1, 'appointment')` -> `'1 appointment'`. `(0, ...)` pluralises, because
+ * "0 appointments" is right and "0 appointment" reads as a missing count.
+ */
+export function plural(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? '' : 's'}`;
+}

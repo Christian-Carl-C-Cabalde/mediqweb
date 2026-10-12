@@ -1,3 +1,4 @@
+import { computed } from '@angular/core';
 import { type ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import {
@@ -66,8 +67,50 @@ describe('DoctorAppointments', () => {
     return session.appointments().find((a) => a.id === id)?.status;
   }
 
-  it('lists every appointment for the signed-in doctor', () => {
-    expect(page().appointments().length).toBe(session.appointments().length);
+  it('lists only the appointments still to happen', () => {
+    expect(page().appointments().length).toBe(session.openAppointments().length);
+    expect(page().appointments().length).toBeLessThan(session.appointments().length);
+  });
+
+  // --- What this list is not
+
+  it('leaves a recorded visit off the list, because the History page holds it', () => {
+    const recorded = session
+      .appointments()
+      .filter((a) => a.status === 'completed' || a.status === 'no-show');
+    expect(recorded.length).toBeGreaterThan(0);
+
+    const shown = page()
+      .appointments()
+      .map((a: any) => a.id);
+    for (const appointment of recorded) {
+      expect(shown).not.toContain(appointment.id);
+    }
+  });
+
+  it('never shows a cancelled appointment, which is the Secretary’s record', () => {
+    const cancelled = session.appointments().filter((a) => a.status === 'cancelled');
+    expect(cancelled.length).toBeGreaterThan(0);
+
+    for (const appointment of page().appointments()) {
+      expect(appointment.status).not.toBe('cancelled');
+    }
+    expect(text()).not.toContain('Cancelled');
+  });
+
+  // The filter used to offer Completed, Cancelled and No-show. Each of them
+  // promised rows that are never rendered, so choosing one returned a permanently
+  // empty table — which reads as a broken page rather than as an empty result.
+  it('offers no status in the filter that cannot appear in the list', () => {
+    const offered = (page().statusOptions as { id: string }[]).map((item) => item.id);
+    expect(offered).toEqual(['all', 'booked', 'confirmed']);
+  });
+
+  it('points a doctor looking for a past visit at the History page', () => {
+    // The list no longer holds finished appointments, so a doctor who opens it
+    // after a consultation has nowhere to look unless the page says where it went.
+    expect(text()).toContain('Visit History');
+    expect(host().querySelector('a[href="/doctor/history"]')).not.toBeNull();
   });
 
   it('filters by patient name', () => {
@@ -86,17 +129,74 @@ describe('DoctorAppointments', () => {
   });
 
   it('filters by status', () => {
-    page().statusFilter.set('cancelled');
+    page().statusFilter.set('confirmed');
     fixture.detectChanges();
+    expect(page().appointments().length).toBeGreaterThan(0);
     for (const appointment of page().appointments()) {
-      expect(appointment.status).toBe('cancelled');
+      expect(appointment.status).toBe('confirmed');
     }
   });
 
+  it('counts the working list without comparing it to itself', () => {
+    // Was "9 of 16", comparing the open count against every appointment the
+    // doctor had ever had — including the finished rows this page no longer
+    // lists. Once the list holds only what is still to happen, "9 of 9" would
+    // say nothing, so the second count appears only when a filter is in play.
+    const total = session.openAppointments().length;
+    expect(page().caption()).toBe(`${total} appointments still to happen`);
+  });
+
+  it('compares against the working list only once a filter is in play', () => {
+    const total = session.openAppointments().length;
+    const booked = session.openAppointments().filter((a) => a.status === 'booked').length;
+
+    page().statusFilter.set('booked');
+    fixture.detectChanges();
+    expect(page().caption()).toBe(`${booked} of ${total} appointments still to happen`);
+
+    page().query.set('juan');
+    fixture.detectChanges();
+    expect(page().caption()).toContain(`of ${total} appointments still to happen`);
+
+    page().statusFilter.set('all');
+    fixture.detectChanges();
+    expect(page().caption()).toContain(`of ${total} appointments still to happen`);
+
+    // Both filters have to be cleared: the search box is a filter too, and
+    // clearing only the dropdown would leave the caption counting a subset.
+    page().query.set('');
+    fixture.detectChanges();
+    expect(page().caption()).toBe(`${total} appointments still to happen`);
+  });
+
+  it('reads "appointment" in the singular when one is left', () => {
+    // The store's list cannot be trimmed without breaking every other test in this
+    // file, and swapping the function on the shared session would not be picked
+    // up anyway: `caption` is a memoised computed that read it in `beforeEach`
+    // and has no signal to tell it the function changed. So this builds its own
+    // component against a one-appointment list.
+    const solo = TestBed.inject(DoctorSession);
+    (solo as { openAppointments: unknown }).openAppointments = computed(() =>
+      solo
+        .appointments()
+        .filter((a) => a.status === 'confirmed')
+        .slice(0, 1),
+    );
+
+    const soloFixture = TestBed.createComponent(DoctorAppointments);
+    soloFixture.detectChanges();
+    expect((soloFixture.componentInstance as any).caption()).toBe('1 appointment still to happen');
+  });
+
   it('explains an empty result rather than showing a bare table', () => {
+    const total = session.openAppointments().length;
     page().query.set('nobody by this name');
     fixture.detectChanges();
     expect(text()).toContain('No appointments match your filters');
+
+    // Zero pluralises: "0 appointment" reads as a count that failed to load, and
+    // the empty message above it is the one saying the filter is the reason.
+    expect(page().caption()).toBe(`0 of ${total} appointments still to happen`);
   });
 
   it('completes a confirmed appointment', () => {

@@ -108,6 +108,49 @@ describe('DoctorSession', () => {
     });
   });
 
+  describe('openAppointments', () => {
+    it('holds booked and confirmed appointments only', () => {
+      expect(session.openAppointments().length).toBeGreaterThan(0);
+      for (const appointment of session.openAppointments()) {
+        expect(['booked', 'confirmed']).toContain(appointment.status);
+      }
+    });
+
+    it('is exactly the complement of visitHistory', () => {
+      // The Doctor area holds one record of every appointment, split in two, and
+      // the only status that falls between them is `cancelled` — which belongs to
+      // the Secretary. Anything else would mean a row the doctor can neither
+      // act on nor look up.
+      const open = new Set(session.openAppointments().map((a) => a.id));
+      const visited = new Set(session.visitHistory().map((a) => a.id));
+      const all = session.appointments();
+
+      for (const appointment of all) {
+        const listed = open.has(appointment.id) || visited.has(appointment.id);
+        expect(listed).toBe(appointment.status !== 'cancelled');
+      }
+      expect([...open].some((id) => visited.has(id))).toBe(false);
+    });
+
+    it('excludes appointments already recorded, so the list stays actionable', () => {
+      const open = session.openAppointments().map((a) => a.id);
+      for (const visit of session.visitHistory()) {
+        expect(open).not.toContain(visit.id);
+      }
+    });
+
+    it('has the day list as a subset', () => {
+      // Both are the same list read differently; if `todaysAppointments` were
+      // still filtering `appointments()` by itself the two could disagree about
+      // what counts as open.
+      const today = new Set(session.todaysAppointments().map((a) => a.id));
+      for (const appointment of session.openAppointments()) {
+        if (today.has(appointment.id)) expect(appointment.status).not.toBe('cancelled');
+      }
+      expect(today.size).toBeLessThanOrEqual(session.openAppointments().length);
+    });
+  });
+
   describe('visitHistory', () => {
     it('holds completed and no-show visits only', () => {
       expect(session.visitHistory().length).toBeGreaterThan(0);
@@ -226,6 +269,20 @@ describe('DoctorSession', () => {
       expect(summary.lastVisit).toBeNull();
     });
 
+    it('never names a cancelled appointment as the last visit', () => {
+      // The patients table heads that column "Last visit", so a cancellation's
+      // date there would be read as a day this doctor saw somebody. Checked over
+      // the whole list rather than one patient, so a fixture swap cannot put a
+      // cancelled row back under that heading.
+      const now = session.now().getTime();
+      for (const summary of session.patients()) {
+        const last = summary.lastVisit;
+        if (!last) continue;
+        expect(last.status).not.toBe('cancelled');
+        expect(new Date(last.startsAt).getTime()).toBeLessThan(now);
+      }
+    });
+
     it('counts a no-show as a visit but not a cancelled one', () => {
       const noShow = session.patients().find((s) => s.patient.id === 'pat-110')!;
       expect(noShow.visitCount).toBe(1);
@@ -277,6 +334,23 @@ describe('DoctorSession', () => {
       const all = session.appointmentsForPatient('pat-101');
       expect(all.length).toBeGreaterThan(0);
       for (const appointment of all) expect(appointment.doctorId).toBe(SIGNED_IN_DOCTOR_ID);
+    });
+
+    it('drops cancellations, so the patient page agrees with the working list', () => {
+      // The Appointments page hides cancellations; if the per-patient history kept
+      // them, the same record would mean two different things depending on which
+      // page it was read from. Pinned across every patient rather than one, so a
+      // fixture swap cannot quietly reintroduce a cancelled row.
+      const cancelled = session.appointments().filter((a) => a.status === 'cancelled');
+      expect(cancelled.length).toBeGreaterThan(0);
+
+      for (const patient of session.patients()) {
+        const ids = session.appointmentsForPatient(patient.patient.id).map((a) => a.id);
+        for (const appointment of cancelled) {
+          if (appointment.patientId !== patient.patient.id) continue;
+          expect(ids).not.toContain(appointment.id);
+        }
+      }
     });
   });
 
