@@ -11,12 +11,44 @@
 // so they stay component-local while having a single source of truth.
 // ============================================================================
 
-// Identity banner: avatar, who this is, and the way back.
-.identity {
+// The page's blocks are plain children of the shell's main column, which has
+// padding but no `gap` of its own, so each one was carrying whatever margin it
+// happened to bring: the sample-data notice gave `--space-5`, the identity banner
+// `--space-4`, the appointment-history card nothing whatsoever, and the footnote
+// `--space-3`. Four spacings between four blocks, one of them zero — so the cards
+// on a record page sat at visibly different distances from each other and only
+// the first pair looked deliberate.
+//
+// One gap on the page host, and the individual margins come off. Leaving them
+// would stack on top of it and put the uneven rhythm straight back.
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+// Identity banner: the way back, then who this is.
+//
+// `.identity` sits on the `ui-card` host, and the card's own `:host` is already
+// `display: flex`. So every rule that used to live here — the flex row, the
+// `gap`, `align-items`, `.identity__body`'s `flex: 1`, and the banner's own
+// `margin-bottom` — either applied to the card's single flex child rather than to
+// the avatar and the name beside it, or double-counted against the page gap
+// above. The avatar and the name were block children of the card body and
+// stacked, which is why the banner read as a list rather than as a person.
+//
+// The row has to be a wrapper inside the projected content; no rule on the host
+// can reach it.
+
+// The back link leads the card. It is the one thing on the page that is about
+// leaving rather than about the patient, so it sits above the identity instead of
+// trailing it — where it used to read as the last fact about Miguel Torres rather
+// than as the way back to the list he came from.
+.identity__row {
   display: flex;
   align-items: center;
   gap: var(--space-4);
-  margin-bottom: var(--space-4);
+  margin-top: var(--space-5);
 }
 
 .identity__body {
@@ -80,15 +112,20 @@
 }
 
 // Scope note at the foot of a record page — what is deliberately not shown.
+// `margin: 0` rather than a top margin: the page host's `gap` already separates
+// it from the card above, and a margin on top of a gap would open a second,
+// different-sized space there.
 .footnote {
-  margin: var(--space-3) 0 0;
+  margin: 0;
   font-size: var(--font-size-small);
   line-height: var(--line-height-small);
   color: var(--color-text-muted);
 }
 
 @media (max-width: 639px) {
-  .identity {
+  // The avatar keeps its own line and the name drops below it, rather than the
+  // two being squeezed until the name wraps mid-word.
+  .identity__row {
     flex-wrap: wrap;
   }
 

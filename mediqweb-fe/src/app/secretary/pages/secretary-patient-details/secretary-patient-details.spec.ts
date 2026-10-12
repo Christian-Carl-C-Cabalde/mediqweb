@@ -155,6 +155,35 @@ describe('SecretaryPatientDetails', () => {
     expect(href?.getAttribute('href')).toBe('/secretary/patients');
   });
 
+  it('puts the way back above the name, not below it', async () => {
+    // It is the one thing on the page that is about leaving rather than about the
+    // patient, so it leads the card. Trailing it read as the last fact about this
+    // person rather than as the way back to the list they came from.
+    await open('pat-205');
+    const host = (fixture.nativeElement as HTMLElement).querySelector('ui-card.identity')!;
+    const kids = [...host.querySelector('.ui-card__body')!.children];
+
+    expect(kids[0].classList).toContain('link-button');
+    expect(kids[1].classList).toContain('identity__row');
+    expect(host.textContent!.indexOf('Back to patients')).toBeLessThan(
+      host.textContent!.indexOf('Miguel Torres'),
+    );
+  });
+
+  it('puts the avatar and the name in one row, inside the card body', async () => {
+    // The flex rules live on `.identity__row` because `.identity` sits on the
+    // card's host, which is already the flex container — a row declared on the
+    // host has the card as its only flex child and never reaches the avatar, so
+    // the banner silently falls back to stacked blocks. Nothing about that looks
+    // broken; it just stops being a row. Asserted structurally because the
+    // computed layout cannot be read here.
+    await open('pat-205');
+    const row = (fixture.nativeElement as HTMLElement).querySelector('.identity__row')!;
+    expect(row).not.toBeNull();
+    expect(row.querySelector('ui-avatar')).not.toBeNull();
+    expect(row.querySelector('.identity__name')).not.toBeNull();
+  });
+
   it('reports an id that matches nobody instead of rendering a blank page', async () => {
     await open('pat-999');
     expect(text()).toContain('Patient not found');

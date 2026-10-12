@@ -128,6 +128,39 @@ describe('DoctorPatientDetails', () => {
     expect(href?.getAttribute('href')).toBe('/doctor/patients');
   });
 
+  it('puts the way back above the name, not below it', async () => {
+    // The same banner the Secretary's patient page uses, so both record pages
+    // lead with the way back and neither trails it as if it were a fact about
+    // the patient.
+    await open('pat-101');
+    const host = (fixture.nativeElement as HTMLElement).querySelector('ui-card.identity')!;
+    const kids = [...host.querySelector('.ui-card__body')!.children];
+
+    expect(kids[0].classList).toContain('link-button');
+    expect(kids[1].classList).toContain('identity__row');
+
+    // The name is read from the store rather than written out, so changing the
+    // fixture cannot leave the assertion quietly comparing the wrong two strings.
+    const name = session.patientName('pat-101');
+    expect(host.textContent!.indexOf('Back to patients')).toBeLessThan(
+      host.textContent!.indexOf(name),
+    );
+  });
+
+  it('puts the avatar and the name in one row, inside the card body', async () => {
+    // The flex rules have to sit on `.identity__row`: `.identity` is the card
+    // host, which is already the flex container, so a row declared on the host
+    // has the card as its only flex child and never reaches the avatar. The
+    // banner then falls back to stacked blocks — which does not look broken, it
+    // just stops being a row. Asserted structurally because the computed layout
+    // cannot be read here.
+    await open('pat-101');
+    const row = (fixture.nativeElement as HTMLElement).querySelector('.identity__row')!;
+    expect(row).not.toBeNull();
+    expect(row.querySelector('ui-avatar')).not.toBeNull();
+    expect(row.querySelector('.identity__name')).not.toBeNull();
+  });
+
   it('reports an id that matches nobody instead of rendering a blank page', async () => {
     await open('pat-999');
     expect(text()).toContain('Patient not found');
