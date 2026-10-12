@@ -425,6 +425,12 @@ function atOpen(doctorId: string, daysFromToday: number, minutesAfterOpen = 0): 
  * all have more than one provider in them. Times come from `atOpen`, so every
  * one sits inside the hours that doctor published — the booking rules can then be
  * demonstrated without the fixtures arguing with them.
+ *
+ * The closed rows deliberately cover all three of completed, cancelled and
+ * no-show on the *assigned* doctor's desk. The Appointment History page shows
+ * exactly those, and a desk seeded with only two of the three would make a
+ * working filter look broken — the same reason the weekly schedule fixtures are
+ * split days rather than single blocks.
  */
 export const MOCK_APPOINTMENTS: readonly Appointment[] = [
   // ---- Past, already closed out
@@ -472,6 +478,15 @@ export const MOCK_APPOINTMENTS: readonly Appointment[] = [
     durationMinutes: 30,
     status: 'completed',
     reason: 'Childhood immunization check',
+  },
+  {
+    id: 'appt-226',
+    patientId: 'pat-205',
+    doctorId: 'doc-003',
+    startsAt: atOpen('doc-003', -3, 60),
+    durationMinutes: 30,
+    status: 'no-show',
+    reason: 'Physiotherapy review',
   },
   {
     id: 'appt-206',
