@@ -80,7 +80,7 @@ export interface Patient {
 /** A patient plus the visit figures the list and dashboard need. */
 export interface PatientSummary {
   readonly patient: Patient;
-  /** Most recent past appointment with the signed-in doctor, cancelled included. */
+  /** Most recent past appointment with the signed-in doctor, cancelled excluded. */
   readonly lastVisit: Appointment | null;
   /** Next appointment that has not been cancelled, ignoring `no-show`. */
   readonly nextVisit: Appointment | null;

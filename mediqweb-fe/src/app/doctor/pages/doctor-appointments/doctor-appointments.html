@@ -20,7 +20,7 @@
     [columns]="columns"
     [rows]="appointments()"
     rowKey="id"
-    [caption]="openCount() + ' of ' + totalCount() + ' appointments still to happen'"
+    [caption]="caption()"
     [emptyMessage]="
       query() || statusFilter() !== 'all'
         ? 'No appointments match your filters.'
@@ -74,5 +74,7 @@
 <p class="row-footnote">
   A Secretary at the front desk confirms an appointment and calls it off; only then can you record
   what happened — complete if the visit went ahead, no-show if the patient was not there in the
-  booked time.
+  booked time. A visit you have recorded moves to
+  <a routerLink="/doctor/history">Visit History</a>, and an appointment the desk called off is kept
+  on the Secretary's record rather than yours.
 </p>

@@ -15,37 +15,47 @@ import {
   type DropdownItem,
   type TableColumn,
 } from '../../../shared/components';
-import { formatDuration } from '../../doctor.dates';
+import { formatDuration, plural } from '../../doctor.dates';
 import { DoctorSession } from '../../doctor-session';
 import { ToastService } from '../../../core/services/toast.service';
 import type { Appointment, AppointmentStatus, VisitOutcome } from '../../doctor.models';
 
-type StatusFilter = 'all' | AppointmentStatus;
+/**
+ * Only the two statuses that can appear here.
+ *
+ * Narrower than `AppointmentStatus` on purpose: the list holds what is still to
+ * happen, so offering "Completed", "No-show" or "Cancelled" in the filter would
+ * promise rows that are never rendered — a filter that can only ever return
+ * nothing is worse than no filter at all.
+ */
+type StatusFilter = 'all' | Extract<AppointmentStatus, 'booked' | 'confirmed'>;
 
 const STATUS_ITEMS: DropdownItem[] = [
   { id: 'all', label: 'All statuses' },
   { id: 'booked', label: 'Booked' },
   { id: 'confirmed', label: 'Confirmed' },
-  { id: 'completed', label: 'Completed' },
-  { id: 'cancelled', label: 'Cancelled' },
-  { id: 'no-show', label: 'No-show' },
 ];
 
 /**
  * The doctor's appointment list.
  *
- * Reading the diary and recording what happened at it. Two actions, and the page
- * is built around how few they are: mark a visit **complete**, or record a
- * **no-show** for a patient who was not there in the booked time. Both say what
- * occurred, and neither is available until the appointment has been confirmed —
- * because the front desk confirms first, and a doctor recording an outcome on a
- * booking nobody approved would skip that step rather than describe anything.
+ * The working list: what is still to happen, and the place to say what happened at
+ * it. Two actions, and the page is built around how few they are — mark a visit
+ * **complete**, or record a **no-show** for a patient who was not there in the
+ * booked time. Both say what occurred, and neither is available until the
+ * appointment has been confirmed, because the front desk confirms first and a
+ * doctor recording an outcome on a booking nobody approved would skip that step
+ * rather than describe anything.
+ *
+ * Nothing that is already finished is listed here. A recorded visit moves to the
+ * History page, and a cancelled appointment is not this doctor's record at all —
+ * calling one off is the Secretary's decision and their history holds it. Twelve
+ * finished rows above the nine that needed doing was the reason this page was
+ * opened to be checked, and none of them needed checking.
  *
  * Everything else in the lifecycle is absent on purpose, and it is the store that
  * refuses it rather than the template that hides it. A doctor cannot approve their
- * own booking — that is the Secretary's, and it means the patient said they were
- * coming — cannot cancel one, which is an administrative decision about a booking
- * rather than a record of a consultation, and cannot create or move one. See
+ * own booking, cannot cancel one, and cannot create or move one. See
  * `DoctorSession.recordOutcome`, which is the only lever the store offers.
  */
 @Component({
@@ -88,7 +98,10 @@ export class DoctorAppointments {
   protected readonly appointments = computed(() => {
     const term = this.query().trim().toLowerCase();
     const status = this.statusFilter();
-    return this.session.appointments().filter((appointment) => {
+    // `openAppointments`, not `appointments`: this page is the working list, and a
+    // visit already recorded belongs on the History page rather than above the
+    // rows that still need something done.
+    return this.session.openAppointments().filter((appointment) => {
       if (status !== 'all' && appointment.status !== status) return false;
       if (!term) return true;
       // Search by the patient's name as well as the reason, otherwise typing
@@ -100,14 +113,23 @@ export class DoctorAppointments {
     });
   });
 
-  protected readonly totalCount = computed(() => this.session.appointments().length);
-
-  /** Still expected to happen: booked or confirmed, cancelled ones excluded. */
-  protected readonly openCount = computed(
-    () =>
-      this.session.appointments().filter((a) => a.status === 'booked' || a.status === 'confirmed')
-        .length,
-  );
+  /**
+   * One line describing the list.
+   *
+   * Was "9 of 16 appointments still to happen", which compared the open count
+   * against every appointment the doctor had ever had — including the ones this
+   * page no longer lists. Comparing the open count to the open count would only
+   * trade "9 of 16" for "9 of 9", so the second number now appears only when a
+   * filter is actually in play, where it says how much of the list is on screen
+   * rather than restating it.
+   */
+  protected readonly caption = computed(() => {
+    const total = this.session.openAppointments().length;
+    const shown = this.appointments().length;
+    const filtered = this.query().trim() !== '' || this.statusFilter() !== 'all';
+    const noun = plural(total, 'appointment');
+    return filtered ? `${shown} of ${noun} still to happen` : `${noun} still to happen`;
+  });
 
   protected onStatusFilterChange(item: DropdownItem): void {
     this.statusFilter.set(item.id as StatusFilter);

@@ -125,13 +125,29 @@ export class DoctorSession {
       .sort(byStart),
   );
 
-  /** Today's list, cancelled appointments dropped so the day reads as a plan. */
+  /**
+   * The appointments still to happen: booked and confirmed, soonest first.
+   *
+   * The Doctor area's working list, and deliberately the *only* one. A visit this
+   * doctor has already recorded is a fact about the past and belongs on
+   * `visitHistory`; a cancelled appointment is not the doctor's record at all,
+   * because calling one off is the Secretary's decision and their history holds
+   * it. Listing all three together put twelve finished rows above the nine that
+   * needed something done, and the finished ones were never the reason anyone
+   * opened the page.
+   *
+   * `LIVE_STATUSES` rather than a hand-written pair, so this stays "not finished"
+   * as statuses are added instead of quietly dropping the next one.
+   */
+  readonly openAppointments = computed(() =>
+    this.appointments().filter((appointment) => LIVE_STATUSES.includes(appointment.status)),
+  );
+
+  /** Today's slice of the working list, so the day reads as a plan. */
   readonly todaysAppointments = computed(() => {
     const now = this.now();
-    return this.appointments().filter(
-      (appointment) =>
-        isSameDay(new Date(appointment.startsAt), now) &&
-        !CLOSED_STATUSES.includes(appointment.status),
+    return this.openAppointments().filter((appointment) =>
+      isSameDay(new Date(appointment.startsAt), now),
     );
   });
 
@@ -184,6 +200,12 @@ export class DoctorSession {
    *
    * Derived from the appointments rather than read from `patientState`
    * directly, which is what keeps an unrelated patient out of the list.
+   *
+   * `lastVisit` skips cancellations, on the same rule as `visitHistory`: the
+   * column is headed "Last visit" and the date beside it is read as a day this
+   * doctor saw somebody. A booking the front desk called off was nobody being
+   * seen, so showing its date there would have the column answer a question
+   * about consultations with the answer from the appointment book.
    */
   readonly patients = computed<PatientSummary[]>(() => {
     const mine = this.appointments();
@@ -197,7 +219,8 @@ export class DoctorSession {
         if (!history.length) return null;
 
         const past = history.filter(
-          (appointment) => new Date(appointment.startsAt).getTime() < now,
+          (appointment) =>
+            appointment.status !== 'cancelled' && new Date(appointment.startsAt).getTime() < now,
         );
         const future = history.filter(
           (appointment) =>
@@ -257,9 +280,20 @@ export class DoctorSession {
     return known ? this.patientById(id) : null;
   }
 
-  /** A patient's appointments with this doctor, soonest first. */
+  /**
+   * A patient's appointments with this doctor, soonest first.
+   *
+   * Cancellations are dropped, on the same rule as the working list: calling an
+   * appointment off is the Secretary's decision and it lives on their history, so
+   * this doctor's record of a patient is what happened at the visits and what is
+   * still booked — not what the front desk called off. A patient page that showed
+   * cancellations while the Appointments page did not would make the same record
+   * mean two different things depending on where it was read.
+   */
   appointmentsForPatient(patientId: string): Appointment[] {
-    return this.appointments().filter((appointment) => appointment.patientId === patientId);
+    return this.appointments().filter(
+      (appointment) => appointment.patientId === patientId && appointment.status !== 'cancelled',
+    );
   }
 
   /** Name for a table cell, so a missing patient never renders as `undefined`. */
