@@ -96,7 +96,21 @@ export class StaffLogin {
       // The gateway returns the role and deliberately does not choose a
       // destination; routing on it is this page's decision, so a second entry
       // point could send the same result somewhere else.
-      await this.router.navigate(['/', role, 'dashboard']);
+      //
+      // Navigation carries its own catch rather than sharing the one below. It
+      // used to sit inside this `try`, so a redirect that failed was reported as
+      // a rejected sign-in — telling the user their email or password was wrong
+      // when the gateway had just accepted it. That is the one thing they are
+      // not, and it sends them off to retype a password that was fine.
+      //
+      // The wording stays silent on whether a session now exists: `AuthGateway`
+      // holds none today, and the real one may. This page cannot know, so it
+      // does not claim either way.
+      try {
+        await this.router.navigate(['/', role, 'dashboard']);
+      } catch {
+        this.authError.set('We could not open your workspace. Please try again.');
+      }
     } catch (error) {
       this.authError.set(
         error instanceof Error ? error.message : 'We could not sign you in. Please try again.',
