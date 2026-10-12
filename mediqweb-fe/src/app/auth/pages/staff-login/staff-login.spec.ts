@@ -82,6 +82,21 @@ describe('StaffLogin', () => {
     fixture.detectChanges();
   };
 
+  /**
+   * Drains everything a resolved sign-in sets off.
+   *
+   * `whenStable` alone is not enough once the gateway resolves: the continuation
+   * calls `navigate`, and *its* rejection is a further microtask before the
+   * catch runs. Yielding to a macrotask empties the whole queue, so the test is
+   * asserting on a page that has actually finished rather than one caught
+   * between two ticks.
+   */
+  const settle = async () => {
+    await fixture.whenStable();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    fixture.detectChanges();
+  };
+
   it('renders the MediQ brand and a single sign-in heading', () => {
     expect(query('ui-brand')).toBeTruthy();
     expect(query('h1').textContent?.trim()).toBe('Sign in');
@@ -220,6 +235,62 @@ describe('StaffLogin', () => {
     await fixture.whenStable();
 
     expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it('does not blame the credentials when the workspace fails to open', async () => {
+    // The gateway accepted these credentials; only the redirect failed. Telling
+    // the user their email or password is wrong sends them off to retype a
+    // password that worked — the single most misleading thing this page could
+    // say. Reachable in practice: every staff route is a lazy chunk, so a deploy
+    // that replaces a chunk under an open tab fails the navigation.
+    vi.spyOn(router, 'navigate').mockRejectedValue(new Error('Failed to fetch chunk'));
+    type('identifier', 'secretary');
+    type('password', '123123');
+    await submit();
+    resolveSignIn!('secretary');
+    await settle();
+
+    const alert = query('.login__alert');
+    expect(alert.textContent).toContain('could not open your workspace');
+    expect(alert.textContent).not.toContain('incorrect');
+    expect(alert.textContent).not.toContain('could not sign you in');
+  });
+
+  it('says nothing about a session when the redirect fails', async () => {
+    // `AuthGateway` stores nothing today and the real one may store a token, so
+    // the page cannot claim the user is signed in — or not. Asserted because the
+    // tempting wording ("you are signed in, but…") would be true of the API and
+    // false of the scaffolding sitting behind it.
+    vi.spyOn(router, 'navigate').mockRejectedValue(new Error('Failed to fetch chunk'));
+    type('identifier', 'secretary');
+    type('password', '123123');
+    await submit();
+    resolveSignIn!('secretary');
+    await settle();
+
+    const text = query('.login__alert').textContent?.toLowerCase() ?? '';
+    expect(text).not.toContain('signed in');
+    expect(text).not.toContain('session');
+    expect(text).not.toContain('logged in');
+  });
+
+  it('releases the button when the redirect fails', async () => {
+    // Otherwise the form sticks on a spinner with no way forward except a
+    // reload, which is the one recovery the user cannot see they need.
+    vi.spyOn(router, 'navigate').mockRejectedValue(new Error('Failed to fetch chunk'));
+    type('identifier', 'secretary');
+    type('password', '123123');
+    await submit();
+    resolveSignIn!('secretary');
+    await settle();
+
+    const button = query<HTMLButtonElement>('ui-button button');
+    expect(button.disabled).toBe(false);
+    // `[attr.aria-busy]="loading()"` binds the boolean, so an idle button carries
+    // the string "false" rather than dropping the attribute — asserting on the
+    // value, not on its presence.
+    expect(button.getAttribute('aria-busy')).toBe('false');
+    expect(query('ui-button ui-spinner')).toBeFalsy();
   });
 
   it('prints the sample accounts, labelled as scaffolding', () => {
