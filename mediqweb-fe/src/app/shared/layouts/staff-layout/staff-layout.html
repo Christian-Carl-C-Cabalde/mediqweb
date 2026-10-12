@@ -75,7 +75,7 @@
         </nav>
       }
 
-      <div class="shell__title-row">
+      <div class="shell__title-row" [class.shell__title-row--untitled]="!hasTitle()">
         @if (pageTitle(); as title) {
           <h1 class="shell__title">{{ title }}</h1>
         }

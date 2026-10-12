@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Avatar, Brand, Button, Modal } from '../../components';
 import { StaffNav } from '../staff-nav/staff-nav';
@@ -58,6 +58,24 @@ export class StaffLayout {
   protected readonly navOpen = signal(false);
   protected readonly logoutConfirmOpen = signal(false);
   protected readonly mainId = `staff-main-${++nextId}`;
+
+  /**
+   * Whether the page declared a heading of its own.
+   *
+   * The row's dead space used to be removed in CSS with
+   * `:not(:has(.shell__title)):not(:has(.shell__actions > *))`. That matches in a
+   * browser and cannot be asserted: jsdom's `:has()` support is unreliable, and
+   * the shell's only guarantee about not leaving a dead band above a heading-less
+   * page was resting on a selector that failed roughly one full run in six.
+   *
+   * Dropping the row's bottom margin says the same thing and needs nothing beyond
+   * a boolean. The row is not hidden outright, because a page may project an
+   * action and no title — the row is what holds that action, so it has to stay.
+   * With no title and no action the actions wrapper is already `:empty` and
+   * collapses to nothing, leaving an empty row that neither takes height nor
+   * margin.
+   */
+  protected readonly hasTitle = computed(() => Boolean(this.pageTitle()));
 
   protected onNavSelected(item: StaffNavItem): void {
     this.navSelected.emit(item);

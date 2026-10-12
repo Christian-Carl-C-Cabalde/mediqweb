@@ -214,10 +214,18 @@ $sidebar-breakpoint: 1024px;
 
 // A page may declare no heading, in which case this row has nothing to show but
 // still owns a `margin-bottom` — which would leave a band of dead space above the
-// page. `:empty` cannot express that, because the actions wrapper is always in the
-// DOM even when it collapses, so the check is for a heading or a projected action.
-.shell__title-row:not(:has(.shell__title)):not(:has(.shell__actions > *)) {
-  display: none;
+// page.
+//
+// The margin is dropped rather than the row hidden. `:empty` cannot express the
+// condition, because the actions wrapper is always in the DOM even when it
+// collapses, and `:has()` works in a browser but cannot be asserted, since jsdom
+// matches it unreliably. Hiding the row outright would also be wrong: a page may
+// project an action and no title, and this row is what holds that action.
+//
+// With no title and no action the wrapper is `:empty` above and collapses to
+// nothing, so the row is left taking neither height nor margin.
+.shell__title-row--untitled {
+  margin-bottom: 0;
 }
 
 // ---------------------------------------------------------------------------
