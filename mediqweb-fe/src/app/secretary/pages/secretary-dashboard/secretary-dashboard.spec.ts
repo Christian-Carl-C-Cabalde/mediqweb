@@ -1,7 +1,7 @@
 import { type ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { MOCK_APPOINTMENTS } from '../../secretary.mock-data';
 import { SecretarySession } from '../../secretary-session';
+import { pinToDeskDay } from '../../secretary.spec-helpers';
 import { SecretaryDashboard } from './secretary-dashboard';
 
 describe('SecretaryDashboard', () => {
@@ -16,19 +16,11 @@ describe('SecretaryDashboard', () => {
       providers: [SecretarySession, provideRouter([])],
     });
     session = TestBed.inject(SecretarySession);
-    const today = MOCK_APPOINTMENTS.find((a) => a.startsAt.slice(0, 10) === dayKeyNow());
-    session.now.set(new Date(today?.startsAt ?? MOCK_APPOINTMENTS[0].startsAt));
+    pinToDeskDay(session);
     fixture = TestBed.createComponent(SecretaryDashboard);
     fixture.detectChanges();
     await fixture.whenStable();
   });
-
-  /** `YYYY-MM-DD` for today, matching the zone-less fixture format. */
-  function dayKeyNow(): string {
-    const now = new Date();
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-  }
 
   function page(): any {
     return fixture.componentInstance;

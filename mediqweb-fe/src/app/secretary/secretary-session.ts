@@ -25,8 +25,15 @@ import type {
   SecretaryProfile,
 } from './secretary.models';
 
-/** A status that ends an appointment's life, so it can no longer be acted on. */
-const CLOSED_STATUSES: readonly AppointmentStatus[] = ['completed', 'cancelled', 'no-show'];
+/**
+ * A status that ends an appointment's life, so it can no longer be acted on.
+ *
+ * Exported because it is the area's one answer to "is this finished", and every
+ * list that filters on it — the day plan, the desk history, the booking rules —
+ * would otherwise be free to spell out its own version and quietly fall behind
+ * when a status is added.
+ */
+export const CLOSED_STATUSES: readonly AppointmentStatus[] = ['completed', 'cancelled', 'no-show'];
 
 /** Statuses that mean the patient is expected to turn up. */
 const LIVE_STATUSES: readonly AppointmentStatus[] = ['booked', 'confirmed'];
