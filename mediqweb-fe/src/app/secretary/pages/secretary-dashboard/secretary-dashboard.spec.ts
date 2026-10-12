@@ -133,6 +133,22 @@ describe('SecretaryDashboard', () => {
     expect(page().awaitingCount()).toBe(before - 1);
   });
 
+  it('tags the agenda card so the shared empty state keeps its inset', () => {
+    // The card turns its own padding off so the rows' dividers run to the card
+    // edges. That leaves the empty state with nothing carrying the horizontal
+    // inset the heading has, so it sat flush against the card border. The shared
+    // partial insets it again through `.agenda-card` — and that rule reaches the
+    // card only if the template still carries the class, which nothing else would
+    // notice if it stopped.
+    const host = (fixture.nativeElement as HTMLElement).querySelector('ui-card.agenda-card');
+    expect(host).not.toBeNull();
+    // Asserted together because they are only related by accident: the tag is
+    // what carries the shared rule, and the padding being off is the reason it is
+    // needed. A card that grew its own padding would make the rule redundant and
+    // the test would say so rather than passing on the tag alone.
+    expect(host!.querySelector('.ui-card--padding-none')).not.toBeNull();
+  });
+
   it('points at the appointment list rather than hosting a booking form', () => {
     // Booking needs a patient, a doctor, a time and a reason — a screen of its
     // own. The dashboard offers the route to it, not a cut-down version.
