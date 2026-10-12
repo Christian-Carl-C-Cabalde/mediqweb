@@ -2,18 +2,6 @@
 
 @if (patient(); as person) {
   <ui-card padding="lg" class="identity">
-    <ui-avatar [name]="person.name" size="lg" />
-
-    <div class="identity__body">
-      <h2 class="identity__name">{{ person.name }}</h2>
-      <p class="identity__meta">
-        <span>Patient {{ person.id }}</span>
-        <ui-status-badge [tone]="statusTone(person.status)" size="sm" [dot]="true">
-          {{ person.status }} account
-        </ui-status-badge>
-      </p>
-    </div>
-
     <a class="link-button" routerLink="/doctor/patients">
       <svg
         viewBox="0 0 24 24"
@@ -30,6 +18,20 @@
       </svg>
       Back to patients
     </a>
+
+    <div class="identity__row">
+      <ui-avatar [name]="person.name" size="lg" />
+
+      <div class="identity__body">
+        <h2 class="identity__name">{{ person.name }}</h2>
+        <p class="identity__meta">
+          <span>Patient {{ person.id }}</span>
+          <ui-status-badge [tone]="statusTone(person.status)" size="sm" [dot]="true">
+            {{ person.status }} account
+          </ui-status-badge>
+        </p>
+      </div>
+    </div>
   </ui-card>
 
   <ui-detail-list heading="Patient information">
