@@ -45,8 +45,29 @@
   gap: var(--space-4);
 }
 
+// The analytics band under a dashboard's main row. Two columns so the charts
+// that compare categories pair up, collapsing to one at the sidebar breakpoint
+// below, where a half-width plot would leave neither the axis labels nor the bar
+// names room to sit.
+.charts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+}
+
+// A chart that needs the whole row — a fortnight of daily labels, a row of hour
+// columns — rather than half of one.
+.charts__wide {
+  grid-column: 1 / -1;
+}
+
+// Both grids collapse together, in one query rather than two, because this
+// partial is re-emitted into every dashboard's scoped stylesheet and each
+// repeated selector is paid for again in each of them.
 @media (max-width: 1023px) {
-  .dash {
+  .dash,
+  .charts {
     grid-template-columns: minmax(0, 1fr);
   }
 }
