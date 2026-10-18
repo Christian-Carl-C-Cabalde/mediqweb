@@ -47,6 +47,13 @@ describe('DoctorSchedule', () => {
     throw new Error(`no weekday ${weekday} within a week`);
   }
 
+  /** The `YYYY-MM-DD` a picker cell stands for, read from its own id. */
+  function cellKey(cell: HTMLElement): string {
+    // Ids are `${uid}-day-${key}`; the key is what comes after the last dash-run,
+    // so slicing on '-day-' rather than splitting keeps the uid out of it.
+    return cell.getAttribute('id')!.split('-day-')[1];
+  }
+
   /** Switches a weekly session on or off. */
   function setSession(day: number, session: number, on: boolean): void {
     page().sessionRow(day, session).get('enabled').setValue(on);
@@ -412,11 +419,73 @@ describe('DoctorSchedule', () => {
       // The reason this picker exists rather than the browser's: on a page whose
       // whole job is overriding dates, the first question is which nearby dates
       // have already been dealt with.
+      //
+      // Compared against the exceptions inside the month on screen, not against
+      // all of them. The grid shows one month at a time and the fixture dates are
+      // 9, 16 and 23 days out from whatever day the suite runs on, so from late
+      // in a month the exceptions fall into the following one and are not on
+      // screen. Counting them all made this fail on 343 of 730 days across 2026
+      // and 2027 while the picker behaved correctly throughout.
+      //
+      // On a month end the first month can hold none of them at all — every
+      // fixture lands in the next month — so this asserts that what IS on screen
+      // is marked, and makes no claim that anything is on screen. The next test
+      // is where "every exception is reachable and marked" is asserted.
       host().querySelector<HTMLButtonElement>('#dated-date')!.click();
       fixture.detectChanges();
-      const marked = [...host().querySelectorAll('.ui-date-picker__cell.is-marked')];
-      expect(marked.length).toBe(session.datedAvailability().length);
+
+      const onScreen = new Set(
+        [...host().querySelectorAll('.ui-date-picker__cell')].map((c) => cellKey(c as HTMLElement)),
+      );
+      const expected = session
+        .datedAvailability()
+        .map((e) => e.date)
+        .filter((date) => onScreen.has(date));
+
+      const marked = [...host().querySelectorAll('.ui-date-picker__cell.is-marked')].map((c) =>
+        cellKey(c as HTMLElement),
+      );
+      expect(marked.sort()).toEqual([...expected].sort());
       expect(page().markedDates()).toEqual(session.datedAvailability().map((e) => e.date));
+    });
+
+    it('reaches every exception by stepping the month, and marks it there', () => {
+      // The other half of the test above, and the one that holds on every day of
+      // the year: an exception the displayed month does not reach is not dropped,
+      // it is one click of the month arrow away. This is also what proves the
+      // first test is not passing vacuously — it compares against all of them.
+      host().querySelector<HTMLButtonElement>('#dated-date')!.click();
+      fixture.detectChanges();
+
+      const expected = session.datedAvailability().map((e) => e.date);
+      expect(expected.length).toBeGreaterThan(0);
+
+      const seen = new Set<string>();
+
+      // One step is enough for the fixtures' furthest date, and two is allowed so
+      // a fixture reaching further still gets its month opened rather than failing
+      // on a bound the test picked.
+      for (let step = 0; step < 3; step += 1) {
+        for (const date of session.datedAvailability().map((e) => e.date)) {
+          const cell = host().querySelector<HTMLElement>(
+            `[id$="-day-${date}"].ui-date-picker__cell`,
+          );
+          if (cell) expect(cell.classList.contains('is-marked')).toBe(true);
+        }
+
+        const marked = [...host().querySelectorAll('.ui-date-picker__cell.is-marked')].map((c) =>
+          cellKey(c as HTMLElement),
+        );
+        for (const date of marked) seen.add(date);
+        if (seen.size === expected.length) break;
+
+        host()
+          .querySelector<HTMLButtonElement>('.ui-date-picker__step[aria-label="Next month"]')!
+          .click();
+        fixture.detectChanges();
+      }
+
+      expect([...seen].sort()).toEqual([...expected].sort());
     });
 
     it('offers the same two sessions as the weekly form', () => {
