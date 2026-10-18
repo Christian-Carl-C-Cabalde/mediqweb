@@ -2,7 +2,10 @@ import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
+  BarChart,
   Card,
+  Heatmap,
+  LineChart,
   MockNotice,
   PieChart,
   StatCard,
@@ -10,6 +13,13 @@ import {
   type BadgeTone,
   type PieSlice,
 } from '../../../shared/components';
+import {
+  appointmentTrendSeries,
+  clinicHeatmap,
+  doctorWorkload,
+  registrationSeries,
+  REPORT_WINDOW_DAYS,
+} from '../../admin.analytics';
 import { AdminSession } from '../../admin-session';
 import type { AppointmentStatus, AuditSeverity } from '../../admin.models';
 
@@ -56,7 +66,17 @@ const LIFECYCLE: readonly { label: string; status: AppointmentStatus; tone: Badg
  */
 @Component({
   selector: 'app-admin-dashboard',
-  imports: [DatePipe, RouterLink, Card, StatCard, PieChart, MockNotice],
+  imports: [
+    DatePipe,
+    RouterLink,
+    BarChart,
+    Card,
+    Heatmap,
+    LineChart,
+    StatCard,
+    PieChart,
+    MockNotice,
+  ],
   templateUrl: './admin-dashboard.html',
   styleUrl: './admin-dashboard.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -64,12 +84,49 @@ const LIFECYCLE: readonly { label: string; status: AppointmentStatus; tone: Badg
 export class AdminDashboard {
   private readonly session = inject(AdminSession);
 
+  /**
+   * One clock for every chart on the page.
+   *
+   * Read once rather than inside each aggregation, so the four charts cannot
+   * disagree about what "today" is if a render happens to straddle midnight.
+   *
+   * There is no date-range filter above these charts. The two datasets they are
+   * built from do not share a time base: patients carry fixed dates spread over
+   * a year, appointments are relative to today and span a fortnight in total.
+   * One control over both would either drop a registration from a window too
+   * short for it or leave most of the appointment charts empty, and a filter
+   * that changes a chart's total by being moved is worse than no filter. Each
+   * chart's caption states the period it does cover.
+   */
+  private readonly now = new Date();
+
   protected readonly doctors = computed(() => this.session.activeDoctorCount());
   protected readonly secretaries = computed(() => this.session.activeSecretaryCount());
   protected readonly patients = computed(() => this.session.activePatientCount());
   protected readonly specializations = computed(() => this.session.specializations().length);
 
   protected readonly activity = computed(() => this.session.recentActivity());
+
+  /** How the reporting window reads in a caption, e.g. "last 14 days". */
+  protected readonly windowLabel = `last ${REPORT_WINDOW_DAYS} days`;
+
+  /** Registrations per calendar month, every month on record, zero-filled. */
+  protected readonly registrations = computed(() =>
+    registrationSeries(this.session.patients(), this.now),
+  );
+
+  /** Appointments per day across the reporting window. */
+  protected readonly trends = computed(() =>
+    appointmentTrendSeries(this.session.appointments(), this.now),
+  );
+
+  /** Appointments per weekday per booked hour, across the reporting window. */
+  protected readonly heatmap = computed(() => clinicHeatmap(this.session.appointments(), this.now));
+
+  /** Completed consultations per doctor, in the reporting window. */
+  protected readonly workload = computed(() =>
+    doctorWorkload(this.session.appointments(), this.session.doctors(), this.now),
+  );
 
   /**
    * The clinic's appointments, counted into the three stages the chart shows.

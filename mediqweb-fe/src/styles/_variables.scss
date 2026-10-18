@@ -29,6 +29,18 @@
   --color-info: #2563eb;
 
   // --------------------------------------------------------------------------
+  // Heatmap intensity ramp
+  // One hue in three steps, so a darker cell reads as "more of the same" rather
+  // than as a different kind of thing. The steps are the brand green blended
+  // over white, which is why the lightest sits so close to
+  // `--color-primary-light`. Text on `low` and `medium` is dark, on `high` is
+  // `--color-text-inverse`; all three pairs clear 4.5:1.
+  // --------------------------------------------------------------------------
+  --color-heat-low: #c6decc;
+  --color-heat-medium: #81b68f;
+  --color-heat-high: #1a7a33;
+
+  // --------------------------------------------------------------------------
   // Backgrounds
   // --------------------------------------------------------------------------
   --color-background: #f5f7f6;

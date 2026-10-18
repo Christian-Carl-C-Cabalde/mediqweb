@@ -39,6 +39,111 @@ describe('AdminDashboard', () => {
       .filter((appointment: any) => statuses.includes(appointment.status)).length;
   }
 
+  it('shows a card for each of the four analytics', () => {
+    for (const heading of [
+      'New patient registrations',
+      'Doctor consultation workload',
+      'Daily appointment trends',
+      'Busy periods',
+    ]) {
+      expect(text()).toContain(heading);
+    }
+  });
+
+  it('keeps the appointments pie chart it already had', () => {
+    expect((fixture.nativeElement as HTMLElement).querySelector('ui-pie-chart')).not.toBeNull();
+    expect(text()).toContain('Appointments');
+  });
+
+  it('counts registrations by month across every month on record', () => {
+    const series = page().registrations();
+    // The fixture's patients registered in six different months; the chart has
+    // a bar per month from the earliest of them through this one, so the total
+    // across the bars is every patient on file.
+    const total = series.reduce((sum: number, bar: { value: number }) => sum + bar.value, 0);
+    expect(total).toBe(session.patients().length);
+
+    // The last bar is this month, so the chart always reaches the reader's own
+    // "now" rather than stopping at the most recent registration.
+    const today = new Date();
+    const expectedLast = `${today.toLocaleString('en', { month: 'short' })} ${String(
+      today.getFullYear(),
+    ).slice(2)}`;
+    expect(series.at(-1).label).toBe(expectedLast);
+
+    // Gaps are drawn as gaps rather than closing up into a tidy climb.
+    expect(series.some((bar: { value: number }) => bar.value === 0)).toBe(true);
+  });
+
+  it('gives every appointment day in the window a bar, and totals to the charted appointments', () => {
+    const points = page().trends();
+    expect(points).toHaveLength(14);
+
+    const windowed = session.appointments().filter((appointment: any) => {
+      const day = appointment.startsAt.slice(0, 10);
+      const today = new Date();
+      const from = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 13);
+      const pad = (value: number) => String(value).padStart(2, '0');
+      const key = (date: Date) =>
+        `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+      return day >= key(from) && day <= key(today);
+    });
+    const charted = windowed.filter((appointment: any) =>
+      ['booked', 'confirmed', 'completed'].includes(appointment.status),
+    );
+
+    const total = points.reduce((sum: number, point: { value: number }) => sum + point.value, 0);
+    expect(total).toBe(charted.length);
+  });
+
+  it('counts the same appointments in the heatmap as the trend', () => {
+    expect(page().heatmap().total).toBe(
+      page()
+        .trends()
+        .reduce((sum: number, point: { value: number }) => sum + point.value, 0),
+    );
+  });
+
+  it('builds the heatmap as a grid of every weekday against the booked hours', () => {
+    const matrix = page().heatmap();
+    expect(matrix.days).toEqual(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
+    expect(matrix.slots.length).toBeGreaterThan(0);
+    expect(matrix.cells).toHaveLength(7 * matrix.slots.length);
+  });
+
+  it("states each chart's period, so two different scopes are not read as one", () => {
+    // The pie counts every appointment; the workload chart counts one reporting
+    // window. Their Finished slices can therefore differ, and today they happen
+    // to both read 5. A reader seeing only "By status" beside "Completed
+    // consultations, last 14 days" would take them as the same scope and
+    // conclude one chart was wrong, so each caption has to name its own.
+    const captions = [
+      ...(fixture.nativeElement as HTMLElement).querySelectorAll(
+        '.chart__caption, .heatmap__caption, .pie__caption',
+      ),
+    ].map((el) => el.textContent?.trim() ?? '');
+
+    // The pie's own caption, which is the one that would otherwise be silent.
+    expect(captions).toContain('By status, all appointments');
+    expect(captions.some((text) => text.includes('last 14 days'))).toBe(true);
+  });
+
+  it('lists every doctor by completed consultations, busiest first', () => {
+    const bars = page().workload();
+    expect(bars).toHaveLength(session.doctors().length);
+    expect(bars[0].label).toBe('Elena Vargas');
+
+    const counts = bars.map((bar: { value: number }) => bar.value);
+    expect([...counts].sort((a: number, b: number) => b - a)).toEqual(counts);
+
+    const completed = session
+      .appointments()
+      .filter((appointment: any) => appointment.status === 'completed');
+    expect(bars.reduce((sum: number, bar: { value: number }) => sum + bar.value, 0)).toBe(
+      completed.length,
+    );
+  });
+
   it('shows a card for each area of the Admin', () => {
     for (const label of ['Doctors', 'Secretaries', 'Patients', 'Specializations']) {
       expect(text()).toContain(label);
@@ -99,11 +204,11 @@ describe('AdminDashboard', () => {
   });
 
   it('draws the stages red, blue and green, in the order the work happens', () => {
-    expect(page().lifecycleSlices().map((slice: any) => slice.color)).toEqual([
-      BADGE_TONE_TOKEN.danger,
-      BADGE_TONE_TOKEN.info,
-      BADGE_TONE_TOKEN.success,
-    ]);
+    expect(
+      page()
+        .lifecycleSlices()
+        .map((slice: any) => slice.color),
+    ).toEqual([BADGE_TONE_TOKEN.danger, BADGE_TONE_TOKEN.info, BADGE_TONE_TOKEN.success]);
   });
 
   it('shows the chart in its own Appointments card beside the activity list', () => {

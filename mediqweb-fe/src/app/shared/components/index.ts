@@ -43,6 +43,13 @@ export {
 export { Table, type TableColumn, type TableSort, type SortDirection } from './table/table';
 export { TableCell } from './table/table-cell';
 export { PieChart, type PieSlice } from './pie-chart/pie-chart';
+// The dashboard's charts. Grouped under `charts/` rather than beside
+// `pie-chart`, which shipped first and is left exactly as it was: these share
+// one set of chart.js registrations and canvas plumbing, and a folder is what
+// makes that sharing visible.
+export { BarChart, type BarOrientation, type ChartBar } from './charts/bar-chart/bar-chart';
+export { Heatmap, type HeatmapCell, type HeatmapMatrix } from './charts/heatmap/heatmap';
+export { LineChart, type LinePoint } from './charts/line-chart/line-chart';
 
 // Shared by every staff area that reads a staff or patient record: the same
 // fact/value grid, and one place that decides how an appointment status looks,
