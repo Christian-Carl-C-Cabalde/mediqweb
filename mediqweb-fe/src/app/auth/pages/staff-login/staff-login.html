@@ -125,15 +125,8 @@
   </div>
 </main>
 
-<ui-modal
-  [open]="forgotPasswordOpen()"
-  title="Forgot your password?"
-  size="sm"
-  (closed)="closeForgotPassword()"
->
-  <p>
-    MediQ staff accounts are created by an administrator, so password resets are handled by your
-    clinic administrator rather than by email.
-  </p>
-  <p>Contact them to have your password reset, then return here to sign in.</p>
-</ui-modal>
+<!-- The reset flow lives in its own component; this page only owns whether it
+     is open. Replacing the old "contact your administrator" note: staff accounts
+     here are mock fixtures, so a local reset flow is demonstrable, and the
+     dialog says plainly that no email is sent. -->
+<app-forgot-password [open]="forgotPasswordOpen()" (closed)="forgotPasswordOpen.set(false)" />

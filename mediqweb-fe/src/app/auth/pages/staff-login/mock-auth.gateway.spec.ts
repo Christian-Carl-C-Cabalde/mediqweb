@@ -1,7 +1,14 @@
+import {
+  resetStoredPasswords,
+  storePassword,
+} from '../../../core/services/password-store';
 import { MOCK_STAFF_ACCOUNTS, MockAuthGateway } from './mock-auth.gateway';
 
 describe('MockAuthGateway', () => {
   const gateway = new MockAuthGateway();
+
+  // The password store is module-scoped, so it outlives every test in this file.
+  beforeEach(() => resetStoredPasswords());
 
   const attempt = (identifier: string, password: string) =>
     gateway.signIn({ identifier, password });
@@ -54,5 +61,37 @@ describe('MockAuthGateway', () => {
     expect(shared).toBe(true);
 
     await expect(attempt('doctor', `${passwords[0]}4`)).rejects.toThrow();
+  });
+
+  describe('after a password change', () => {
+    it('accepts the new password', async () => {
+      const doctor = MOCK_STAFF_ACCOUNTS.find((account) => account.role === 'doctor')!;
+      storePassword(doctor.accountId, 'clinic-portal-2026');
+
+      await expect(attempt('doctor', 'clinic-portal-2026')).resolves.toBe('doctor');
+    });
+
+    it('stops accepting the old one', async () => {
+      // A reset that reports success and leaves the previous password working
+      // would be the one outcome that makes the whole feature a lie.
+      const doctor = MOCK_STAFF_ACCOUNTS.find((account) => account.role === 'doctor')!;
+      storePassword(doctor.accountId, 'clinic-portal-2026');
+
+      await expect(attempt('doctor', '123123')).rejects.toThrow(
+        'Email or password is incorrect.',
+      );
+    });
+
+    it('leaves the other accounts alone', async () => {
+      const doctor = MOCK_STAFF_ACCOUNTS.find((account) => account.role === 'doctor')!;
+      storePassword(doctor.accountId, 'clinic-portal-2026');
+
+      await expect(attempt('secretary', '123123')).resolves.toBe('secretary');
+      await expect(attempt('admin', '123123')).resolves.toBe('admin');
+    });
+
+    it('is unaffected for an account that was never changed', async () => {
+      await expect(attempt('doctor', '123123')).resolves.toBe('doctor');
+    });
   });
 });

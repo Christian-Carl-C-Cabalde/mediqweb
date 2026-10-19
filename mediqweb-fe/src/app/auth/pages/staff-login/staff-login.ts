@@ -5,10 +5,10 @@ import {
   Brand,
   Button,
   FormField,
-  Modal,
   SampleAccounts,
   type SampleAccount,
 } from '../../../shared/components';
+import { ForgotPassword } from '../../components/forgot-password/forgot-password';
 import { AUTH_GATEWAY } from './auth.gateway';
 import { emailOrUsername } from './staff-login.validators';
 import { MOCK_STAFF_ACCOUNTS, MockAuthGateway } from './mock-auth.gateway';
@@ -25,7 +25,7 @@ import { MOCK_STAFF_ACCOUNTS, MockAuthGateway } from './mock-auth.gateway';
  */
 @Component({
   selector: 'app-staff-login',
-  imports: [ReactiveFormsModule, Brand, Button, FormField, Modal, SampleAccounts],
+  imports: [ReactiveFormsModule, Brand, Button, FormField, ForgotPassword, SampleAccounts],
   templateUrl: './staff-login.html',
   styleUrl: './staff-login.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

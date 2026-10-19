@@ -1,8 +1,16 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
+import { PasswordManagementService } from '../../../core/services/password-management.service';
+import {
+  resetStoredPasswords,
+  storedPassword,
+} from '../../../core/services/password-store';
 import { StaffLogin } from './staff-login';
 import { AUTH_GATEWAY, AuthGateway, StaffCredentials, StaffRole } from './auth.gateway';
+import { MockAuthGateway } from './mock-auth.gateway';
 import { emailOrUsername } from './staff-login.validators';
+
+const GOOD = 'clinic-portal-2026';
 
 describe('emailOrUsername', () => {
   const run = (value: string) => emailOrUsername({ value } as never);
@@ -192,7 +200,7 @@ describe('StaffLogin', () => {
     expect(submitted).toHaveLength(2);
   });
 
-  it('opens the forgot-password dialog with administrator guidance', async () => {
+  it('opens the forgot-password dialog as a reset flow', async () => {
     const link = queryAll('.login__link')[0];
     link.click();
     fixture.detectChanges();
@@ -201,7 +209,14 @@ describe('StaffLogin', () => {
 
     const dialog = query<HTMLDialogElement>('dialog');
     expect(dialog.hasAttribute('open')).toBe(true);
-    expect(dialog.textContent).toContain('created by an administrator');
+    // Replaces the old "contact your administrator" note: the link now starts a
+    // real reset flow, so the first thing it must offer is an address to send a
+    // code to.
+    expect(dialog.textContent).toContain('Forgot your password?');
+    expect(dialog.textContent).toContain('receive a verification code');
+    expect(dialog.textContent).toContain('Send verification code');
+    expect(dialog.textContent).toContain('Back to sign in');
+    expect(query<HTMLInputElement>('#forgot-password-email')).toBeTruthy();
   });
 
   it('assists the identifier and password fields', () => {
@@ -310,5 +325,120 @@ describe('StaffLogin', () => {
     const heading = query<HTMLHeadingElement>('.samples__heading');
     expect(heading.tagName).toBe('H2');
     expect(section.getAttribute('aria-labelledby')).toBe(heading.id);
+  });
+});
+
+/**
+ * The reset flow driven through the real gateway.
+ *
+ * The block above stubs `AUTH_GATEWAY` so sign-in can be resolved by hand, which
+ * is the wrong tool for "does a reset actually change the password". This one uses
+ * the mock gateway itself, so the round trip is real: request a code, verify it,
+ * reset, then sign in with the new password.
+ */
+describe('StaffLogin password reset, end to end', () => {
+  let fixture: ComponentFixture<StaffLogin>;
+  let passwords: PasswordManagementService;
+
+  const host = () => fixture.nativeElement as HTMLElement;
+  const dialog = () => host().querySelector('dialog') as HTMLDialogElement;
+
+  beforeEach(async () => {
+    resetStoredPasswords();
+    await TestBed.configureTestingModule({
+      imports: [StaffLogin],
+      providers: [provideRouter([])],
+    }).compileComponents();
+
+    passwords = TestBed.inject(PasswordManagementService);
+    fixture = TestBed.createComponent(StaffLogin);
+    fixture.detectChanges();
+    await fixture.whenStable();
+  });
+
+  const click = (label: string) => {
+    const button = [...host().querySelectorAll('button')]
+      .map((el) => el as HTMLButtonElement)
+      .find((el) => (el.textContent ?? '').trim().includes(label));
+    expect(button, `no button labelled "${label}"`).toBeTruthy();
+    button!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    fixture.detectChanges();
+  };
+
+  const settle = async () => {
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+  };
+
+  const flow = () => fixture.debugElement.children
+    .map((child) => child.componentInstance)
+    .find((instance) => instance && typeof instance.requestCode === 'function') as any;
+
+  it('resets the password and signs in with it', async () => {
+    // Open the reset dialog from the link below the password field.
+    const link = host().querySelector<HTMLButtonElement>('.login__link')!;
+    link.click();
+    await settle();
+    expect(dialog().hasAttribute('open')).toBe(true);
+
+    // Ask for a code.
+    const f = flow();
+    f.emailForm.controls.email.setValue('rafael.santos@mediq.ph');
+    f.emailForm.controls.email.markAsTouched();
+    await settle();
+    click('Send verification code');
+    await settle();
+
+    // Verify the code the service actually issued.
+    f.verifyCode(passwords.peekIssuedCode(f.challenge().challengeId) as string);
+    await settle();
+
+    // Set a new password.
+    f.passwordForm.setValue({ newPassword: GOOD, confirmPassword: GOOD });
+    await settle();
+    await f.resetPassword();
+    await settle();
+
+    expect(storedPassword('doc-002', 'original')).toBe(GOOD);
+
+    // "Return to sign in" goes back to the form, and the new password works.
+    click('Return to sign in');
+    await settle();
+    expect(dialog().hasAttribute('open')).toBe(false);
+
+    const identifier = host().querySelector<HTMLInputElement>('[formcontrolname="identifier"]')!;
+    const password = host().querySelector<HTMLInputElement>('[formcontrolname="password"]')!;
+    identifier.value = 'doctor';
+    identifier.dispatchEvent(new Event('input'));
+    password.value = GOOD;
+    password.dispatchEvent(new Event('input'));
+    await settle();
+
+    // The gateway is provided at component level rather than in the root injector,
+    // so it is reached the way the app reaches it.
+    await expect(new MockAuthGateway().signIn({ identifier: 'doctor', password: GOOD })).resolves.toBe(
+      'doctor',
+    );
+  });
+
+  it('does not sign the user in by itself', async () => {
+    const f = flow();
+    f.emailForm.controls.email.setValue('rafael.santos@mediq.ph');
+    f.emailForm.controls.email.markAsTouched();
+    await settle();
+    click('Send verification code');
+    await settle();
+    f.verifyCode(passwords.peekIssuedCode(f.challenge().challengeId) as string);
+    await settle();
+    f.passwordForm.setValue({ newPassword: GOOD, confirmPassword: GOOD });
+    await settle();
+    await f.resetPassword();
+    await settle();
+
+    // The dialog is showing a receipt, not a workspace: navigation only happens
+    // when the user submits the sign-in form.
+    expect(host().querySelector('.login__form')).toBeTruthy();
+    expect(TestBed.inject(Router).url).toBe('/');
   });
 });

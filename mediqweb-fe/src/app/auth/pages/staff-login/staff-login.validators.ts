@@ -16,3 +16,19 @@ export const emailOrUsername: ValidatorFn = (control: AbstractControl): Validati
   if (!value) return null;
   return EMAIL.test(value) || USERNAME.test(value) ? null : { emailOrUsername: true };
 };
+
+/**
+ * Email format, for the forgot-password field.
+ *
+ * Strictly an address, unlike `emailOrUsername` above: recovery is matched
+ * against a registered address, so accepting a username here would only ever
+ * produce a request that cannot succeed. Returns null for an empty value so
+ * `Validators.required` stays the single owner of "this field is blank".
+ */
+const EMAIL_ONLY = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+export const emailAddress: ValidatorFn = (control: AbstractControl): ValidationErrors | null => {
+  const value = String(control.value ?? '').trim();
+  if (!value) return null;
+  return EMAIL_ONLY.test(value) ? null : { emailAddress: true };
+};

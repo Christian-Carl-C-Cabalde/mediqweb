@@ -60,6 +60,15 @@ export { DetailList } from './detail-list/detail-list';
 // Overlays
 export { Modal, type ModalPlacement, type ModalSize } from './modal/modal';
 
+// Password management, shared by the signed-in "change password" dialog and the
+// login page's forgot-password flow so both apply the same policy, the same code
+// entry and the same reveal behaviour.
+export { OtpInput } from './otp-input/otp-input';
+export { PasswordFields } from './password-fields/password-fields';
+// Renders the Security card itself, so the Doctor and Secretary profiles each
+// get it by adding one element and pass their own signed-in account.
+export { ChangePassword } from './change-password/change-password';
+
 /**
  * Shared by every area because every area is currently backed by mock data.
  * The `area` input names the area so the wording does not drift.
