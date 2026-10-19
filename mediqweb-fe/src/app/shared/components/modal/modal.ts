@@ -93,9 +93,34 @@ export class Modal {
   /** Id for the description, so the dialog can point `aria-describedby` at it. */
   protected readonly descriptionId = `ui-modal-description-${++nextId}`;
 
+  /**
+   * Whether the current press began on the backdrop rather than on the panel.
+   *
+   * `null` means no press has been seen, which is the case for a programmatic
+   * click with no pointer involved.
+   */
+  private pressStartedOnBackdrop: boolean | null = null;
+
+  protected onPointerDown(event: Event): void {
+    this.pressStartedOnBackdrop = event.target === this.dialogRef()?.nativeElement;
+  }
+
   protected onBackdropClick(event: MouseEvent): void {
+    const dialog = this.dialogRef()?.nativeElement;
     // Clicks on the panel bubble here too; only the <dialog> itself is backdrop.
-    if (event.target !== this.dialogRef()?.nativeElement) return;
+    if (event.target !== dialog) return;
+
+    // The click's own target is not enough to go on. A drag that *starts* inside
+    // the panel — selecting a password, dragging out of the field — and is
+    // *released* over the backdrop produces a click whose target is the nearest
+    // common ancestor of the press and the release, which is the <dialog>. That
+    // made selecting text close the dialog mid-gesture. Requiring the press to
+    // have started on the backdrop too is what separates the two: a real
+    // backdrop click begins and ends there, and a selection begins on content.
+    const beganOnPanel = this.pressStartedOnBackdrop === false;
+    this.pressStartedOnBackdrop = null;
+    if (beganOnPanel) return;
+
     if (this.closeOnBackdrop()) this.close();
   }
 

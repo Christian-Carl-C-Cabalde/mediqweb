@@ -643,6 +643,107 @@ describe('MediQ shared components', () => {
       expect((fixture.nativeElement as HTMLElement).querySelector('.ui-modal__close')).toBeNull();
     });
 
+    /**
+     * Backdrop dismissal versus a text selection.
+     *
+     * The regression: `onBackdropClick` judged the click by its target alone. A
+     * drag that starts on the panel — selecting a password — and is released over
+     * the backdrop produces a click retargeted by the browser to the nearest
+     * common ancestor of press and release, which is the `<dialog>` itself. The
+     * modal read that as a backdrop click and closed mid-selection.
+     */
+    describe('backdrop dismissal', () => {
+      /** Builds an open modal whose panel body holds one focusable input. */
+      function open() {
+        const fixture = TestBed.createComponent(Modal);
+        fixture.componentRef.setInput('open', true);
+        fixture.detectChanges();
+
+        let count = 0;
+        fixture.componentInstance.closed.subscribe(() => count++);
+
+        const host = fixture.nativeElement as HTMLElement;
+        const dialog = host.querySelector('dialog') as HTMLDialogElement;
+        const body = host.querySelector('.ui-modal__body') as HTMLElement;
+        const input = document.createElement('input');
+        input.id = 'probe';
+        body.appendChild(input);
+
+        return { fixture, dialog, input, closedCount: () => count };
+      }
+
+      it('closes when the backdrop is both pressed and released', () => {
+        const { dialog, closedCount } = open();
+
+        dialog.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+        dialog.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+        expect(closedCount()).toBe(1);
+      });
+
+      it('does not close for a drag that starts on the panel and ends on the backdrop', () => {
+        const { dialog, input, closedCount } = open();
+
+        // The gesture that broke selecting a password.
+        input.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+        dialog.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+        dialog.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+        expect(closedCount()).toBe(0);
+      });
+
+      it('does not close for a click that starts and ends on the panel', () => {
+        const { dialog, input, closedCount } = open();
+
+        input.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+        input.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+        expect(closedCount()).toBe(0);
+      });
+
+      it('does not close when a control inside the panel is used', () => {
+        const { input, closedCount } = open();
+        const button = document.createElement('button');
+        button.type = 'button';
+        input.after(button);
+
+        button.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+        button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+        expect(closedCount()).toBe(0);
+      });
+
+      it('still closes on a later genuine backdrop click after a drag', () => {
+        // The drag must not leave the flag latched and disarm the backdrop.
+        const { dialog, input, closedCount } = open();
+
+        input.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+        dialog.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        expect(closedCount()).toBe(0);
+
+        dialog.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+        dialog.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        expect(closedCount()).toBe(1);
+      });
+
+      it('leaves a backdrop click alone when closeOnBackdrop is false', () => {
+        const fixture = TestBed.createComponent(Modal);
+        fixture.componentRef.setInput('open', true);
+        fixture.componentRef.setInput('closeOnBackdrop', false);
+        fixture.detectChanges();
+        let count = 0;
+        fixture.componentInstance.closed.subscribe(() => count++);
+        const dialog = (fixture.nativeElement as HTMLElement).querySelector(
+          'dialog',
+        ) as HTMLDialogElement;
+
+        dialog.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+        dialog.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+        expect(count).toBe(0);
+      });
+    });
+
     it('labels the dialog for assistive technology', () => {
       const fixture = TestBed.createComponent(Modal);
       fixture.componentRef.setInput('title', 'Confirm appointment');

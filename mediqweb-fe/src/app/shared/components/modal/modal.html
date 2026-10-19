@@ -3,6 +3,7 @@
   [class]="'ui-modal ui-modal--' + size() + ' ui-modal--at-' + placement()"
   [attr.aria-label]="title()"
   [attr.aria-describedby]="description() ? descriptionId : null"
+  (mousedown)="onPointerDown($event)"
   (click)="onBackdropClick($event)"
   (cancel)="onCancel($event)"
 >
