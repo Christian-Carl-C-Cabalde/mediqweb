@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import { storedPassword } from '../../../core/services/password-store';
 import { AuthGateway, StaffCredentials, StaffRole } from './auth.gateway';
 
 /** One sample staff account. */
@@ -6,6 +7,14 @@ interface MockAccount {
   readonly identifier: string;
   readonly password: string;
   readonly role: StaffRole;
+  /**
+   * The id the password service files this account's overrides under.
+   *
+   * Not the same as `identifier`: `doctor` is what a person types, `doc-002` is
+   * what the Doctor area's own session calls the signed-in doctor. Without this
+   * the two would never meet and a changed password would not affect sign-in.
+   */
+  readonly accountId: string;
 }
 
 /**
@@ -17,9 +26,9 @@ interface MockAccount {
  * of these must be deleted when the API branch lands — see `MockAuthGateway`.
  */
 export const MOCK_STAFF_ACCOUNTS: readonly MockAccount[] = [
-  { identifier: 'admin', password: '123123', role: 'admin' },
-  { identifier: 'doctor', password: '123123', role: 'doctor' },
-  { identifier: 'secretary', password: '123123', role: 'secretary' },
+  { identifier: 'admin', password: '123123', role: 'admin', accountId: 'admin-001' },
+  { identifier: 'doctor', password: '123123', role: 'doctor', accountId: 'doc-002' },
+  { identifier: 'secretary', password: '123123', role: 'secretary', accountId: 'sec-001' },
 ];
 
 /**
@@ -30,6 +39,11 @@ export const MOCK_STAFF_ACCOUNTS: readonly MockAccount[] = [
  * session: there is nothing to store, and the staff areas each keep their own
  * mock identity. **This whole file is scaffolding** — the real implementation
  * replaces it with an HTTP call and the accounts above disappear with it.
+ *
+ * A password changed through the profile's Security card or the login page's
+ * reset flow is accepted here, because a reset that then leaves the old password
+ * working would be the one outcome that makes the whole feature a lie. The
+ * replacement lives in memory for the session; a real gateway asks a server.
  */
 @Injectable()
 export class MockAuthGateway implements AuthGateway {
@@ -40,7 +54,10 @@ export class MockAuthGateway implements AuthGateway {
     const identifier = credentials.identifier.trim().toLowerCase();
     const account = MOCK_STAFF_ACCOUNTS.find(
       (candidate) =>
-        candidate.identifier === identifier && candidate.password === credentials.password,
+        candidate.identifier === identifier &&
+        // `storedPassword` falls back to the fixture password, so sign-in is
+        // unchanged until something has actually been changed.
+        storedPassword(candidate.accountId, candidate.password) === credentials.password,
     );
 
     return new Promise<StaffRole>((resolve, reject) => {
