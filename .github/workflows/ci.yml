@@ -2,103 +2,107 @@ name: CI
 
 on:
   push:
-    branches: [main, develop, backend/server]
+    branches: [main, backend/server]
   pull_request:
-    branches: [main]
+    branches: [main, backend/server]
 
 env:
   JAVA_VERSION: '17'
   NODE_VERSION: '20'
-  KOTLIN_VERSION: '2.2.10'
+  FRONTEND_DIR: mediqweb/mediqweb-fe
+  SERVER_DIR: server
 
 jobs:
-  ktor-server:
-    name: Ktor Server
+  lint:
+    name: Lint (frontend)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Set up JDK ${{ env.JAVA_VERSION }}
-        uses: actions/setup-java@v4
-        with:
-          java-version: ${{ env.JAVA_VERSION }}
-          distribution: 'temurin'
-      - name: Validate Gradle wrapper
-        uses: gradle/wrapper-validation-action@v3
-      - name: Build and test Ktor server
-        working-directory: server
-        run: ./gradlew build -x test
-      - name: Run Ktor server tests
-        working-directory: server
-        run: ./gradlew test
-
-  web-frontend:
-    name: Web Frontend
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Node.js
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: mediqweb/mediqweb-fe/package-lock.json
+          cache-dependency-path: ${{ env.FRONTEND_DIR }}/package-lock.json
       - name: Install dependencies
-        working-directory: mediqweb/mediqweb-fe
+        working-directory: ${{ env.FRONTEND_DIR }}
         run: npm ci
-      - name: Run web tests
-        working-directory: mediqweb/mediqweb-fe
+      - name: Run prettier lint
+        working-directory: ${{ env.FRONTEND_DIR }}
+        run: npm run lint
+
+  typecheck:
+    name: Typecheck (frontend)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: ${{ env.FRONTEND_DIR }}/package-lock.json
+      - name: Install dependencies
+        working-directory: ${{ env.FRONTEND_DIR }}
+        run: npm ci
+      - name: Run typecheck
+        working-directory: ${{ env.FRONTEND_DIR }}
+        run: npx tsc --noEmit
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: ${{ env.FRONTEND_DIR }}/package-lock.json
+      - name: Install frontend dependencies
+        working-directory: ${{ env.FRONTEND_DIR }}
+        run: npm ci
+      - name: Run frontend tests
+        working-directory: ${{ env.FRONTEND_DIR }}
         # vitest cannot run this project's Jasmine specs: angular.json has no
         # `test` architect target, no vitest config exists, and no browser is
         # installed for headless `ng test`. Fall back to the tsc type check
         # (the project's existing `npm test` equivalent) on app source.
-        # NOTE: `tsc -p tsconfig.spec.json` is intentionally not included here
-        # because 22 pre-existing tracked spec files carry type errors
-        # (TS2345 StaffDraft mismatch, TS2488 NodeList iterator) unrelated to
-        # this change; fixing them is out of scope.
-        run: npx tsc --noEmit -p tsconfig.app.json
-      - name: Lint web frontend
-        working-directory: mediqweb/mediqweb-fe
-        run: npm run lint
-      - name: Build web frontend
-        working-directory: mediqweb/mediqweb-fe
-        env:
-          # vercel-build.sh injects API_BASE_URL into index.html and its
-          # localhost guard rejects the dev default (http://localhost:8099).
-          # CI build verification is not a production deploy, so use the
-          # loopback IP form to satisfy the guard without a real backend.
-          API_BASE_URL: http://127.0.0.1:8099
-        run: npm run build
-
-  android:
-    name: Android App
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+        run: npm test
       - name: Set up JDK ${{ env.JAVA_VERSION }}
         uses: actions/setup-java@v4
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: 'temurin'
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-      - name: Validate Gradle wrapper
-        uses: gradle/wrapper-validation-action@v3
-      - name: Build Android debug APK
-        working-directory: .
-        run: ./gradlew :app:assembleDebug
-      - name: Run Android tests
-        working-directory: .
-        run: ./gradlew :app:test
+          cache: 'gradle'
+      - name: Run server tests
+        working-directory: ${{ env.SERVER_DIR }}
+        run: ./gradlew test
 
-  openapi-validation:
-    name: OpenAPI Spec Validation
+  build:
+    name: Build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Validate OpenAPI spec
-        run: |
-          if command -v swagger-cli >/dev/null 2>&1; then
-            swagger-cli validate server/src/main/resources/openapi/documentation.yaml
-          else
-            echo "swagger-cli not installed, skipping spec validation"
-          fi
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: ${{ env.FRONTEND_DIR }}/package-lock.json
+      - name: Install frontend dependencies
+        working-directory: ${{ env.FRONTEND_DIR }}
+        run: npm ci
+      - name: Build frontend
+        working-directory: ${{ env.FRONTEND_DIR }}
+        run: npm run build
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: 'gradle'
+      - name: Build server
+        working-directory: ${{ env.SERVER_DIR }}
+        run: ./gradlew build

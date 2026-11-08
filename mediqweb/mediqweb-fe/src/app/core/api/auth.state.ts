@@ -4,32 +4,13 @@ import { AuthSession, UserProfile } from './models';
 
 @Injectable({ providedIn: 'root' })
 export class AuthState {
-  private session$ = new BehaviorSubject<AuthSession | null>(this.loadSession());
-
-  private loadSession(): AuthSession | null {
-    try {
-      const raw = sessionStorage.getItem('mediq_access_token');
-      if (!raw) return null;
-      return JSON.parse(raw);
-    } catch {
-      return null;
-    }
-  }
-
-  private save(session: AuthSession): void {
-    sessionStorage.setItem('mediq_access_token', JSON.stringify(session));
-    sessionStorage.setItem('mediq_refresh_expires_at', session.refreshExpiresAt);
-  }
+  private session$ = new BehaviorSubject<AuthSession | null>(null);
 
   clear(): void {
-    sessionStorage.removeItem('mediq_access_token');
-    sessionStorage.removeItem('mediq_refresh_expires_at');
-    sessionStorage.removeItem('mediq_profile');
     this.session$.next(null);
   }
 
   setSession(session: AuthSession): void {
-    this.save(session);
     this.session$.next(session);
   }
 
