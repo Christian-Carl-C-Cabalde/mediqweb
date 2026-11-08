@@ -2,7 +2,7 @@ package com.example.mediq.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.mediq.data.api.RetrofitClient
+import com.example.mediq.data.api.SupabaseApiService
 import com.example.mediq.data.model.Message
 import com.example.mediq.data.model.MessageAuthorRole
 import com.example.mediq.ui.screens.messages.ChatMessage
@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class ChatViewModel : ViewModel() {
-    private val api = RetrofitClient.apiService
+    private val api = SupabaseApiService()
 
     private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
     val messages: StateFlow<List<ChatMessage>> = _messages.asStateFlow()
@@ -63,3 +63,4 @@ class ChatViewModel : ViewModel() {
         }
     }
 }
+

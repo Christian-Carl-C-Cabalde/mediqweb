@@ -2,7 +2,7 @@ package com.example.mediq.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.mediq.data.api.RetrofitClient
+import com.example.mediq.data.api.SupabaseApiService
 import com.example.mediq.data.model.Appointment
 import com.example.mediq.data.model.AppointmentStatus as ApiAppointmentStatus
 import com.example.mediq.data.model.Doctor
@@ -31,7 +31,7 @@ import java.time.Instant
  * On failure an error message is shown — never fake data.
  */
 class HomeViewModel : ViewModel() {
-    private val api = RetrofitClient.apiService
+    private val api = SupabaseApiService()
 
     private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()

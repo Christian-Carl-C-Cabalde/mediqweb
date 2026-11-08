@@ -15,7 +15,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.mediq.ui.components.MediQBottomBar
 import com.example.mediq.ui.components.mainTabForRoute
-import com.example.mediq.data.api.RetrofitClient
+import com.example.mediq.data.api.SupabaseClient
 import com.example.mediq.ui.navigation.MediQNavHost
 import com.example.mediq.ui.navigation.Screen
 import com.example.mediq.ui.session.MediQSession
@@ -29,7 +29,7 @@ class MainActivity : FragmentActivity() {
         // Restore the signed-in account (if any) before drawing the first
         // screen, so closing and reopening the app keeps the session.
         MediQSession.init(applicationContext)
-        RetrofitClient.accessToken = MediQSession.accessToken
+        SupabaseClient.accessToken = MediQSession.accessToken
         android.widget.Toast.makeText(
             this,
             if (MediQSession.user.value != null) "Restored: ${MediQSession.user.value?.username}" else "No session restored",

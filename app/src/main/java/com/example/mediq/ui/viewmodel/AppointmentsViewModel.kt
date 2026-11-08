@@ -2,7 +2,7 @@ package com.example.mediq.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.mediq.data.api.RetrofitClient
+import com.example.mediq.data.api.SupabaseApiService
 import com.example.mediq.data.model.Appointment as ApiAppointment
 import com.example.mediq.data.model.AppointmentStatus as ApiAppointmentStatus
 import com.example.mediq.data.model.Doctor
@@ -17,7 +17,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class AppointmentsViewModel : ViewModel() {
-    private val api = RetrofitClient.apiService
+    private val api = SupabaseApiService()
 
     private val _appointments = MutableStateFlow<List<AppointmentBooking>>(emptyList())
     val appointments: StateFlow<List<AppointmentBooking>> = _appointments.asStateFlow()

@@ -3,7 +3,7 @@ package com.example.mediq.ui.viewmodel
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.mediq.data.api.RetrofitClient
+import com.example.mediq.data.api.SupabaseApiService
 import com.example.mediq.data.model.Notification as ApiNotification
 import com.example.mediq.data.model.NotificationType as ApiNotificationType
 import com.example.mediq.ui.screens.notifications.NotificationHelper
@@ -30,7 +30,7 @@ class NotificationsViewModel(private val context: Context) : ViewModel() {
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
-    private val api = RetrofitClient.apiService
+    private val api = SupabaseApiService()
 
     init {
         viewModelScope.launch {
@@ -75,3 +75,4 @@ class NotificationsViewModel(private val context: Context) : ViewModel() {
         else -> NotificationType.CONFIRMED
     }
 }
+

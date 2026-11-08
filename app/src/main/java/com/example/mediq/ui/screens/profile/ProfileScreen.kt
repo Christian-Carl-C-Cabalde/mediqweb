@@ -17,7 +17,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.example.mediq.data.api.RetrofitClient
+import com.example.mediq.data.api.SupabaseClient
 import com.example.mediq.ui.components.MediQPageHeader
 import com.example.mediq.ui.navigation.Screen
 import com.example.mediq.ui.session.MediQSession
@@ -79,7 +79,7 @@ fun ProfileScreen(
         onConfirmSignOut = {
             showSignOutDialog = false
             MediQSession.signOut()
-            RetrofitClient.accessToken = null
+            SupabaseClient.accessToken = null
             navController.navigate(Screen.SignIn.route) { popUpTo(0) }
         }
     )

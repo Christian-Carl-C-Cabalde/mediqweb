@@ -2,17 +2,17 @@ package com.example.mediq.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.mediq.data.api.RetrofitClient
+import com.example.mediq.data.api.SupabaseApiService
+import com.example.mediq.data.api.SupabaseClient
 import com.example.mediq.data.model.*
 import com.example.mediq.ui.session.MediQSession
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import retrofit2.HttpException
 
 class ProfileViewModel : ViewModel() {
-    private val api = RetrofitClient.apiService
+    private val api = SupabaseApiService()
 
     private val _profile = MutableStateFlow<UserProfile?>(null)
     val profile: StateFlow<UserProfile?> = _profile.asStateFlow()
@@ -32,7 +32,7 @@ class ProfileViewModel : ViewModel() {
     private fun handleAuthFailure() {
         _authError.value = true
         MediQSession.signOut()
-        RetrofitClient.accessToken = null
+        SupabaseClient.accessToken = null
     }
 
     fun loadProfile() {
@@ -43,7 +43,7 @@ class ProfileViewModel : ViewModel() {
             try {
                 _profile.value = api.getProfile()
             } catch (e: Exception) {
-                val isAuth = e is HttpException && e.code() == 401
+                val isAuth = e.message?.contains("401") == true || e.message?.contains("Unauthorized") == true
                 if (isAuth) {
                     handleAuthFailure()
                 } else {
@@ -64,7 +64,7 @@ class ProfileViewModel : ViewModel() {
                 _profile.value = api.updateProfile(draft)
                 _updateSuccess.value = true
             } catch (e: Exception) {
-                val isAuth = e is HttpException && e.code() == 401
+                val isAuth = e.message?.contains("401") == true || e.message?.contains("Unauthorized") == true
                 if (isAuth) {
                     handleAuthFailure()
                 } else {

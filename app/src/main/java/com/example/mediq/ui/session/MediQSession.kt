@@ -2,6 +2,7 @@ package com.example.mediq.ui.session
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.example.mediq.data.api.SupabaseClient
 import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -43,14 +44,11 @@ object MediQSession {
     /** The account that is signed in, or null when nobody is. */
     val user: StateFlow<SignedInUser?> = _user.asStateFlow()
 
-    private var _accessToken: String? = null
-    private var _refreshToken: String? = null
+    /** The bearer token from the last sign-in, provided by the Supabase client. */
+    val accessToken: String? get() = SupabaseClient.accessToken
 
-    /** The bearer token from the last sign-in, if any. */
-    val accessToken: String? get() = _accessToken
-
-    /** The refresh token from the last sign-in, if any. */
-    val refreshToken: String? get() = _refreshToken
+    /** The refresh token from the last sign-in, provided by the Supabase client. */
+    val refreshToken: String? get() = SupabaseClient.refreshToken
 
     /**
      * Accounts created on this device, keyed by username.
@@ -91,8 +89,6 @@ object MediQSession {
         var fullName = p?.getString("fullName", null)
         var email = p?.getString("email", null)
         var phone = p?.getString("phone", null)
-        var access = p?.getString("accessToken", null)
-        var refresh = p?.getString("refreshToken", null)
 
         // Fall back to the on-disk copy if SharedPreferences came up empty
         // (e.g. after a process death that did not flush prefs in time).
@@ -106,8 +102,6 @@ object MediQSession {
                 fullName = get("fullName")
                 email = get("email")
                 phone = get("phone")
-                access = get("accessToken")
-                refresh = get("refreshToken")
             }
         }
         if (username.isNullOrBlank()) return
@@ -117,8 +111,6 @@ object MediQSession {
         val user = SignedInUser(username, resolvedFullName, resolvedEmail, resolvedPhone)
         knownAccounts[username] = user
         _user.value = user
-        _accessToken = access
-        _refreshToken = refresh
     }
 
     /**
@@ -208,16 +200,15 @@ object MediQSession {
 
     /** Store the tokens issued at sign-in. */
     fun setTokens(accessToken: String?, refreshToken: String?) {
-        _accessToken = accessToken
-        _refreshToken = refreshToken
-        persistTokens()
+        SupabaseClient.accessToken = accessToken
+        SupabaseClient.refreshToken = refreshToken
     }
 
     /** Forgets the signed-in account. */
     fun signOut() {
         _user.value = null
-        _accessToken = null
-        _refreshToken = null
+        SupabaseClient.accessToken = null
+        SupabaseClient.refreshToken = null
         persistClear()
     }
 
@@ -226,8 +217,8 @@ object MediQSession {
         _user.value = null
         knownAccounts.clear()
         pendingRegistration = null
-        _accessToken = null
-        _refreshToken = null
+        SupabaseClient.accessToken = null
+        SupabaseClient.refreshToken = null
         persistClear()
     }
 
@@ -249,11 +240,7 @@ object MediQSession {
     }
 
     private fun persistTokens() {
-        val editor = prefs?.edit() ?: return
-        editor.putString("accessToken", _accessToken)
-        editor.putString("refreshToken", _refreshToken)
-        editor.commit()
-        persistFile()
+        // Supabase client manages its own token persistence; nothing to store here.
     }
 
     private fun persistClear() {
@@ -272,9 +259,7 @@ object MediQSession {
             "username=${user.username}\n" +
                 "fullName=${user.fullName}\n" +
                 "email=${user.email ?: ""}\n" +
-                "phone=${user.phoneNumber ?: ""}\n" +
-                "accessToken=${_accessToken ?: ""}\n" +
-                "refreshToken=${_refreshToken ?: ""}\n"
+                "phone=${user.phoneNumber ?: ""}\n"
         )
     }
 }

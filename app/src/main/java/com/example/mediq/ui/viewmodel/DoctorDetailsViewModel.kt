@@ -2,7 +2,7 @@ package com.example.mediq.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.mediq.data.api.RetrofitClient
+import com.example.mediq.data.api.SupabaseApiService
 import com.example.mediq.data.model.ClinicHours
 import com.example.mediq.data.model.Doctor
 import com.example.mediq.ui.screens.doctordetails.*
@@ -22,7 +22,7 @@ import java.time.ZoneId
  * screen opens it fetches the updated clinic hours and renders them.
  */
 class DoctorDetailsViewModel : ViewModel() {
-    private val api = RetrofitClient.apiService
+    private val api = SupabaseApiService()
 
     private val _uiState = MutableStateFlow<DoctorDetailsUiState>(DoctorDetailsUiState.Loading)
     /** The current UI state: loading, error, or loaded with profile + schedule. */

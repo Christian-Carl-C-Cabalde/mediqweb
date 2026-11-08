@@ -2,7 +2,7 @@ package com.example.mediq.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.mediq.data.api.RetrofitClient
+import com.example.mediq.data.api.SupabaseApiService
 import com.example.mediq.data.model.MessageThread
 import com.example.mediq.ui.session.DisplayName
 import com.example.mediq.ui.screens.messages.ChatMessage
@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class MessagesViewModel : ViewModel() {
-    private val api = RetrofitClient.apiService
+    private val api = SupabaseApiService()
 
     private val _uiState = MutableStateFlow<MessagesUiState>(MessagesUiState.Loading)
     val uiState: StateFlow<MessagesUiState> = _uiState.asStateFlow()
