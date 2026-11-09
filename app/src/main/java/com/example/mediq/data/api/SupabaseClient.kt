@@ -16,8 +16,8 @@ object SupabaseClient {
      *
      * Override with -Dmediq.supabase.url=... and -Dmediq.supabase.anonKey=... if needed.
      */
-    private const val DEBUG_URL = "http://10.0.2.2:54321"
-    private const val DEBUG_ANON_KEY = "sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH"
+    private const val DEBUG_URL = "https://wdoyhtjpjhmhsegdllvd.supabase.co"
+    private const val DEBUG_ANON_KEY = "sb_publishable_dqZ7_WytRZV-VszwpoPbSg_ACWypKl8"
 
     private val SUPABASE_URL: String =
         System.getProperty("mediq.supabase.url") ?: if (BuildConfig.DEBUG) {

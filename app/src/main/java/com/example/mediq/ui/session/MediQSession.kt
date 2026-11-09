@@ -36,6 +36,9 @@ object MediQSession {
 
     private const val PREFS_NAME = "mediq_session"
 
+    private const val KEY_ACCESS_TOKEN = "access_token"
+    private const val KEY_REFRESH_TOKEN = "refresh_token"
+
     private var prefs: SharedPreferences? = null
     private var filesDir: File? = null
 
@@ -44,11 +47,11 @@ object MediQSession {
     /** The account that is signed in, or null when nobody is. */
     val user: StateFlow<SignedInUser?> = _user.asStateFlow()
 
-    /** The bearer token from the last sign-in, provided by the Supabase client. */
-    val accessToken: String? get() = SupabaseClient.accessToken
+    /** The bearer token from the last sign-in, persisted to SharedPreferences. */
+    val accessToken: String? get() = prefs?.getString(KEY_ACCESS_TOKEN, null) ?: SupabaseClient.accessToken
 
-    /** The refresh token from the last sign-in, provided by the Supabase client. */
-    val refreshToken: String? get() = SupabaseClient.refreshToken
+    /** The refresh token from the last sign-in, persisted to SharedPreferences. */
+    val refreshToken: String? get() = prefs?.getString(KEY_REFRESH_TOKEN, null) ?: SupabaseClient.refreshToken
 
     /**
      * Accounts created on this device, keyed by username.
@@ -89,6 +92,13 @@ object MediQSession {
         var fullName = p?.getString("fullName", null)
         var email = p?.getString("email", null)
         var phone = p?.getString("phone", null)
+
+        // Restore tokens into the Supabase client so authenticated calls work
+        // after a process death or app restart.
+        val restoredAccess = p?.getString(KEY_ACCESS_TOKEN, null)
+        val restoredRefresh = p?.getString(KEY_REFRESH_TOKEN, null)
+        if (restoredAccess != null) SupabaseClient.accessToken = restoredAccess
+        if (restoredRefresh != null) SupabaseClient.refreshToken = restoredRefresh
 
         // Fall back to the on-disk copy if SharedPreferences came up empty
         // (e.g. after a process death that did not flush prefs in time).
@@ -202,6 +212,10 @@ object MediQSession {
     fun setTokens(accessToken: String?, refreshToken: String?) {
         SupabaseClient.accessToken = accessToken
         SupabaseClient.refreshToken = refreshToken
+        val editor = prefs?.edit() ?: return
+        accessToken?.let { editor.putString(KEY_ACCESS_TOKEN, it) } ?: editor.remove(KEY_ACCESS_TOKEN)
+        refreshToken?.let { editor.putString(KEY_REFRESH_TOKEN, it) } ?: editor.remove(KEY_REFRESH_TOKEN)
+        editor.commit()
     }
 
     /** Forgets the signed-in account. */
