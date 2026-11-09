@@ -6,7 +6,7 @@
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
-    "build": "ng build && sh vercel-build.sh",
+    "build": "ng build --configuration production",
     "watch": "ng build --watch",
     "test": "tsc --noEmit",
     "lint": "npx prettier --check \"src/**/*.{ts,html}\""
