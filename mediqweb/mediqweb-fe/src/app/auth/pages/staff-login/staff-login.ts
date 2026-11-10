@@ -3,18 +3,17 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Brand, Button, FormField } from '../../../shared/components';
 import { ForgotPassword } from '../../components/forgot-password/forgot-password';
-import { SupabaseService } from '../../../core/api/supabase.service';
+import { AUTH_GATEWAY, StaffRole } from './auth.gateway';
+import { emailOrUsername } from './staff-login.validators';
 
 /**
  * Staff sign-in for Admin, Doctor and Secretary.
  *
- * Authenticates against Supabase Auth (signInWithPassword) so accounts created
- * at /signup can log in here. After a successful sign-in the Supabase session
- * is stored in sessionStorage and the user is routed to a dashboard.
- *
- * Role-based routing to /admin | /doctor | /secretary is not yet possible
- * from Supabase Auth alone — the profiles table carries roles but RLS is
- * deny-all with no policies. Routes to /doctor/dashboard as a default landing.
+ * Delegates authentication to the `AUTH_GATEWAY` seam so the page stays
+ * agnostic of *how* credentials are verified (Supabase Auth today, Ktor
+ * tomorrow). On success the gateway returns the staff role and this page
+ * routes to the matching dashboard. The Supabase session (access token,
+ * profile) is owned by `AuthService` once the gateway signs in.
  */
 @Component({
   selector: 'app-staff-login',
@@ -26,7 +25,7 @@ import { SupabaseService } from '../../../core/api/supabase.service';
 })
 export class StaffLogin {
   private readonly fb = inject(FormBuilder);
-  private readonly supabase = inject(SupabaseService);
+  private readonly gateway = inject(AUTH_GATEWAY);
   private readonly router = inject(Router);
 
   protected readonly loading = signal(false);
@@ -35,16 +34,15 @@ export class StaffLogin {
   protected readonly forgotPasswordOpen = signal(false);
 
   protected readonly form = this.fb.nonNullable.group({
-    email: ['', [Validators.required, Validators.email]],
+    identifier: ['', [Validators.required, emailOrUsername]],
     password: ['', [Validators.required]],
   });
 
-  /** Cleared as soon as the user edits the field, so a stale error lingers no longer than the submit that raised it. */
-  protected emailError(): string | null {
-    const control = this.form.controls.email;
+  protected identifierError(): string | null {
+    const control = this.form.controls.identifier;
     if (!control.touched) return null;
-    if (control.hasError('required')) return 'Enter your email address.';
-    if (control.hasError('email')) return 'Enter a valid email address.';
+    if (control.hasError('required')) return 'Enter your email or username.';
+    if (control.hasError('emailOrUsername')) return 'Enter a valid email address or username.';
     return null;
   }
 
@@ -73,25 +71,17 @@ export class StaffLogin {
 
     this.loading.set(true);
     try {
-      const { email, password } = this.form.getRawValue();
-      const { data, error } = await this.supabase.signIn(email, password);
-      if (error) {
-        throw error;
-      }
+      const { identifier, password } = this.form.getRawValue();
+      const role = await this.gateway.signIn({ identifier, password });
 
-      // Persist the Supabase session so subsequent requests can carry it.
-      const session = data.session;
-      if (session?.access_token) {
-        sessionStorage.setItem('mediq_access_token', session.access_token);
-        sessionStorage.setItem('mediq_user_email', data.user?.email ?? email);
-      }
-
-      // Supabase Auth does not return a role, so there is no role-based
-      // destination yet. Land on the doctor dashboard as a default; the user
-      // can navigate to another workspace from there. Role-based routing
-      // requires RLS policies on the profiles table (out of scope here).
+      const route =
+        role === 'admin'
+          ? '/admin/dashboard'
+          : role === 'doctor'
+            ? '/doctor/dashboard'
+            : '/secretary/dashboard';
       try {
-        await this.router.navigate(['/doctor/dashboard']);
+        await this.router.navigate([route]);
       } catch {
         this.authError.set('We could not open your workspace. Please try again.');
       }

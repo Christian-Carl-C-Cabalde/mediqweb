@@ -30,23 +30,23 @@
         }
 
         <ui-form-field
-          #emailField
-          label="Email"
-          controlId="staff-email"
+          #identifierField
+          label="Email or username"
+          controlId="staff-identifier"
           [required]="true"
-          [error]="emailError()"
+          [error]="identifierError()"
         >
           <input
-            id="staff-email"
+            id="staff-identifier"
             class="login__input"
-            type="email"
-            formControlName="email"
-            name="email"
-            autocomplete="email"
+            type="text"
+            formControlName="identifier"
+            name="identifier"
+            autocomplete="username"
             autocapitalize="none"
             spellcheck="false"
-            [attr.aria-invalid]="emailError() ? true : null"
-            [attr.aria-describedby]="emailError() ? emailField.helpId() : null"
+            [attr.aria-invalid]="identifierError() ? true : null"
+            [attr.aria-describedby]="identifierError() ? identifierField.helpId() : null"
           />
         </ui-form-field>
 

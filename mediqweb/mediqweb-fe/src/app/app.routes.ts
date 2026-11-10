@@ -2,12 +2,14 @@ import { Routes } from '@angular/router';
 
 import { authGuard } from './core/auth.guard';
 import { roleGuard } from './core/api/role.guard';
+import { provideRealAuthGateway } from './auth/pages/staff-login/http-auth-gateway-adapter';
 
 export const routes: Routes = [
   {
     path: 'login',
     title: 'Sign in · MediQ',
     loadComponent: () => import('./auth/pages/staff-login/staff-login').then((m) => m.StaffLogin),
+    providers: [provideRealAuthGateway()],
   },
   {
     path: 'signup',
