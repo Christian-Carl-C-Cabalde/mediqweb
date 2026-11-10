@@ -9,6 +9,11 @@ export const routes: Routes = [
     title: 'Sign in · MediQ',
     loadComponent: () => import('./auth/pages/staff-login/staff-login').then((m) => m.StaffLogin),
   },
+  {
+    path: 'signup',
+    title: 'Create account · MediQ',
+    loadComponent: () => import('./auth/pages/auth-signup/auth-signup').then((m) => m.AuthSignup),
+  },
   { path: '', pathMatch: 'full', redirectTo: 'login' },
   {
     path: 'admin',

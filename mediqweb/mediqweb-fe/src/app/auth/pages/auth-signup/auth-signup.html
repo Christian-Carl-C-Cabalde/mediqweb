@@ -1,0 +1,88 @@
+<main class="signup">
+  <div class="signup__panel">
+    <aside class="signup__aside" aria-hidden="true">
+      <div class="signup__aside-inner">
+        <ui-brand />
+        <div class="signup__brand-accent" aria-hidden="true"></div>
+        <p class="signup__tagline">Create a MediQ account.</p>
+        <ul class="signup__points">
+          <li>Any email works — no confirmation link is sent.</li>
+          <li>Created by your administrator through the service role.</li>
+        </ul>
+      </div>
+    </aside>
+
+    <section class="signup__form-side">
+      @if (createdEmail(); as email) {
+        <header class="signup__header">
+          <ui-brand class="signup__brand-mobile" />
+          <h1 class="signup__title">Account created</h1>
+          <p class="signup__subtitle">An account was created for {{ email }}.</p>
+        </header>
+
+        <p class="signup__success" role="status">
+          Account created for <strong>{{ email }}</strong>. You can
+          <a routerLink="/login">sign in now</a>.
+        </p>
+      } @else {
+        <header class="signup__header">
+          <ui-brand class="signup__brand-mobile" />
+          <h1 class="signup__title">Create account</h1>
+          <p class="signup__subtitle">Use any email — no confirmation link is sent.</p>
+        </header>
+
+        <form class="signup__form" [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+          @if (error(); as message) {
+            <p class="signup__alert" role="alert">
+              <span class="signup__alert-icon" aria-hidden="true">!</span>
+              <span>{{ message }}</span>
+            </p>
+          }
+
+          <ui-form-field
+            #emailField
+            label="Email"
+            controlId="signup-email"
+            [required]="true"
+            [error]="emailError()"
+          >
+            <input
+              id="signup-email"
+              class="signup__input"
+              type="email"
+              formControlName="email"
+              name="email"
+              autocomplete="email"
+              autocapitalize="none"
+              spellcheck="false"
+              [attr.aria-invalid]="emailError() ? true : null"
+              [attr.aria-describedby]="emailError() ? emailField.helpId() : null"
+            />
+          </ui-form-field>
+
+          <ui-password-fields
+            idPrefix="signup"
+            [newPassword]="form.controls.password"
+            [confirmPassword]="form.controls.confirmPassword"
+            [newError]="passwordError()"
+            [confirmError]="confirmPasswordError()"
+          />
+
+          <ui-button
+            type="submit"
+            variant="primary"
+            size="lg"
+            [fullWidth]="true"
+            [loading]="loading()"
+          >
+            Create account
+          </ui-button>
+        </form>
+
+        <p class="signup__note">
+          Already have an account? <a routerLink="/login">Sign in</a>
+        </p>
+      }
+    </section>
+  </div>
+</main>
