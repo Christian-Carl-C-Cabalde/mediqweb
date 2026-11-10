@@ -24,6 +24,32 @@ export class SupabaseService {
       );
     }
     this.supabase = createClient(url, key);
+
+    const serviceRoleKey = environment.supabaseServiceRoleKey;
+    if (url && serviceRoleKey) {
+      this.admin = createClient(url, serviceRoleKey, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      });
+    }
+  }
+
+  private admin?: SupabaseClient;
+
+  async createUser(email: string, password: string) {
+    if (!this.admin) {
+      throw new Error(
+        'SUPABASE_SERVICE_ROLE_KEY is not configured; cannot create admin users without email confirmation.',
+      );
+    }
+    const { data, error } = await this.admin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+    });
+    if (error) {
+      throw error;
+    }
+    return data;
   }
 
   get client(): SupabaseClient {
