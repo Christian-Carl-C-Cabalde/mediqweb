@@ -3,34 +3,30 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Brand, Button, FormField } from '../../../shared/components';
 import { ForgotPassword } from '../../components/forgot-password/forgot-password';
-import { AUTH_GATEWAY } from './auth.gateway';
-import { emailOrUsername } from './staff-login.validators';
-import { provideRealAuthGateway } from './http-auth-gateway-adapter';
+import { SupabaseService } from '../../../core/api/supabase.service';
 
 /**
  * Staff sign-in for Admin, Doctor and Secretary.
  *
- * There is deliberately no registration path: staff accounts are created by an
- * Admin, so the only way in is an existing account. The "forgot password"
- * route therefore explains who to contact instead of pretending to email a
- * reset link.
+ * Authenticates against Supabase Auth (signInWithPassword) so accounts created
+ * at /signup can log in here. After a successful sign-in the Supabase session
+ * is stored in sessionStorage and the user is routed to a dashboard.
  *
- * Calls the real auth gateway (direct to Ktor) on submit.
+ * Role-based routing to /admin | /doctor | /secretary is not yet possible
+ * from Supabase Auth alone — the profiles table carries roles but RLS is
+ * deny-all with no policies. Routes to /doctor/dashboard as a default landing.
  */
 @Component({
   selector: 'app-staff-login',
+  standalone: true,
   imports: [ReactiveFormsModule, Brand, Button, FormField, ForgotPassword],
   templateUrl: './staff-login.html',
   styleUrl: './staff-login.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
-    providers: [
-      // Real API-backed auth gateway (direct to Supabase). No mock credentials.
-      provideRealAuthGateway(),
-    ],
 })
 export class StaffLogin {
   private readonly fb = inject(FormBuilder);
-  private readonly gateway = inject(AUTH_GATEWAY);
+  private readonly supabase = inject(SupabaseService);
   private readonly router = inject(Router);
 
   protected readonly loading = signal(false);
@@ -39,18 +35,16 @@ export class StaffLogin {
   protected readonly forgotPasswordOpen = signal(false);
 
   protected readonly form = this.fb.nonNullable.group({
-    identifier: ['', [Validators.required, emailOrUsername]],
-    // No length or format rules: the account was created by an Admin, and
-    // second-guessing the rules at sign-in only ever blocks valid users.
+    email: ['', [Validators.required, Validators.email]],
     password: ['', [Validators.required]],
   });
 
   /** Cleared as soon as the user edits the field, so a stale error lingers no longer than the submit that raised it. */
-  protected identifierError(): string | null {
-    const control = this.form.controls.identifier;
+  protected emailError(): string | null {
+    const control = this.form.controls.email;
     if (!control.touched) return null;
-    if (control.hasError('required')) return 'Enter your email or username.';
-    if (control.hasError('emailOrUsername')) return 'Enter a valid email address or username.';
+    if (control.hasError('required')) return 'Enter your email address.';
+    if (control.hasError('email')) return 'Enter a valid email address.';
     return null;
   }
 
@@ -79,28 +73,31 @@ export class StaffLogin {
 
     this.loading.set(true);
     try {
-      const role = await this.gateway.signIn(this.form.getRawValue());
-      // The gateway returns the role and deliberately does not choose a
-      // destination; routing on it is this page's decision, so a second entry
-      // point could send the same result somewhere else.
-      //
-      // Navigation carries its own catch rather than sharing the one below. It
-      // used to sit inside this `try`, so a redirect that failed was reported as
-      // a rejected sign-in — telling the user their email or password was wrong
-      // when the gateway had just accepted it. That is the one thing they are
-      // not, and it sends them off to retype a password that was fine.
-      //
-      // The wording stays silent on whether a session now exists: `AuthGateway`
-      // holds none today, and the real one may. This page cannot know, so it
-      // does not claim either way.
+      const { email, password } = this.form.getRawValue();
+      const { data, error } = await this.supabase.signIn(email, password);
+      if (error) {
+        throw error;
+      }
+
+      // Persist the Supabase session so subsequent requests can carry it.
+      const session = data.session;
+      if (session?.access_token) {
+        sessionStorage.setItem('mediq_access_token', session.access_token);
+        sessionStorage.setItem('mediq_user_email', data.user?.email ?? email);
+      }
+
+      // Supabase Auth does not return a role, so there is no role-based
+      // destination yet. Land on the doctor dashboard as a default; the user
+      // can navigate to another workspace from there. Role-based routing
+      // requires RLS policies on the profiles table (out of scope here).
       try {
-        await this.router.navigate(['/', role, 'dashboard']);
+        await this.router.navigate(['/doctor/dashboard']);
       } catch {
         this.authError.set('We could not open your workspace. Please try again.');
       }
-    } catch (error) {
+    } catch (err) {
       this.authError.set(
-        error instanceof Error ? error.message : 'We could not sign you in. Please try again.',
+        err instanceof Error ? err.message : 'We could not sign you in. Please try again.',
       );
     } finally {
       this.loading.set(false);
