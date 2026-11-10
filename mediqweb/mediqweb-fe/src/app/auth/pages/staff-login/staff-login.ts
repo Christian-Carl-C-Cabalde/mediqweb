@@ -3,9 +3,44 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Brand, Button, FormField } from '../../../shared/components';
 import { ForgotPassword } from '../../components/forgot-password/forgot-password';
+import { AuthService } from '../../../core/api/auth.service';
+import { UserProfile } from '../../../core/api/models';
 import { AUTH_GATEWAY } from './auth.gateway';
 import { emailOrUsername } from './staff-login.validators';
-import { provideRealAuthGateway } from './http-auth-gateway-adapter';
+import { MockAuthGateway } from './mock-auth.gateway';
+
+const MOCK_PROFILES: Record<string, UserProfile> = {
+  admin: {
+    id: 'admin-001',
+    username: 'admin',
+    fullName: 'Admin User',
+    email: 'admin@mediq.app',
+    mobileNumber: '+639170000000',
+    dateOfBirth: '1985-01-01',
+    role: 'admin',
+    status: 'ACTIVE',
+  },
+  doctor: {
+    id: 'doc-002',
+    username: 'doctor',
+    fullName: 'Doctor User',
+    email: 'doctor@mediq.app',
+    mobileNumber: '+639171234567',
+    dateOfBirth: '1980-05-15',
+    role: 'doctor',
+    status: 'ACTIVE',
+  },
+  secretary: {
+    id: 'sec-001',
+    username: 'secretary',
+    fullName: 'Secretary User',
+    email: 'secretary@mediq.app',
+    mobileNumber: '+639173456789',
+    dateOfBirth: '1990-03-10',
+    role: 'secretary',
+    status: 'ACTIVE',
+  },
+};
 
 /**
  * Staff sign-in for Admin, Doctor and Secretary.
@@ -15,7 +50,7 @@ import { provideRealAuthGateway } from './http-auth-gateway-adapter';
  * route therefore explains who to contact instead of pretending to email a
  * reset link.
  *
- * Calls the real auth gateway (Hono BFF → Ktor) on submit.
+ * Calls the real auth gateway (direct to Ktor) on submit.
  */
 @Component({
   selector: 'app-staff-login',
@@ -23,14 +58,15 @@ import { provideRealAuthGateway } from './http-auth-gateway-adapter';
   templateUrl: './staff-login.html',
   styleUrl: './staff-login.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  providers: [
-    // Real API-backed auth gateway (Hono BFF → Ktor). No mock credentials.
-    provideRealAuthGateway(),
-  ],
+    providers: [
+      // Mock auth gateway — bypasses Supabase Auth entirely for local dev.
+      { provide: AUTH_GATEWAY, useClass: MockAuthGateway },
+    ],
 })
 export class StaffLogin {
   private readonly fb = inject(FormBuilder);
   private readonly gateway = inject(AUTH_GATEWAY);
+  private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
 
   protected readonly loading = signal(false);
@@ -80,6 +116,16 @@ export class StaffLogin {
     this.loading.set(true);
     try {
       const role = await this.gateway.signIn(this.form.getRawValue());
+      const profile = MOCK_PROFILES[role];
+      const now = new Date();
+      const oneHour = new Date(now.getTime() + 60 * 60 * 1000).toISOString();
+      this.auth.setSessionFromGateway({
+        accessToken: `mock-${role}-token`,
+        expiresAt: oneHour,
+        refreshToken: `mock-${role}-refresh`,
+        refreshExpiresAt: oneHour,
+        profile,
+      });
       // The gateway returns the role and deliberately does not choose a
       // destination; routing on it is this page's decision, so a second entry
       // point could send the same result somewhere else.
