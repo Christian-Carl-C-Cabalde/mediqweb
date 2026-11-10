@@ -57,9 +57,9 @@ class SupabaseApiService {
             .header("apikey", SupabaseClient.anonKey)
             .header("Content-Type", "application/json")
         if (auth) {
-            val token = SupabaseClient.accessToken
-                ?: throw RuntimeException("Not authenticated")
-            requestBuilder.header("Authorization", "Bearer $token")
+            SupabaseClient.accessToken?.let { token ->
+                requestBuilder.header("Authorization", "Bearer $token")
+            }
         } else {
             requestBuilder.header("Authorization", "Bearer ${SupabaseClient.anonKey}")
         }
@@ -87,8 +87,24 @@ class SupabaseApiService {
         val expiresIn = obj.optInt("expires_in", 3600)
         val user = obj.getJSONObject("user")
         val userId = user.getString("id")
+        val userEmail = user.optString("email", null)
 
-        val profile = getProfileByUserId(userId)
+        // Profile may not exist yet (RLS deny-all or trigger lag). Fall back to
+        // a profile built from the auth user data so sign-in doesn't crash.
+        val profile = getProfileByUserId(userId) ?: UserProfile(
+            id = userId,
+            username = userEmail?.substringBefore("@") ?: userId,
+            fullName = userEmail ?: userId,
+            email = userEmail,
+            mobileNumber = "",
+            dateOfBirth = "",
+            role = UserRole.PATIENT,
+            status = AccountStatus.ACTIVE,
+            doctorId = null,
+            assignedDoctorId = null,
+            createdAt = "",
+            updatedAt = "",
+        )
         SupabaseClient.accessToken = accessToken
         SupabaseClient.refreshToken = refreshToken
         return@withContext AuthSession(
@@ -100,7 +116,7 @@ class SupabaseApiService {
         )
     }
 
-    suspend fun register(request: RegisterRequest): AuthSession = withContext(Dispatchers.Default) {
+    suspend fun register(request: RegisterRequest): AuthSession? = withContext(Dispatchers.Default) {
         val body = httpRequest("POST", "${SupabaseClient.authUrl}/signup", auth = false,
             body = jsonBody(
                 "email" to request.email,
@@ -114,13 +130,43 @@ class SupabaseApiService {
                 ),
             ))
         val obj = JSONObject(body)
-        val session = obj.getJSONObject("session")
-        val accessToken = session.getString("access_token")
-        val refreshToken = session.optString("refresh_token", "")
-        val user = session.getJSONObject("user")
+        val user = obj.getJSONObject("user")
         val userId = user.getString("id")
+        val userEmail = user.optString("email", "")
 
-        val profile = getProfileByUserId(userId)
+        // Supabase may return no session when email confirmation is required
+        // (default on free tier). In that case registration still succeeded
+        // but the patient must confirm their email before signing in.
+        val sessionObj = obj.optJSONObject("session")
+        if (sessionObj == null) {
+            return@withContext null
+        }
+
+        val accessToken = sessionObj.getString("access_token")
+        val refreshToken = sessionObj.optString("refresh_token", "")
+
+        // Profile may not exist yet (RLS deny-all or trigger lag). Set the
+        // token first so the profile lookup can authenticate, then fall back
+        // to a profile built from the signup data if the read fails.
+        SupabaseClient.accessToken = accessToken
+        val profile = try {
+            getProfileByUserId(userId)
+        } catch (e: Exception) {
+            null
+        } ?: UserProfile(
+            id = userId,
+            username = request.username,
+            fullName = request.fullName,
+            email = userEmail.ifBlank { null },
+            mobileNumber = request.mobileNumber ?: "",
+            dateOfBirth = request.dateOfBirth,
+            role = request.role,
+            status = AccountStatus.ACTIVE,
+            doctorId = null,
+            assignedDoctorId = null,
+            createdAt = "",
+            updatedAt = "",
+        )
         SupabaseClient.accessToken = accessToken
         SupabaseClient.refreshToken = refreshToken
         return@withContext AuthSession(
@@ -172,8 +218,7 @@ class SupabaseApiService {
     }
 
     suspend fun updatePassword(request: UpdatePasswordRequest): UserProfile = withContext(Dispatchers.Default) {
-        val session = SupabaseClient.accessToken ?: throw RuntimeException("Not authenticated")
-        httpRequest("POST", "${SupabaseClient.authUrl}/user", auth = true,
+        httpRequest("PATCH", "${SupabaseClient.authUrl}/user", auth = true,
             body = jsonBody("password" to request.newPassword))
         return@withContext getProfile()
     }
@@ -205,7 +250,9 @@ class SupabaseApiService {
         val session = SupabaseClient.accessToken
             ?: throw RuntimeException("Not authenticated")
         val userId = getCurrentUserId(session)
-        return@withContext getProfileByUserId(userId)
+        val profile = getProfileByUserId(userId)
+            ?: throw RuntimeException("Profile not found for user $userId")
+        return@withContext profile
     }
 
     suspend fun updateProfile(draft: ProfileDraft): UserProfile = withContext(Dispatchers.Default) {
@@ -569,13 +616,20 @@ class SupabaseApiService {
         }
     }
 
-    private suspend fun getProfileByUserId(userId: String): UserProfile {
-        val session = SupabaseClient.accessToken
-            ?: throw RuntimeException("Not authenticated")
-        val body = fetchJson("${SupabaseClient.restUrl}/profiles?select=*&user_id=eq.$userId", session)
-        val arr = JSONArray(body)
-        val first = arr.getJSONObject(0)
-        return parseProfile(first)
+    private suspend fun getProfileByUserId(userId: String): UserProfile? {
+        return try {
+            val session = SupabaseClient.accessToken
+                ?: throw RuntimeException("Not authenticated")
+            val body = fetchJson("${SupabaseClient.restUrl}/profiles?select=*&user_id=eq.$userId", session)
+            val arr = JSONArray(body)
+            if (arr.length() == 0) return null
+            val first = arr.getJSONObject(0)
+            parseProfile(first)
+        } catch (e: Exception) {
+            // RLS deny-all blocks the profile read; fall back to auth-user data
+            // so sign-in doesn't crash when no profiles row exists yet.
+            null
+        }
     }
 
     private suspend fun getCurrentUserId(session: String): String {
