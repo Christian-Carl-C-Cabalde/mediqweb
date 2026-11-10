@@ -30,6 +30,14 @@ export class SupabaseService {
     return this.supabase;
   }
 
+  from(table: string) {
+    return this.supabase.from(table);
+  }
+
+  rpc(functionName: string, params?: any) {
+    return this.supabase.rpc(functionName, params);
+  }
+
   async signIn(email: string, password: string) {
     return this.supabase.auth.signInWithPassword({ email, password });
   }
