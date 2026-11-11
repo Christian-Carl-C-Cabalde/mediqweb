@@ -105,7 +105,7 @@ fun nextAppointment(
         .minByOrNull { DateTimeFormatter.instant(it.startsAt) }
         ?: return null
 
-    val doctor = doctors.find { it.id == upcoming.doctorId }
+    val doctor = doctors.find { it.id == upcoming.doctorId || it.userId == upcoming.doctorId }
     return NextAppointment(
         id = upcoming.id,
         time = DateTimeFormatter.formatTime(upcoming.startsAt),

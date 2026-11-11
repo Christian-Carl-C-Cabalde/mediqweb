@@ -83,7 +83,7 @@ class AppointmentsViewModel : ViewModel() {
         doctors: List<Doctor>,
         conversations: List<MessageThread>
     ): AppointmentBooking {
-        val doctor = doctors.find { it.id == appt.doctorId }
+        val doctor = doctors.find { it.id == appt.doctorId || it.userId == appt.doctorId }
         val conversation = conversations.firstOrNull {
             it.patientId == appt.patientId && it.doctorId == appt.doctorId
         }
