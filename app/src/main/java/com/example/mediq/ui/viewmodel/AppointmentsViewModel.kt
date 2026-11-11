@@ -55,7 +55,13 @@ class AppointmentsViewModel : ViewModel() {
                 val result = api.getAppointments()
                 val doctors = loadDoctors()
                 val conversations = api.getConversations()
-                _appointments.value = result.items.map { toBooking(it, doctors, conversations) }
+                val all = result.items.map { toBooking(it, doctors, conversations) }
+                // Keep only the most recent 6 upcoming appointments for the upcoming tab
+                val upcoming = all
+                    .filter { it.status == AppointmentStatus.Confirmed || it.status == AppointmentStatus.AwaitingConfirmation }
+                    .take(6)
+                val history = all.filter { it.status != AppointmentStatus.Confirmed && it.status != AppointmentStatus.AwaitingConfirmation }
+                _appointments.value = upcoming + history
             } catch (e: Exception) {
                 _error.value = e.message ?: "Failed to load appointments"
             } finally {

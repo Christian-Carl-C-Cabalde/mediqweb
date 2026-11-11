@@ -65,5 +65,13 @@ sealed interface AppointmentsUiState {
 data class AppointmentsActions(
     val onRetry: () -> Unit = {},
     /** Opens one booking; [fromTab] remembers where the patient came from. */
-    val onOpenAppointment: (id: String, fromTab: AppointmentsTab) -> Unit = { _, _ -> }
+    val onOpenAppointment: (id: String, fromTab: AppointmentsTab) -> Unit = { _, _ -> },
+    /** Pull-to-refresh reloads the appointment list. */
+    val onRefresh: () -> Unit = {},
+    /** Current count of unread notifications. */
+    val notificationCount: Int = 0,
+    /** Tap to open the notifications screen. */
+    val onNotificationClick: () -> Unit = {},
+    /** Tab selection changed. */
+    val onTabSelected: (AppointmentsTab) -> Unit = { _ -> }
 )

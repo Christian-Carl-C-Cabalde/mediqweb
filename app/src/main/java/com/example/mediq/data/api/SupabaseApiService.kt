@@ -116,9 +116,9 @@ class SupabaseApiService {
                 }
                 return@withContext retryBody
             } else {
-                // Refresh failed - clear tokens and throw original error
-                SupabaseClient.accessToken = null
-                SupabaseClient.refreshToken = null
+                // Refresh failed - clear tokens and signal session expiry so the UI
+                // can redirect to sign-in
+                MediQSession.signOut()
                 throw RuntimeException("HTTP ${response.code}: $responseBody")
             }
         }

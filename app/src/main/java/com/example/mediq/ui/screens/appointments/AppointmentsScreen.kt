@@ -2,7 +2,13 @@ package com.example.mediq.ui.screens.appointments
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -13,6 +19,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -20,7 +27,10 @@ import com.example.mediq.ui.components.MediQPageHeader
 import com.example.mediq.ui.navigation.Screen
 import com.example.mediq.ui.screens.appointments.AppointmentCancellationStore
 import com.example.mediq.ui.theme.MediQScaffoldBackground
+import com.example.mediq.ui.theme.MediQGreen
 import com.example.mediq.ui.viewmodel.AppointmentsViewModel
+import com.example.mediq.ui.viewmodel.NotificationsViewModel
+import kotlinx.coroutines.flow.map
 
 /** Where the patient came from, handed back by the detail screen. */
 private const val SOURCE_TAB_KEY = "appointment_source_tab"
@@ -35,11 +45,15 @@ private const val CANCELLED_ID_KEY = "cancelled_appointment_id"
  *
  * Bookings are loaded from the API via [AppointmentsViewModel]; sample data is
  * no longer used in the running app.
+ *
+ * Pull-to-refresh reloads the appointment list. The notification count shows
+ * how many unread appointment-related notifications are waiting.
  */
 @Composable
 fun AppointmentsScreen(
     navController: NavController,
-    viewModel: AppointmentsViewModel = viewModel()
+    viewModel: AppointmentsViewModel = viewModel(),
+    notificationsViewModel: NotificationsViewModel = viewModel()
 ) {
     var selectedTabIndex by rememberSaveable { mutableIntStateOf(0) }
     var cancelledIds by rememberSaveable { mutableStateOf(emptySet<String>()) }
@@ -47,6 +61,10 @@ fun AppointmentsScreen(
     val bookings by viewModel.appointments.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
+
+    val notificationCount by notificationsViewModel.notifications.map { list ->
+        list.count { item -> item.unread }
+    }.collectAsState(initial = 0).value
 
     LaunchedEffect(viewModel) {
         viewModel.loadAppointments()
@@ -71,14 +89,13 @@ fun AppointmentsScreen(
     LaunchedEffect(cancelledId) {
         if (!cancelledId.isNullOrBlank()) {
             cancelledIds = cancelledIds + cancelledId
-            // A cancelled booking now lives in history.
             selectedTabIndex = AppointmentsTab.History.ordinal
             backStackEntry?.savedStateHandle?.remove<String>(CANCELLED_ID_KEY)
         }
     }
 
     val all = bookings
-    val upcoming = all.filter { it.status.canCancel }
+    val upcoming = all.filter { it.status.canCancel }.take(6)
     val history = all.filterNot { it.status.canCancel }
     val content = AppointmentsUiState.Content(upcoming = upcoming, history = history).withCancelled(cancelledIds)
 
@@ -91,7 +108,6 @@ fun AppointmentsScreen(
     AppointmentsContent(
         state = state,
         selectedTab = selectedTab,
-        onTabSelected = { selectedTabIndex = it.ordinal },
         actions = AppointmentsActions(
             onRetry = { viewModel.loadAppointments() },
             onOpenAppointment = { id, fromTab ->
@@ -99,17 +115,19 @@ fun AppointmentsScreen(
                     ?.savedStateHandle
                     ?.set(SOURCE_TAB_KEY, fromTab.ordinal)
                 navController.navigate(Screen.AppointmentDetails.createRoute(id))
-            }
+            },
+            onRefresh = { viewModel.loadAppointments() },
+            notificationCount = notificationCount,
+            onNotificationClick = { navController.navigate(Screen.Notifications.route) },
+            onTabSelected = { selectedTabIndex = it.ordinal }
         )
     )
 }
 
-/** State switch. Everything below this point is navigation-free and previewable. */
 @Composable
 fun AppointmentsContent(
     state: AppointmentsUiState,
     selectedTab: AppointmentsTab,
-    onTabSelected: (AppointmentsTab) -> Unit,
     actions: AppointmentsActions
 ) {
     Column(
@@ -122,7 +140,28 @@ fun AppointmentsContent(
             subtitle = "Upcoming and past visits"
         )
 
-        AppointmentTabs(selected = selectedTab, onSelect = onTabSelected)
+        if (actions.notificationCount > 0) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End
+            ) {
+                Row(
+                    modifier = Modifier
+                        .background(MediQGreen)
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = "${actions.notificationCount} unread",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
+            }
+        }
+
+        AppointmentTabs(selected = selectedTab, onSelect = actions.onTabSelected)
 
         when (state) {
             AppointmentsUiState.Loading -> AppointmentsLoadingState()
@@ -137,7 +176,8 @@ fun AppointmentsContent(
                 bookings = state.forTab(selectedTab),
                 onOpen = { booking ->
                     actions.onOpenAppointment(booking.id, selectedTab)
-                }
+                },
+                modifier = Modifier.fillMaxSize()
             )
         }
     }

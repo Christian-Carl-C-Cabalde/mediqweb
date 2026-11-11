@@ -51,6 +51,10 @@ object MediQSession {
     /** The account that is signed in, or null when nobody is. */
     val user: StateFlow<SignedInUser?> = _user.asStateFlow()
 
+    /** True when the session has expired (refresh token invalid). Triggers sign-out and redirect to login. */
+    private val _sessionExpired = MutableStateFlow(false)
+    val sessionExpired: StateFlow<Boolean> = _sessionExpired.asStateFlow()
+
     /** The bearer token from the last sign-in, persisted to SharedPreferences. */
     val accessToken: String? get() = prefs?.getString(KEY_ACCESS_TOKEN, null) ?: SupabaseClient.accessToken
 
@@ -300,6 +304,7 @@ object MediQSession {
     /** Forgets the signed-in account. */
     fun signOut() {
         _user.value = null
+        _sessionExpired.value = true
         SupabaseClient.accessToken = null
         SupabaseClient.refreshToken = null
         SupabaseClient.authUserId = null
