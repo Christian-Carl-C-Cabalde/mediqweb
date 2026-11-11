@@ -77,9 +77,9 @@ class SupabaseApiService {
             SupabaseClient.accessToken?.let { token ->
                 requestBuilder.header("Authorization", "Bearer $token")
             }
-        } else {
-            requestBuilder.header("Authorization", "Bearer ${SupabaseClient.anonKey}")
         }
+        // Unauthenticated requests send only the apikey header (no Authorization header).
+        // Supabase rejects the anon key as a Bearer token.
         if (method != "GET" && method != "HEAD") {
             requestBuilder.header("Prefer", "return=representation")
         }
