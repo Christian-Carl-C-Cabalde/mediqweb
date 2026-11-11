@@ -1,6 +1,6 @@
 {
   "buildCommand": "npm run build",
-  "installCommand": "npm ci",
+  "installCommand": "npm install",
   "outputDirectory": "dist/mediqapp-fe",
   "routes": [
     { "src": "/assets/(.*)", "headers": { "Cache-Control": "public, max-age=31536000, immutable" }, "continue": true },
