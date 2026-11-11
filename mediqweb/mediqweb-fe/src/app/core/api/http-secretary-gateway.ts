@@ -216,7 +216,7 @@ export class HttpSecretaryGateway {
               (this.supabase as any)
                 .from('doctors')
                 .select('*')
-                .eq('user_id', profileResult.data.user_id)
+                .eq('user_id', profileResult.data.assigned_doctor_id)
                 .maybeSingle(),
             ).pipe(
               map((r: any) => {

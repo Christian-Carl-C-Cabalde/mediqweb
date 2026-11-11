@@ -63,11 +63,11 @@ fun SignInScreen(
         }
     }
 
-    // Auto-login as igotnobroads@gmail.com so you don't have to type credentials
+    // Auto-login so you don't have to type credentials
     LaunchedEffect(Unit) {
         if (sessionUser == null) {
             scope.launch {
-                val profile = viewModel.signIn("igotnobroads@gmail.com", "qasxq2ew") ?: return@launch
+                val profile = viewModel.signIn("jlmandahinog65115@liceo.edu.ph", "qasxq2ew") ?: return@launch
                 MediQSession.signIn(
                     SignedInUser(
                         username = profile.username,

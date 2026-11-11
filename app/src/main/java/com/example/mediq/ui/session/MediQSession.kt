@@ -2,6 +2,7 @@ package com.example.mediq.ui.session
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.example.mediq.data.api.SupabaseApiService
 import com.example.mediq.data.api.SupabaseClient
 import java.io.File
 import java.util.concurrent.TimeUnit
@@ -302,6 +303,7 @@ object MediQSession {
         SupabaseClient.accessToken = null
         SupabaseClient.refreshToken = null
         SupabaseClient.authUserId = null
+        SupabaseApiService.clearAllCaches()
         persistClear()
     }
 
@@ -312,6 +314,7 @@ object MediQSession {
         pendingRegistration = null
         SupabaseClient.accessToken = null
         SupabaseClient.refreshToken = null
+        SupabaseApiService.clearAllCaches()
         persistClear()
     }
 

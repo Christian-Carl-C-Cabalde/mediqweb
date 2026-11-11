@@ -47,6 +47,14 @@ class SupabaseApiService {
         private val appointmentsCache = mutableMapOf<String, Pair<Long, Paged<Appointment>>>()
         private val DOCTORS_CACHE_TTL_MS = java.util.concurrent.TimeUnit.MINUTES.toMillis(5)
         private val APPOINTMENTS_CACHE_TTL_MS = java.util.concurrent.TimeUnit.MINUTES.toMillis(2)
+
+        /** Clears all in-memory caches. Called on sign-out so cached data from one user
+         *  never leaks into the next user's session. */
+        fun clearAllCaches() {
+            doctorsCache.clear()
+            specializationsCache.clear()
+            appointmentsCache.clear()
+        }
     }
 
     private suspend fun httpRequest(
@@ -471,8 +479,14 @@ class SupabaseApiService {
     suspend fun getConversations(): List<MessageThread> = withContext(Dispatchers.Default) {
         val session = SupabaseClient.accessToken
             ?: throw RuntimeException("Not authenticated")
-        val userId = getCurrentUserId(session)
-        val url = "${SupabaseClient.restUrl}/message_threads?select=*&or=(patient_id.eq.$userId,doctor_id.eq.$userId)"
+        val authUserId = getCurrentUserId(session)
+        // Resolve the users.id from auth_user_id, because message_threads stores
+        // users.id (not auth.users.id) in patient_id/doctor_id.
+        val userBody = fetchJson("${SupabaseClient.restUrl}/users?select=id&auth_user_id=eq.$authUserId", session)
+        val userArr = JSONArray(userBody)
+        if (userArr.length() == 0) return@withContext emptyList()
+        val userId = userArr.getJSONObject(0).getString("id")
+        val url = "${SupabaseClient.restUrl}/message_threads?select=*&or=(patient_id.eq.$userId,doctor_id.eq.$userId)&order=last_message_at.desc"
         val body = fetchJson(url, session)
         val arr = JSONArray(body)
         return@withContext arr.map { parseMessageThread(it) }
@@ -814,7 +828,7 @@ class SupabaseApiService {
             id = obj.getString("id"),
             conversationId = obj.getString("conversation_id"),
             authorId = obj.getString("author_id"),
-            authorRole = MessageAuthorRole.valueOf(obj.optString("author_role", "PATIENT")),
+            authorRole = MessageAuthorRole.valueOf(obj.optString("author_role", "PATIENT").uppercase()),
             body = obj.getString("body"),
             sentAt = obj.getString("sent_at"),
             readAt = obj.optString("read_at", null),
