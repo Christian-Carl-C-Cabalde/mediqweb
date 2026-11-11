@@ -2,7 +2,7 @@
 <!--
   Debug build: allow cleartext to local Ktor server addresses so the
   emulator/device can reach http://10.0.2.2:8099/ via adb reverse.
-  Production host still requires HTTPS.
+  Production host and Supabase still require HTTPS.
 -->
 <network-security-config>
     <domain-config cleartextTrafficPermitted="true">
@@ -12,5 +12,6 @@
     </domain-config>
     <domain-config cleartextTrafficPermitted="false">
         <domain includeSubdomains="false">mediq-ktor-server.onrender.com</domain>
+        <domain includeSubdomains="false">wdoyhtjpjhmhsegdllvd.supabase.co</domain>
     </domain-config>
 </network-security-config>

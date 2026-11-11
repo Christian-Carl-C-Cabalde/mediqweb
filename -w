@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MediQ Login Test (supabase-js)</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, sans-serif; max-width: 400px; margin: 40px auto; padding: 0 16px; line-height: 1.5; }
+    h1 { font-size: 1.25rem; margin-bottom: 8px; }
+    .card { border: 1px solid #ddd; border-radius: 12px; padding: 24px; background: #fafafa; }
+    label { display: block; margin: 12px 0 6px; font-size: 0.9rem; color: #333; }
+    input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; }
+    button { margin-top: 16px; width: 100%; padding: 12px; background: #2563eb; color: white; border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    #status { margin-top: 16px; padding: 12px; border-radius: 8px; font-size: 0.9rem; display: none; }
+    .ok { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+    .err { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+    ul { margin: 12px 0; padding-left: 20px; }
+    code { background: #eee; padding: 2px 6px; border-radius: 4px; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <h1>MediQ Login Test</h1>
+  <div class="card">
+    <form id="form">
+      <label>Email</label>
+      <input id="email" type="email" value="admin@mediq.app" required />
+      <label>Password</label>
+      <input id="password" type="password" value="demo12345" required />
+      <button type="submit" id="btn">Sign in</button>
+    </form>
+    <div id="status"></div>
+    <ul>
+      <li><strong>admin@mediq.app</strong> → ADMIN dashboard</li>
+      <li><strong>dr.smith@mediq.app</strong> → DOCTOR dashboard</li>
+      <li><strong>dr.chen@mediq.app</strong> → DOCTOR dashboard</li>
+      <li><strong>dr.garcia@mediq.app</strong> → DOCTOR dashboard</li>
+      <li><strong>sec.jones@mediq.app</strong> → SECRETARY dashboard</li>
+      <li><strong>demo@mediq.app</strong> → PATIENT (no route)</li>
+    </ul>
+    <p style="font-size: 0.8rem; color: #666; margin-top: 16px;">All passwords: <code>demo12345</code></p>
+  </div>
+  <script>
+    const { createClient } = supabase;
+    const SUPABASE_URL = 'https://wdoyhtjpjhmhsegdllvd.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_dqZ7_WytRZV-VszwpoPbSg_ACWypKl8';
+    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+    const $ = (id) => document.getElementById(id);
+    const status = $('status');
+    const btn = $('btn');
+
+    function show(msg, type) {
+      status.textContent = msg;
+      status.className = type;
+      status.style.display = 'block';
+    }
+
+    $('form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      btn.disabled = true;
+      btn.textContent = 'Signing in...';
+      status.style.display = 'none';
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: $('email').value,
+          password: $('password').value,
+        });
+        if (error) throw error;
+        if (!data.session?.access_token) throw new Error('No session returned');
+
+        // Resolve role via RPC
+        const { data: roleData, error: roleError } = await supabase.rpc('mediq_current_role');
+        if (roleError) throw roleError;
+        const role = Array.isArray(roleData) ? roleData[0]?.mediq_current_role : roleData?.mediq_current_role;
+
+        show(
+          `Login OK! User: ${data.user.email}<br>` +
+          `Role: ${role}<br>` +
+          `Route: /${role?.toLowerCase()}`,
+          'ok'
+        );
+        console.log('Full result:', { session: data.session, role: roleData });
+      } catch (err) {
+        show(`Error: ${err.message}`, 'err');
+        console.error(err);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Sign in';
+      }
+    });
+  </script>
+</body>
+</html>

@@ -10,6 +10,7 @@ export interface UserProfile {
   role: UserRole;
   status: string;
   assignedDoctorId?: string;
+  joinedOn?: string;
 }
 
 export interface AuthSession {

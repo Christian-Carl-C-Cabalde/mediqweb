@@ -1,0 +1,1 @@
+{"nodes": [{"id": "data_n_plus_one_batch_loading", "label": "Eliminate N+1 Queries with Batch Loading", "file_type": "document", "source_file": "agent/skills/supabase-postgres-best-practices/references/data-n-plus-one.md", "rationale": "Optimizes database round trips by batching queries using arrays or JOINs.", "_origin": "semantic"}], "edges": [], "hyperedges": []}

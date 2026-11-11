@@ -1,0 +1,1 @@
+-- No‑op migration: constraint added by later migration (original link‑profiles migration).

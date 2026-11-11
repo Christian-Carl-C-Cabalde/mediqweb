@@ -1,0 +1,1 @@
+{"nodes": [{"id": "schema_foreign_key_indexes_joins", "label": "Index Foreign Key Columns", "file_type": "document", "source_file": "agent/skills/supabase-postgres-best-practices/references/schema-foreign-key-indexes.md", "rationale": "Speeds up JOINs and ON DELETE CASCADE operations."}], "edges": [], "hyperedges": []}

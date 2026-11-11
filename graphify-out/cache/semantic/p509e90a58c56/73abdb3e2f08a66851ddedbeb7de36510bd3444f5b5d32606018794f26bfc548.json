@@ -1,0 +1,1 @@
+{"nodes": [{"id": "conn_limits_max_connections", "label": "Set Appropriate Connection Limits", "file_type": "document", "source_file": "agent/skills/supabase-postgres-best-practices/references/conn-limits.md", "rationale": "Critical for preventing database crashes and memory exhaustion."}], "edges": [], "hyperedges": []}

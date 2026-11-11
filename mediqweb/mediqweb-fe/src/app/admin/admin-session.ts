@@ -1,7 +1,9 @@
 import { Injectable, computed, signal, inject } from '@angular/core';
-import { forkJoin, map } from 'rxjs';
+import { forkJoin, map, from, switchMap, catchError, of, Observable } from 'rxjs';
 import { HttpAdminGateway } from '../core/api/http-admin-gateway';
 import { HttpPatientGateway } from '../core/api/http-patient-gateway';
+import { SupabaseService } from '../core/api/supabase.service';
+import { ToastService } from '../core/services/toast.service';
 import type {
   AccountStatus,
   Appointment as AdminAppointment,
@@ -34,6 +36,8 @@ export type StaffKind = 'doctor' | 'secretary';
 export class AdminSession {
   private readonly adminGateway = inject(HttpAdminGateway);
   private readonly patientGateway = inject(HttpPatientGateway);
+  private readonly supabase = inject(SupabaseService);
+  private readonly toasts = inject(ToastService);
 
   private readonly doctorsState = signal<StaffAccount[]>([]);
   private readonly secretariesState = signal<StaffAccount[]>([]);
@@ -62,18 +66,20 @@ export class AdminSession {
       doctorSpecs: this.adminGateway.getDoctorSpecializations(),
     }).subscribe({
       next: ({ accounts, doctorSpecs }) => {
-        const doctors = accounts.doctors as unknown as ApiAccount[];
-        const secretaries = accounts.secretaries as unknown as ApiAccount[];
-        const patients = accounts.patients as unknown as ApiAccount[];
-        // doctorSpecs maps doctor.id -> { specializationId, licenseNumber }
+        const doctors = accounts.doctors as unknown as StaffAccount[];
+        const secretaries = accounts.secretaries as unknown as StaffAccount[];
+        const patients = accounts.patients as unknown as PatientAccount[];
+        // doctorSpecs maps doctor.user_id -> { specializationId, licenseNumber };
+        // accounts are already mapped StaffAccount objects from getAccounts(),
+        // so spread and overlay specialization/license rather than remap.
         this.doctorsState.set(
           doctors.map((d) => {
             const meta = doctorSpecs.get(d.id);
-            return toStaffAccount(d, meta?.specializationId ?? null, meta?.licenseNumber ?? null);
+            return { ...d, specializationId: meta?.specializationId ?? null, licenseNumber: meta?.licenseNumber ?? null };
           }),
         );
-        this.secretariesState.set(secretaries.map((d) => toStaffAccount(d, null, null)));
-        this.patientsState.set(patients.map(toPatientAccount));
+        this.secretariesState.set(secretaries);
+        this.patientsState.set(patients);
       },
       error: () => {
         // Leave lists empty; pages show nothing until data arrives.
@@ -86,7 +92,7 @@ export class AdminSession {
       error: () => {},
     });
 
-    this.patientGateway.getAppointments().subscribe({
+    this.adminGateway.getAppointments().subscribe({
       next: (paged) =>
         this.appointmentsState.set((paged.items ?? []) as unknown as AdminAppointment[]),
       error: () => {},
@@ -164,8 +170,18 @@ export class AdminSession {
         target.update((list) => list.map((a) => (a.id === '' ? created : a)));
         this.record(`Created ${kind} account`, created.name, 'info');
         this.createErrorState.set(null);
+        // Refresh full lists so newly created account appears alongside existing ones
+        this.adminGateway.getAccounts().subscribe({
+          next: ({ doctors: d, secretaries: s, patients: p }) => {
+            this.doctorsState.set(d as StaffAccount[]);
+            this.secretariesState.set(s as StaffAccount[]);
+            this.patientsState.set(p as unknown as PatientAccount[]);
+          },
+          error: () => {},
+        });
       },
       error: (err: unknown) => {
+        console.error('createStaffAccount failed:', err);
         const serverMessage = (err as { error?: { message?: string } })?.error?.message;
         this.createErrorState.set(serverMessage ?? 'Failed to create account.');
         target.update((list) => list.filter((a) => a.id === ''));
@@ -236,25 +252,40 @@ export class AdminSession {
     return true;
   }
 
-  addSpecialization(name: string, description: string): AdminSpecialization {
+  addSpecialization(name: string, description: string): Observable<AdminSpecialization> {
+    const id = crypto.randomUUID();
     const specialization: AdminSpecialization = {
-      id: '',
+      id,
       name: name.trim(),
       description: description.trim(),
     };
     this.specializationsState.update((list) => [...list, specialization]);
 
-    this.patientGateway.getSpecializations().subscribe({
-      next: () => {
-        // Re-fetch to get the server-assigned id.
-        this.specializationsState.set([]);
-      },
-      error: () => {
-        this.specializationsState.update((list) => list.filter((s) => s.id === ''));
-      },
-    });
-
-    return specialization;
+    // Persist to Supabase so the server assigns a real id.
+    return from(
+      (this.supabase as any)
+        .from('specializations')
+        .insert({ id, name: specialization.name, description: specialization.description })
+        .select()
+        .single(),
+    ).pipe(
+      switchMap((r: any) => {
+        if (r.error) {
+          throw new Error(r.error?.message ?? 'Failed to create specialization');
+        }
+        const created = r.data;
+        // Replace the optimistic entry with the server-created one.
+        this.specializationsState.update((list) =>
+          list.map((s) => (s.id === id ? { ...created } as AdminSpecialization : s)),
+        );
+        return of(created as AdminSpecialization);
+      }),
+      catchError((err: any) => {
+        this.specializationsState.update((list) => list.filter((s) => s.id === id));
+        this.toasts.error('Failed to create specialization', err.message ?? 'Unknown error');
+        return of(specialization);
+      }),
+    );
   }
 
   updateSpecialization(id: string, name: string, description: string): void {
@@ -280,10 +311,30 @@ export class AdminSession {
       severity,
     };
     this.auditState.update((list) => [entry, ...list]);
+
+    // Persist to Supabase audit_logs table.
+    const now = new Date().toISOString();
+    from(
+      this.supabase
+        .from('audit_logs')
+        .insert({
+          id: crypto.randomUUID(),
+          actor: entry.actor,
+          action: entry.action,
+          target: entry.target,
+          at: now,
+          severity,
+          created_at: now,
+        }),
+    ).subscribe({
+      error: () => {
+        // Don't surface audit persistence failures to the user — local state is updated.
+      },
+    });
   }
 
   private newestFirst(entries: readonly AuditEntry[]): AuditEntry[] {
-    return [...entries].sort((a, b) => b.at.localeCompare(a.at));
+    return [...entries].sort((a, b) => (b.at ?? '').localeCompare(a.at ?? ''));
   }
 }
 
@@ -313,7 +364,7 @@ function toPatientAccount(api: ApiAccount): PatientAccount {
     phone: api.mobileNumber,
     dateOfBirth: api.dateOfBirth,
     status: api.status,
-    registeredOn: api.createdAt.slice(0, 10),
+    registeredOn: api.createdAt ? api.createdAt.slice(0, 10) : '',
   };
 }
 

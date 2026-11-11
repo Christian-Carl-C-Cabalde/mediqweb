@@ -1,0 +1,1 @@
+{"nodes": [{"id": "schema_primary_keys_strategy", "label": "Select Optimal Primary Key Strategy", "file_type": "document", "source_file": "agent/skills/supabase-postgres-best-practices/references/schema-primary-keys.md", "rationale": "Recommends IDENTITY for sequential IDs and UUIDv7 for distributed systems to avoid fragmentation."}], "edges": [], "hyperedges": []}

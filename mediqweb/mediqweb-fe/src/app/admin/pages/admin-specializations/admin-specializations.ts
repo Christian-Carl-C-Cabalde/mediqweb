@@ -106,8 +106,14 @@ export class AdminSpecializations {
       this.session.updateSpecialization(current.id, name, description);
       this.toasts.success('Specialization updated', `${label} now reads "${description.trim()}".`);
     } else {
-      this.session.addSpecialization(name, description);
-      this.toasts.success('Specialization added', `${label} is now available to assign.`);
+      this.session.addSpecialization(name, description).subscribe({
+        next: () => {
+          this.toasts.success('Specialization added', `${label} is now available to assign.`);
+        },
+        error: () => {
+          this.toasts.error('Failed to add specialization', 'Please try again.');
+        },
+      });
     }
 
     // Closed before the toast, so the notification is not behind the dialog's

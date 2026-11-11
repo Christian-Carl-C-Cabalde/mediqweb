@@ -297,6 +297,9 @@ data class UserProfile(
     val assignedDoctorId: String? = null,
     val createdAt: String,
     val updatedAt: String,
+    val specialization: String = "",
+    val licenseNumber: String = "",
+    val joinedOn: String = "",
 )
 
 @Serializable

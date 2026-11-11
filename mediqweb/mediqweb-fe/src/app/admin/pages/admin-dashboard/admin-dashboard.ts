@@ -134,7 +134,7 @@ export class AdminDashboard {
     const appointments = this.session.appointments();
     return LIFECYCLE.map(({ label, status, tone }) => ({
       label,
-      value: appointments.filter((appointment) => appointment.status === status).length,
+      value: appointments.filter((appointment) => appointment.status?.toLowerCase() === status).length,
       color: BADGE_TONE_TOKEN[tone],
     }));
   });

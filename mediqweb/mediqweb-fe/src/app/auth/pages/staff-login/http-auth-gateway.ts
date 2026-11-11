@@ -1,36 +1,60 @@
 import { Injectable, inject } from '@angular/core';
-import { firstValueFrom } from 'rxjs';
-import { AuthSession } from '../../../core/api/models';
-import { HttpClient } from '@angular/common/http';
 import { StaffCredentials, StaffRole } from './auth.gateway';
+import { SupabaseService } from '../../../core/api/supabase.service';
 import { AuthService } from '../../../core/api/auth.service';
-import { environment } from '../../../../environments/environment';
 
-const SIGN_IN = `${environment.apiBaseUrl}/auth/sign-in`;
-
-/**
- * HTTP implementation of AuthGateway for staff sign-in.
- *
- * Calls the Hono BFF (which proxies to Ktor), stores the resulting session,
- * and returns the user's role for routing.
- */
 @Injectable()
 export class HttpAuthGateway {
-  private readonly http = inject(HttpClient);
+  private readonly supabase = inject(SupabaseService);
   private readonly authService = inject(AuthService);
 
   async signIn(credentials: StaffCredentials): Promise<StaffRole> {
-    const session = await firstValueFrom(
-      this.http.post<{ accessToken: string; refreshToken: string; profile: { role: string } }>(
-        SIGN_IN,
-        { username: credentials.identifier, password: credentials.password },
-      ),
-    );
-    this.authService.setSessionFromGateway({
-      ...session,
-      expiresAt: new Date(Date.now() + 3600000).toISOString(),
-      refreshExpiresAt: new Date(Date.now() + 86400000).toISOString(),
-    } as AuthSession);
-    return session.profile.role as StaffRole;
+    // Resolve username → email if the identifier is not an email address.
+    let email = credentials.identifier;
+    if (!email.includes('@')) {
+      const { data: profile, error: profileError } = await this.supabase
+        .from('profiles')
+        .select('email')
+        .eq('username', email)
+        .single();
+      if (profileError || !profile?.email) {
+        throw new Error('Invalid credentials');
+      }
+      email = profile.email;
+    }
+
+    const { data, error } = await this.supabase.signIn(email, credentials.password);
+    if (error) throw error;
+
+    // Ensure we have a valid access token. Supabase may return null session for certain flows.
+    let accessToken: string | null = data.session?.access_token ?? null;
+    if (!accessToken) {
+      // Fallback: explicitly fetch the current session after sign‑in.
+      const sessResult = await this.supabase.getSession();
+      accessToken = sessResult?.data?.session?.access_token ?? null;
+    }
+    if (accessToken) {
+      this.authService.accessToken$.next(accessToken);
+    } else {
+      throw new Error('Failed to obtain access token after sign‑in');
+    }
+
+    // Fetch profile to determine role for routing
+    const { data: profileData } = await this.supabase.getProfile(data.user.id);
+    if (profileData) {
+      this.authService.profile$.next({
+        id: profileData.user_id,
+        username: profileData.username,
+        fullName: profileData.full_name ?? '',
+        email: profileData.email ?? '',
+        mobileNumber: profileData.mobile_number ?? '',
+        dateOfBirth: '',
+        role: profileData.role?.toLowerCase() ?? 'patient',
+        status: profileData.status ?? 'ACTIVE',
+      });
+    }
+
+    const role = profileData?.role?.toLowerCase() ?? 'patient';
+    return role as StaffRole;
   }
 }

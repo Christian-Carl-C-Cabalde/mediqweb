@@ -46,11 +46,11 @@ class AuthViewModel : ViewModel() {
     fun register(request: RegisterRequest) {
         viewModelScope.launch {
             _uiState.value = AuthUiState.Loading
-            try {
-                val session = api.register(request)
-                currentUser = session.profile
-                MediQSession.setTokens(session.accessToken, session.refreshToken)
-                _uiState.value = AuthUiState.Success(session.profile)
+try {
+            val session = api.register(request) ?: return@launch
+            currentUser = session.profile
+            MediQSession.setTokens(session.accessToken, session.refreshToken)
+            _uiState.value = AuthUiState.Success(session.profile)
             } catch (e: Exception) {
                 _uiState.value = AuthUiState.Error(registerMessage(e))
             }
@@ -72,6 +72,15 @@ class AuthViewModel : ViewModel() {
     }
 
     /**
+     * Starts a password reset for the given email and generates a local OTP
+     * code. No email or SMS is involved — the code appears on this device.
+     */
+    fun requestResetOtp(address: String) {
+        MediQSession.beginReset(address)
+        MediQSession.generateLocalOtp()
+    }
+
+    /**
      * Checks a one-time code.
      *
      * Returns the session the server issued when the code was right, or null
@@ -89,6 +98,20 @@ class AuthViewModel : ViewModel() {
     }
 
     /**
+     * Verifies a locally generated OTP code. Returns true when the code matches
+     * and has not expired. Consumes the code on success.
+     */
+    fun verifyLocalOtp(code: String): Boolean = MediQSession.verifyLocalOtp(code)
+
+    /**
+     * Generates a 6-digit local OTP code and stores it for verification.
+     * No third-party email or SMS is involved — the code lives on this device.
+     */
+    fun generateLocalOtp() {
+        MediQSession.generateLocalOtp()
+    }
+
+    /**
      * Sets a new password for the account the code proved.
      */
     suspend fun updatePassword(newPassword: String): Boolean = try {
@@ -97,6 +120,23 @@ class AuthViewModel : ViewModel() {
     } catch (e: Exception) {
         _uiState.value = AuthUiState.Error(e.message ?: "We could not save your new password.")
         false
+    }
+
+    /**
+     * Verifies the local OTP code and, when it is right, sets a new password
+     * for the account. Returns true when the reset succeeded.
+     */
+    suspend fun resetPassword(code: String, newPassword: String): Boolean {
+        return try {
+            if (!MediQSession.verifyLocalOtp(code)) {
+                _uiState.value = AuthUiState.Error("That code is not right. Check the six digits and try again.")
+                return false
+            }
+            updatePassword(newPassword)
+        } catch (e: Exception) {
+            _uiState.value = AuthUiState.Error(e.message ?: "We could not reset your password.")
+            false
+        }
     }
 
     /**

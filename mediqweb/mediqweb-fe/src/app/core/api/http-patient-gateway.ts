@@ -31,6 +31,7 @@ function toProfile(row: any): UserProfile {
     role: (row.role ?? 'patient') as UserProfile['role'],
     status: row.status ?? 'ACTIVE',
     assignedDoctorId: row.assigned_doctor_id,
+    joinedOn: row.created_at ?? '',
   };
 }
 

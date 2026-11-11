@@ -1,0 +1,1 @@
+{"nodes": [{"id": "schema_constraints_migrations", "label": "Add Constraints Safely in Migrations", "file_type": "document", "source_file": "agent/skills/supabase-postgres-best-practices/references/schema-constraints.md", "rationale": "Provides idempotent patterns for adding constraints in PostgreSQL."}], "edges": [], "hyperedges": []}

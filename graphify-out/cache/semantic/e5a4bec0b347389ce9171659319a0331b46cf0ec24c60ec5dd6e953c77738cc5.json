@@ -1,0 +1,1 @@
+{"nodes": [{"id": "lock_deadlock_prevention_ordering", "label": "Prevent Deadlocks with Consistent Lock Ordering", "file_type": "document", "source_file": "agent/skills/supabase-postgres-best-practices/references/lock-deadlock-prevention.md", "rationale": "Improves reliability by eliminating circular wait conditions.", "_origin": "semantic"}], "edges": [], "hyperedges": []}

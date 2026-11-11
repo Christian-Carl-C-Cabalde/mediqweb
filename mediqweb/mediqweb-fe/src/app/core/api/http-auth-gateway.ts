@@ -39,8 +39,9 @@ export class HttpAuthGateway {
                     email: p.email ?? '',
                     mobileNumber: p.email ?? '',
                     dateOfBirth: '',
-                    role: (p.role ?? 'patient') as UserProfile['role'],
+                    role: ((p.role ?? 'patient') as string).toLowerCase() as UserProfile['role'],
                     status: p.status ?? 'ACTIVE',
+                    joinedOn: p.created_at ?? '',
                   },
                 };
                 return session;
@@ -77,8 +78,9 @@ export class HttpAuthGateway {
               email: p.email ?? '',
               mobileNumber: p.email ?? '',
               dateOfBirth: '',
-              role: (p.role ?? 'patient') as UserProfile['role'],
+              role: ((p.role ?? 'patient') as string).toLowerCase() as UserProfile['role'],
               status: p.status ?? 'ACTIVE',
+              joinedOn: p.created_at ?? '',
             } as UserProfile;
           }),
         );

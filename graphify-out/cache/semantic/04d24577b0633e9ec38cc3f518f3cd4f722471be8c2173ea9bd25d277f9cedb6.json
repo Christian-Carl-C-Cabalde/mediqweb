@@ -1,0 +1,1 @@
+{"nodes": [{"id": "query_missing_indexes_where_join", "label": "Add Indexes on WHERE and JOIN Columns", "file_type": "document", "source_file": "agent/skills/supabase-postgres-best-practices/references/query-missing-indexes.md", "rationale": "Critical for avoiding sequential scans on large tables.", "_origin": "semantic"}], "edges": [], "hyperedges": []}

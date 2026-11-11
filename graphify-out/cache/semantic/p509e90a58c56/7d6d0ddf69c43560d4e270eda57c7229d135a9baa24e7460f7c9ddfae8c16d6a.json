@@ -1,0 +1,1 @@
+{"nodes": [{"id": "schema_lowercase_identifiers_compatibility", "label": "Use Lowercase Identifiers for Compatibility", "file_type": "document", "source_file": "agent/skills/supabase-postgres-best-practices/references/schema-lowercase-identifiers.md", "rationale": "Avoids case-sensitivity bugs and quoting requirements in tools and ORMs."}], "edges": [], "hyperedges": []}

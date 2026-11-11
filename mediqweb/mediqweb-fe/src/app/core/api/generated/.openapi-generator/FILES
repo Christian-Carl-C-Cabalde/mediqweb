@@ -1,0 +1,17 @@
+.gitignore
+.npmignore
+README.md
+api.ts
+base.ts
+common.ts
+configuration.ts
+docs/AuthSession.md
+docs/DefaultApi.md
+docs/RegisterRequest.md
+docs/SignInRequest.md
+docs/UserProfile.md
+git_push.sh
+index.ts
+package.json
+tsconfig.esm.json
+tsconfig.json

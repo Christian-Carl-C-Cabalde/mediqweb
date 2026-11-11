@@ -18,6 +18,10 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Supabase credentials (hardcoded in buildConfigField below)
+        buildConfigField("String", "SUPABASE_URL", "\"https://wdoyhtjpjhmagdllvd.supabase.co\"")
+        buildConfigField("String", "SUPABASE_ANON_KEY", "\"sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH\"")
     }
 
     buildTypes {

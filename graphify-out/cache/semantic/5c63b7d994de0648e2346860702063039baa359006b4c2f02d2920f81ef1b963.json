@@ -1,0 +1,1 @@
+{"nodes": [{"id": "monitor_pg_stat_statements_analysis", "label": "Enable pg_stat_statements for Query Analysis", "file_type": "document", "source_file": "agent/skills/supabase-postgres-best-practices/references/monitor-pg-stat-statements.md", "rationale": "Provides visibility into top resource-consuming query patterns.", "_origin": "semantic"}], "edges": [], "hyperedges": []}

@@ -20,13 +20,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.example.mediq.data.model.OtpPurpose
 import com.example.mediq.ui.components.MediQPageHeader
 import com.example.mediq.ui.components.MediQNotice
 import com.example.mediq.ui.navigation.Screen
+import com.example.mediq.ui.session.MediQSession
 import com.example.mediq.ui.theme.MediQBackground
 import com.example.mediq.ui.theme.MediQError
 import com.example.mediq.ui.theme.MediQErrorContainer
@@ -39,7 +40,7 @@ import kotlinx.coroutines.launch
 /**
  * Forgot password, step 2: the code and the new password.
  *
- * Job: prove the number belongs to the patient and set a new password.
+ * Job: prove the code shown on this device and set a new password.
  * Primary action: reset the password.
  */
 @Composable
@@ -54,13 +55,20 @@ fun ResetPasswordScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var saving by remember { mutableStateOf(false) }
 
-    val contact = navController.previousBackStackEntry
+    val email = navController.previousBackStackEntry
         ?.savedStateHandle
-        ?.get<String>(RESET_CONTACT_KEY)
-        ?: AuthSamples.PHONE_NUMBER
+        ?.get<String>(RESET_EMAIL_KEY)
+        ?: ""
+
+    /*
+     * The locally generated 6-digit code lives in MediQSession. Read it here
+     * so it can be displayed on screen for the patient to read and type back.
+     */
+    val otpCode = MediQSession.currentOtpCode
 
     ResetPasswordContent(
-        contact = contact,
+        email = email,
+        otpCode = otpCode,
         code = code,
         onCodeChange = { code = it.filter { ch -> ch.isDigit() }.take(AuthValidation.OTP_LENGTH); error = null },
         password = password,
@@ -87,14 +95,12 @@ fun ResetPasswordScreen(
 
             saving = true
             scope.launch {
-                val session = viewModel.verifyOtp(contact, code, OtpPurpose.RESET_PASSWORD)
-                val saved = session != null && viewModel.updatePassword(password)
+                val ok = viewModel.resetPassword(code, password)
                 saving = false
-                if (saved) {
+                if (ok) {
                     navController.navigate(Screen.SignIn.route) { popUpTo(0) }
-                } else {
-                    error = "We could not reset the password. Check the code and try again."
                 }
+                // error is already set by viewModel.resetPassword on failure
             }
         }
     )
@@ -103,7 +109,8 @@ fun ResetPasswordScreen(
 /** The code and password step. Everything below this point is previewable. */
 @Composable
 fun ResetPasswordContent(
-    contact: String,
+    email: String,
+    otpCode: String?,
     code: String,
     onCodeChange: (String) -> Unit,
     password: String,
@@ -140,10 +147,35 @@ fun ResetPasswordContent(
             Spacer(Modifier.height(MediQSpacing.xs))
 
             Text(
-                text = "We sent a ${AuthValidation.OTP_LENGTH}-digit code to $contact. Enter it with the new password you want.",
+                text = "Enter the code shown above with the new password you want.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MediQTextSecondary
             )
+
+            Spacer(Modifier.height(MediQSpacing.xxl))
+
+            // The locally generated code, displayed in large digits.
+            otpCode?.let { displayed ->
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = MediQSpacing.gutter)
+                        .align(Alignment.CenterHorizontally)
+                ) {
+                    Text(
+                        text = displayed.chunked(2).joinToString(" "),
+                        style = MaterialTheme.typography.displayMedium,
+                        color = MediQTextPrimary,
+                        modifier = Modifier
+                            .padding(vertical = MediQSpacing.lg)
+                            .background(
+                                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                shape = MaterialTheme.shapes.medium
+                            )
+                            .padding(horizontal = MediQSpacing.xl)
+                    )
+                }
+            }
 
             Spacer(Modifier.height(MediQSpacing.xxl))
 
@@ -194,7 +226,7 @@ fun ResetPasswordContent(
 
             AuthPrimaryButton(
                 label = if (saving) "Resetting..." else "Reset password",
-                enabled = !saving,
+                enabled = !saving && code.length == AuthValidation.OTP_LENGTH,
                 onClick = onReset
             )
 

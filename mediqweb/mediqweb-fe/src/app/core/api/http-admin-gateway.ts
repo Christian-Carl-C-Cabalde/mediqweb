@@ -6,7 +6,11 @@ import type { AccountStatus } from '../../shared/domain/account-status';
 import { SupabaseService } from './supabase.service';
 import type { Appointment, AppointmentFilter, Paged } from './models';
 
-function toStaffAccount(row: any): StaffAccount {
+function toStaffAccount(
+  row: any,
+  specializationId: string | null = null,
+  licenseNumber: string | null = null,
+): StaffAccount {
   return {
     id: row.user_id,
     name: row.full_name ?? '',
@@ -14,8 +18,8 @@ function toStaffAccount(row: any): StaffAccount {
     username: row.username,
     status: row.status,
     role: row.role,
-    specializationId: null,
-    licenseNumber: null,
+    specializationId,
+    licenseNumber,
     assignedDoctorId: row.assigned_doctor_id ?? null,
     joinedOn: row.created_at ?? '',
     lastActiveOn: null,
@@ -79,10 +83,13 @@ export class HttpAdminGateway {
             .select('*')
             .eq('role', 'ADMIN')
             .eq('user_id', result.data.user.id)
-            .single(),
+            .maybeSingle(),
         ).pipe(
           switchMap((adminResult: any) => {
-            if (adminResult.error || !adminResult.data) {
+            if (adminResult.error) {
+              throw new Error(adminResult.error?.message ?? 'Failed to verify admin');
+            }
+            if (!adminResult.data) {
               throw new Error('Admin only');
             }
             return from((this.supabase as any).from('profiles').select('*')).pipe(
@@ -110,24 +117,58 @@ export class HttpAdminGateway {
         if (result.error || !result.data?.user) {
           throw new Error('Not authenticated');
         }
+        // Verify caller is ADMIN by reading their profile
         return from(
           (this.supabase as any)
             .from('profiles')
-            .insert({
-              username: draft.username,
-              full_name: draft.name,
-              email: draft.email,
-              role: kind.toUpperCase(),
-              status: 'ACTIVE',
-            })
-            .select()
-            .single(),
+            .select('role')
+            .eq('user_id', result.data.user.id)
+            .maybeSingle(),
         ).pipe(
-          map((r: any) => {
-            if (r.error || !r.data) {
-              throw new Error(r.error?.message ?? 'Failed to create account');
+          switchMap((adminResult: any) => {
+            if (adminResult.error) {
+              throw new Error(adminResult.error?.message ?? 'Failed to verify admin');
             }
-            return toStaffAccount(r.data);
+            if (!adminResult.data || adminResult.data.role !== 'ADMIN') {
+              throw new Error('Admin only');
+            }
+            // Call Edge Function that creates auth user + domain rows via service role
+            return from(
+              (this.supabase as any).client.functions.invoke('create-staff-account', {
+                body: {
+                  email: draft.email,
+                  username: draft.username,
+                  fullName: draft.name,
+                  password: draft.password,
+                  role: kind,
+                  specializationId: draft.specializationId ?? null,
+                  licenseNumber: draft.licenseNumber ?? null,
+                  assignedDoctorId: draft.assignedDoctorId ?? null,
+                  mobileNumber: '',
+                  dateOfBirth: '',
+                },
+              }),
+            ).pipe(
+              map((fnResult: any) => {
+                if (fnResult.error) {
+                  throw new Error(fnResult.error.message ?? 'Failed to create account');
+                }
+                const { userId, role: createdRole } = fnResult;
+                return {
+                  id: userId,
+                  name: draft.name,
+                  email: draft.email,
+                  username: draft.username,
+                  status: draft.status,
+                  role: kind,
+                  specializationId: kind === 'doctor' ? draft.specializationId ?? null : null,
+                  licenseNumber: kind === 'doctor' ? draft.licenseNumber ?? null : null,
+                  assignedDoctorId: kind === 'secretary' ? draft.assignedDoctorId ?? null : null,
+                  joinedOn: new Date().toISOString().slice(0, 10),
+                  lastActiveOn: null,
+                } as StaffAccount;
+              }),
+            );
           }),
         );
       }),
@@ -141,7 +182,7 @@ export class HttpAdminGateway {
         .update({ status })
         .eq('user_id', id)
         .select()
-        .single(),
+        .maybeSingle(),
     ).pipe(
       map((r: any) => {
         if (r.error || !r.data) {
@@ -159,7 +200,7 @@ export class HttpAdminGateway {
         .update({ assigned_doctor_id: doctorId })
         .eq('user_id', id)
         .select()
-        .single(),
+        .maybeSingle(),
     ).pipe(
       map((r: any) => {
         if (r.error || !r.data) {
@@ -185,7 +226,7 @@ export class HttpAdminGateway {
     Map<string, { specializationId: string | null; licenseNumber: string | null }>
   > {
     return from(
-      (this.supabase as any).from('doctors').select('id, specialization_id, license_number'),
+      (this.supabase as any).from('doctors').select('user_id, specialization_id, license_number'),
     ).pipe(
       map((r: any) => {
         if (r.error) {
@@ -193,7 +234,7 @@ export class HttpAdminGateway {
         }
         return new Map(
           (r.data ?? []).map((d: any) => [
-            d.id,
+            d.user_id,
             { specializationId: d.specialization_id, licenseNumber: d.license_number },
           ]),
         );
@@ -240,6 +281,57 @@ export class HttpAdminGateway {
         limit: filter?.limit ?? (r.data ?? []).length,
         offset: filter?.offset ?? 0,
       })),
+    );
+  }
+
+  getSettings(): Observable<{
+    clinic_name: string;
+    address: string;
+    contact_email: string;
+    contact_number: string;
+    session_timeout_minutes: number;
+    retention_period_days: number;
+    updated_at: string;
+  }> {
+    return from((this.supabase as any).from('clinic_settings').select('*').single()).pipe(
+      map((r: any) => {
+        if (r.error) {
+          throw new Error(r.error?.message ?? 'Failed to load settings');
+        }
+        return r.data ?? {};
+      }),
+    );
+  }
+
+  updateSettings(draft: {
+    clinic_name?: string;
+    address?: string;
+    contact_email?: string;
+    contact_number?: string;
+    session_timeout_minutes?: number;
+    retention_period_days?: number;
+  }): Observable<{ id: string }> {
+    return from(this.supabase.getUser()).pipe(
+      switchMap((result: any) => {
+        if (result.error || !result.data?.user) {
+          throw new Error('Not authenticated');
+        }
+        return from(
+          (this.supabase as any)
+            .from('clinic_settings')
+            .update({ ...draft, updated_by: result.data.user.id })
+            .eq('id', 'clinic')
+            .select('id')
+            .single(),
+        ).pipe(
+          map((r: any) => {
+            if (r.error) {
+              throw new Error(r.error?.message ?? 'Failed to save settings');
+            }
+            return r.data ?? { id: 'clinic' };
+          }),
+        );
+      }),
     );
   }
 }

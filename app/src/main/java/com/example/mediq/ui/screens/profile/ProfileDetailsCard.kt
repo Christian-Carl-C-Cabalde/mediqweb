@@ -118,6 +118,32 @@ internal fun ProfileDetailsCard(
                 HorizontalDivider(color = MediQBorder, modifier = Modifier.padding(horizontal = MediQSpacing.md))
             }
 
+            // Doctor-specific fields
+            profile.specialization?.let { spec ->
+                HorizontalDivider(color = MediQBorder, modifier = Modifier.padding(horizontal = MediQSpacing.md))
+                ProfileDetailRow(
+                    label = "Specialization",
+                    value = spec,
+                    modifier = Modifier.padding(horizontal = MediQSpacing.md, vertical = MediQSpacing.md),
+                )
+            }
+            profile.licenseNumber?.let { lic ->
+                HorizontalDivider(color = MediQBorder, modifier = Modifier.padding(horizontal = MediQSpacing.md))
+                ProfileDetailRow(
+                    label = "License number",
+                    value = lic,
+                    modifier = Modifier.padding(horizontal = MediQSpacing.md, vertical = MediQSpacing.md),
+                )
+            }
+            profile.joinedOn?.let { joined ->
+                HorizontalDivider(color = MediQBorder, modifier = Modifier.padding(horizontal = MediQSpacing.md))
+                ProfileDetailRow(
+                    label = "Joined MediQ",
+                    value = joined,
+                    modifier = Modifier.padding(horizontal = MediQSpacing.md, vertical = MediQSpacing.md),
+                )
+            }
+
             OutlinedButton(
                 onClick = onEdit,
                 modifier = Modifier

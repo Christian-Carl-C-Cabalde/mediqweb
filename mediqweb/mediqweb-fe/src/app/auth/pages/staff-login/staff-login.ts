@@ -5,6 +5,7 @@ import { Brand, Button, FormField } from '../../../shared/components';
 import { ForgotPassword } from '../../components/forgot-password/forgot-password';
 import { AUTH_GATEWAY, StaffRole } from './auth.gateway';
 import { emailOrUsername } from './staff-login.validators';
+import { AuthService } from '../../../core/api/auth.service';
 
 /**
  * Staff sign-in for Admin, Doctor and Secretary.
@@ -12,8 +13,7 @@ import { emailOrUsername } from './staff-login.validators';
  * Delegates authentication to the `AUTH_GATEWAY` seam so the page stays
  * agnostic of *how* credentials are verified (Supabase Auth today, Ktor
  * tomorrow). On success the gateway returns the staff role and this page
- * routes to the matching dashboard. The Supabase session (access token,
- * profile) is owned by `AuthService` once the gateway signs in.
+ * routes to the matching dashboard.
  */
 @Component({
   selector: 'app-staff-login',
@@ -26,6 +26,7 @@ import { emailOrUsername } from './staff-login.validators';
 export class StaffLogin {
   private readonly fb = inject(FormBuilder);
   private readonly gateway = inject(AUTH_GATEWAY);
+  private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
 
   protected readonly loading = signal(false);
@@ -41,8 +42,8 @@ export class StaffLogin {
   protected identifierError(): string | null {
     const control = this.form.controls.identifier;
     if (!control.touched) return null;
-    if (control.hasError('required')) return 'Enter your email or username.';
-    if (control.hasError('emailOrUsername')) return 'Enter a valid email address or username.';
+    if (control.hasError('required')) return 'Enter your email address.';
+    if (control.hasError('emailOrUsername')) return 'Enter a valid email address.';
     return null;
   }
 
@@ -76,10 +77,10 @@ export class StaffLogin {
 
       const route =
         role === 'admin'
-          ? '/admin/dashboard'
+          ? '/admin'
           : role === 'doctor'
-            ? '/doctor/dashboard'
-            : '/secretary/dashboard';
+            ? '/doctor'
+            : '/secretary';
       try {
         await this.router.navigate([route]);
       } catch {

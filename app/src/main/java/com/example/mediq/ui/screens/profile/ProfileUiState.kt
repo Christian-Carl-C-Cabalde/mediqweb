@@ -13,7 +13,10 @@ data class ProfileData(
     val email: String? = null,
     val initials: String,
     val phoneNumber: String? = null,
-    val dateOfBirth: String? = null
+    val dateOfBirth: String? = null,
+    val specialization: String? = null,
+    val licenseNumber: String? = null,
+    val joinedOn: String? = null,
 )
 
 val MockProfile = ProfileData(
@@ -63,7 +66,10 @@ fun UserProfile.toProfileData(): ProfileData =
         email = email?.takeIf { it.isNotBlank() },
         initials = DisplayName.initials(fullName),
         phoneNumber = mobileNumber.takeIf { it.isNotBlank() },
-        dateOfBirth = dateOfBirth.takeIf { it.isNotBlank() }
+        dateOfBirth = dateOfBirth.takeIf { it.isNotBlank() },
+        specialization = specialization.takeIf { it.isNotBlank() },
+        licenseNumber = licenseNumber.takeIf { it.isNotBlank() },
+        joinedOn = createdAt.takeIf { it.isNotBlank() },
     )
 
 fun SignedInUser.toProfileData(): ProfileData =

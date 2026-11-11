@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.example.mediq.data.api.SupabaseClient
 import java.io.File
+import java.util.concurrent.TimeUnit
+import kotlin.random.Random
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -60,6 +62,36 @@ object MediQSession {
      * name, so it is kept here to answer the next sign-in.
      */
     private val knownAccounts = mutableMapOf<String, SignedInUser>()
+
+    /** A locally generated one-time code for registration, waiting to be verified. */
+    internal data class OtpPending(
+        val code: String,
+        val expiresAt: Long,
+    )
+
+    /** How long a locally generated OTP stays valid (5 minutes). */
+    internal const val OTP_EXPIRY_MILLIS = 5L * 60 * 1000
+
+    /** A locally generated OTP code and when it expires. */
+    private var pendingOtp: OtpPending? = null
+
+    /** The currently valid local OTP code, or null when none exists or it has expired. */
+    internal val currentOtpCode: String?
+        get() {
+            val pending = pendingOtp ?: return null
+            if (System.currentTimeMillis() > pending.expiresAt) {
+                pendingOtp = null
+                return null
+            }
+            return pending.code
+        }
+
+    /** The email waiting for password reset, waiting for OTP verification. */
+    private var resetEmail: String? = null
+
+    /** The email being reset, or null when no reset is in progress. */
+    internal val currentResetEmail: String?
+        get() = resetEmail
 
     /** The details step's pending registration, waiting for the username. */
     internal data class RegistrationPending(
@@ -142,6 +174,46 @@ object MediQSession {
         val pending = pendingRegistration
         pendingRegistration = null
         return pending
+    }
+
+    /**
+     * Generates a 6-digit local OTP code and stores it for verification.
+     * No third-party email or SMS is involved — the code lives on this device.
+     */
+    fun generateLocalOtp(): String {
+        val code = (100_000 + Random.nextInt(900_000)).toString()
+        pendingOtp = OtpPending(code, System.currentTimeMillis() + OTP_EXPIRY_MILLIS)
+        return code
+    }
+
+    /**
+     * Verifies a locally generated OTP code. Returns true when the code matches
+     * and has not expired. Consumes the code on success so it cannot be reused.
+     */
+    fun verifyLocalOtp(code: String): Boolean {
+        val pending = pendingOtp ?: return false
+        if (System.currentTimeMillis() > pending.expiresAt) {
+            pendingOtp = null
+            return false
+        }
+        if (pending.code != code) return false
+        pendingOtp = null
+        return true
+    }
+
+    /**
+     * Starts a password reset for the given email. Stores the email so the
+     * reset step can show it on screen.
+     */
+    fun beginReset(email: String) {
+        resetEmail = email.trim().lowercase()
+    }
+
+    /**
+     * Clears the pending reset email.
+     */
+    internal fun clearReset() {
+        resetEmail = null
     }
 
     /**

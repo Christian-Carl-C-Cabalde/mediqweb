@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { from, of, switchMap } from 'rxjs';
 import { type ActivatedRouteSnapshot, NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
 import {
@@ -9,12 +10,7 @@ import {
   type StaffProfile,
 } from '../shared/layouts';
 import { AdminSession } from './admin-session';
-
-/**
- * The signed-in administrator. Placeholder identity — there is no session yet,
- * so the role and the menu are fixed rather than derived from a token.
- */
-const ADMIN: StaffProfile = { name: 'Alex Rivera', role: 'Administrator' };
+import { SupabaseService } from '../core/api/supabase.service';
 
 const DASHBOARD_ROUTE = '/admin/dashboard';
 
@@ -84,8 +80,9 @@ const ADMIN_NAV: readonly StaffNavEntry[] = [
 })
 export class AdminShell {
   private readonly router = inject(Router);
+  private readonly supabase = inject(SupabaseService);
 
-  protected readonly user = ADMIN;
+  protected user: StaffProfile = { name: 'Administrator', role: 'ADMIN' };
   protected readonly nav = ADMIN_NAV;
 
   /**
@@ -111,14 +108,42 @@ export class AdminShell {
   });
 
   constructor() {
-    // Navigation *end*, not start, so the snapshot already points at the new
-    // route by the time the heading is recomputed.
+    // Load the signed-in admin's profile from Supabase so the shell shows
+    // real name and role instead of a placeholder.
+    from(this.supabase.getUser()).pipe(
+      switchMap((result: any) => {
+        if (result.error || !result.data?.user) {
+          this.user = { name: 'Administrator', role: 'ADMIN' };
+          return of(null);
+        }
+        return from(
+          this.supabase
+            .from('profiles')
+            .select('full_name, email, role')
+            .eq('user_id', result.data.user.id)
+            .single(),
+        );
+      }),
+    ).subscribe({
+      next: (profileResult: any) => {
+        if (!profileResult?.data) return;
+        this.user = {
+          name: profileResult.data.full_name || 'Administrator',
+          role: profileResult.data.role || 'ADMIN',
+          email: profileResult.data.email,
+        };
+      },
+      error: () => {
+        this.user = { name: 'Administrator', role: 'ADMIN' };
+      },
+    });
+
     this.router.events
       .pipe(
         filter((event) => event instanceof NavigationEnd),
         takeUntilDestroyed(),
       )
-      .subscribe(() => this.navCount.update((n) => n + 1));
+      .subscribe(() => this.navCount.update((n: number) => n + 1));
   }
 
   /**

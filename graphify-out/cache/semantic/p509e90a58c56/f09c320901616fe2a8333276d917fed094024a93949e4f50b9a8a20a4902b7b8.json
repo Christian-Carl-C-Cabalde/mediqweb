@@ -1,0 +1,1 @@
+{"nodes": [{"id": "docs_api_contract", "label": "MediQ API Contract", "file_type": "document", "source_file": "docs/api-contract.md", "rationale": "Canonical definition of endpoints, request/response shapes, and auth rules."}], "edges": [], "hyperedges": []}

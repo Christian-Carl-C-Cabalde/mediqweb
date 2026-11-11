@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -24,7 +23,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.example.mediq.data.model.OtpPurpose
 import com.example.mediq.ui.components.MediQPageHeader
 import com.example.mediq.ui.components.MediQNotice
 import com.example.mediq.ui.navigation.Screen
@@ -37,14 +35,15 @@ import com.example.mediq.ui.theme.MediQTextSecondary
 import com.example.mediq.ui.viewmodel.AuthViewModel
 import kotlinx.coroutines.launch
 
-/** The saved-state key the contact step leaves the number under. */
-internal const val RESET_CONTACT_KEY = "reset_password_contact"
+/** The saved-state key the email step leaves the address under. */
+internal const val RESET_EMAIL_KEY = "reset_password_email"
 
 /**
- * Forgot password, step 1: which number.
+ * Forgot password, step 1: which email.
  *
- * Job: send a one-time code to the number the patient signed up with.
- * Primary action: send the code.
+ * Job: collect the email on the account and generate a local one-time code.
+ * Primary action: send the code. No email or SMS is sent — the code appears
+ * on this device.
  */
 @Composable
 fun ForgotPasswordScreen(
@@ -52,46 +51,48 @@ fun ForgotPasswordScreen(
     viewModel: AuthViewModel = viewModel()
 ) {
     val scope = rememberCoroutineScope()
-    var contact by rememberSaveable { mutableStateOf("") }
+    var email by rememberSaveable { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
-    var sending by remember { mutableStateOf(false) }
+    var generating by remember { mutableStateOf(false) }
 
     ForgotPasswordContent(
-        contact = contact,
-        onContactChange = { contact = it; error = null },
+        email = email,
+        onEmailChange = { email = it; error = null },
         error = error,
-        sending = sending,
+        generating = generating,
         onBack = { navController.popBackStack() },
         onSendCode = {
-            val number = contact.trim()
-            if (number.isEmpty()) {
-                error = "Enter the number you signed up with"
+            val address = email.trim()
+            if (address.isEmpty()) {
+                error = "Enter your email address"
                 return@ForgotPasswordContent
             }
-            sending = true
+            generating = true
             scope.launch {
-                val sent = viewModel.requestOtp(number, OtpPurpose.RESET_PASSWORD)
-                sending = false
-                if (sent) {
-                    navController.currentBackStackEntry
-                        ?.savedStateHandle
-                        ?.set(RESET_CONTACT_KEY, number)
-                    navController.navigate(Screen.ResetPassword.route)
-                } else {
-                    error = "We could not send the code. Check your connection and try again."
+                val emailError = AuthValidation.validateEmail(address)
+                if (emailError != null) {
+                    generating = false
+                    error = emailError
+                    return@launch
                 }
+                viewModel.requestResetOtp(address)
+                generating = false
+                navController.currentBackStackEntry
+                    ?.savedStateHandle
+                    ?.set(RESET_EMAIL_KEY, address)
+                navController.navigate(Screen.ResetPassword.route)
             }
         }
     )
 }
 
-/** The number step. Everything below this point is previewable. */
+/** The email step. Everything below this point is previewable. */
 @Composable
 fun ForgotPasswordContent(
-    contact: String,
-    onContactChange: (String) -> Unit,
+    email: String,
+    onEmailChange: (String) -> Unit,
     error: String?,
-    sending: Boolean,
+    generating: Boolean,
     onBack: () -> Unit,
     onSendCode: () -> Unit,
     modifier: Modifier = Modifier
@@ -120,7 +121,7 @@ fun ForgotPasswordContent(
             Spacer(Modifier.height(MediQSpacing.xs))
 
             Text(
-                text = "Tell us the number on your account and we will send a code to prove it is yours.",
+                text = "Enter the email on your account. A code will appear on this screen to verify it is you.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MediQTextSecondary
             )
@@ -128,13 +129,13 @@ fun ForgotPasswordContent(
             Spacer(Modifier.height(MediQSpacing.xxl))
 
             AuthField(
-                value = contact,
-                onValueChange = onContactChange,
-                label = "Mobile number",
-                placeholder = AuthSamples.PHONE_NUMBER,
+                value = email,
+                onValueChange = onEmailChange,
+                label = "Email address",
+                placeholder = "name@example.com",
                 error = error,
-                enabled = !sending,
-                keyboardType = KeyboardType.Phone
+                enabled = !generating,
+                keyboardType = KeyboardType.Text
             )
 
             if (error != null) {
@@ -151,8 +152,8 @@ fun ForgotPasswordContent(
             Spacer(Modifier.height(MediQSpacing.xxl))
 
             AuthPrimaryButton(
-                label = if (sending) "Sending code..." else "Send code",
-                enabled = !sending,
+                label = if (generating) "Generating code..." else "Send code",
+                enabled = !generating,
                 onClick = onSendCode
             )
 

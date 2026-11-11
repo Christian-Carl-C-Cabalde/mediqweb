@@ -1,0 +1,1 @@
+{"nodes": [{"id": "schema_partitioning_large_tables", "label": "Partition Large Tables for Better Performance", "file_type": "document", "source_file": "agent/skills/supabase-postgres-best-practices/references/schema-partitioning.md", "rationale": "Improves maintenance and query performance for tables > 100M rows.", "_origin": "semantic"}], "edges": [], "hyperedges": []}

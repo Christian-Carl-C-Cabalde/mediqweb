@@ -17,9 +17,6 @@ echo ">> Substituting API URLs into environment.prod.ts"
 if [ -n "$API_BASE_URL" ]; then
   sed -i "s#https://api\.mediq\.app#$API_BASE_URL#g" src/environments/environment.prod.ts
 fi
-if [ -n "$BFF_BASE_URL" ]; then
-  sed -i "s#https://bff\.mediq\.app#$BFF_BASE_URL#g" src/environments/environment.prod.ts
-fi
 
 echo ">> Building Angular application"
 npm run build

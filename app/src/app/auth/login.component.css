@@ -1,0 +1,105 @@
+.login-screen {
+  max-width: 400px;
+  margin: 3rem auto;
+  padding: 2rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.login-header h1 {
+  margin: 0;
+  font-size: 1.75rem;
+  color: #1f2937;
+}
+
+.login-header p {
+  margin: 0.5rem 0 0;
+  color: #6b7280;
+  font-size: 0.95rem;
+}
+
+.demo-accounts {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.demo-btn {
+  width: 100%;
+  padding: 0.875rem;
+  background: #f3f4f6;
+  border: 2px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #1f2937;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.demo-btn:hover {
+  background: #e5e7eb;
+  border-color: #d1d5db;
+}
+
+.demo-btn:active {
+  background: #d1d5db;
+}
+
+.demo-btn span {
+  display: block;
+  margin-top: 0.25rem;
+}
+
+.error-banner {
+  background: #fee2e2;
+  color: #991b1b;
+  padding: 0.75rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  text-align: center;
+  border: 1px solid #f87171;
+}
+
+.success-screen {
+  text-align: center;
+  padding: 3rem;
+  background: #d1fae5;
+  border-radius: 8px;
+  margin: 2rem auto;
+  max-width: 400px;
+}
+
+.success-screen h3 {
+  color: #059669;
+  margin-bottom: 1rem;
+}
+
+.success-screen p {
+  color: #6b7280;
+  margin-bottom: 1.5rem;
+}
+
+.reset-btn {
+  width: 100%;
+  padding: 0.75rem;
+  background: #1d4ed8;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  margin-top: 1rem;
+  cursor: pointer;
+}
+
+.reset-btn:hover {
+  background: #1e40af;
+}
+```

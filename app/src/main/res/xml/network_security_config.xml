@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  The MediQ API is reached over HTTPS only. Cleartext traffic is not
-  permitted for any domain, including the production API host.
+  The MediQ app reaches the Ktor backend over HTTPS and Supabase REST API over HTTPS.
+  Cleartext traffic is not permitted for any domain.
 -->
 <network-security-config>
     <domain-config cleartextTrafficPermitted="false">
         <domain includeSubdomains="false">mediq-ktor-server.onrender.com</domain>
+        <domain includeSubdomains="false">wdoyhtjpjhmhsegdllvd.supabase.co</domain>
     </domain-config>
 </network-security-config>

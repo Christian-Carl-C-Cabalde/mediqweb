@@ -1,0 +1,175 @@
+<div *ngIf="!isVerified" class="otp-container">
+  <h2>Enter OTP Code</h2>
+  
+  <p>An OTP has been sent to <strong>{{ email }}</strong>. Enter the 4-digit code below.</p>
+  
+  <div class="otp-inputs">
+    <input 
+      type="text" 
+      maxlength="1" 
+      (input)="onInput($event, 0)" 
+      class="otp-input"
+      placeholder="_"
+      autocomplete="one-time-code"
+    >
+    <input 
+      type="text" 
+      maxlength="1" 
+      (input)="onInput($event, 1)" 
+      class="otp-input"
+      placeholder="_"
+      autocomplete="one-time-code"
+    >
+    <input 
+      type="text" 
+      maxlength="1" 
+      (input)="onInput($event, 2)" 
+      class="otp-input"
+      placeholder="_"
+      autocomplete="one-time-code"
+    >
+    <input 
+      type="text" 
+      maxlength="1" 
+      (input)="onInput($event, 3)" 
+      class="otp-input"
+      placeholder="_"
+      autocomplete="one-time-code"
+    >
+  </div>
+  
+  <button (click)="resendOtp()" *ngIf="!isVerified" class="resend-btn">
+    Resend OTP
+  </button>
+  
+  <div *ngIf="error" class="error-message">
+    {{ error }}
+  </div>
+</div>
+
+<div *ngIf="isVerified" class="success-screen">
+  <h3>Logged in successfully!</h3>
+  <p>Welcome to MediQ</p>
+  <button (click)="loginCompleted()" class="continue-btn">Continue</button>
+</div>
+```
+
+```css
+.otp-container {
+  max-width: 360px;
+  margin: 2rem auto;
+  padding: 2rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.otp-container h2 {
+  text-align: center;
+  margin-bottom: 1rem;
+  color: #1f2937;
+}
+
+.otp-container p {
+  text-align: center;
+  margin-bottom: 2rem;
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+.otp-inputs {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+}
+
+.otp-input {
+  width: 56px;
+  height: 56px;
+  font-size: 24px;
+  text-align: center;
+  border: 2px solid #d1d5db;
+  border-radius: 6px;
+  background: #f9fafb;
+  color: #1f2937;
+  padding: 0;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.otp-input:hover {
+  border-color: #9ca3af;
+}
+
+.otp-input:focus {
+  border-color: #3b82f6;
+  background: #e5e7eb;
+}
+
+.otp-input:focus::placeholder {
+  opacity: 0;
+}
+
+.resend-btn {
+  width: 100%;
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: #1d4ed8;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.resend-btn:hover {
+  background: #1e40af;
+}
+
+.resend-btn:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
+.error-message {
+  background: #fee2e2;
+  color: #991b1b;
+  padding: 0.75rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  text-align: center;
+  border: 1px solid #f87171;
+}
+
+.success-screen {
+  text-align: center;
+  padding: 3rem;
+  background: #d1fae5;
+  border-radius: 8px;
+  margin: 2rem auto;
+  max-width: 360px;
+}
+
+.success-screen h3 {
+  color: #059669;
+  margin-bottom: 1rem;
+}
+
+.success-screen .continue-btn {
+  margin-top: 1rem;
+  padding: 0.75rem 1.5rem;
+  background: #1d4ed8;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.continue-btn:hover {
+  background: #1e40af;
+}
+```

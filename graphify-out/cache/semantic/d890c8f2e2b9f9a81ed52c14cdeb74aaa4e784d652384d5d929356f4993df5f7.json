@@ -1,0 +1,1 @@
+{"nodes": [{"id": "lock_skip_locked_queues", "label": "Use SKIP LOCKED for Non-Blocking Queue Processing", "file_type": "document", "source_file": "agent/skills/supabase-postgres-best-practices/references/lock-skip-locked.md", "rationale": "Enables parallel worker processing without blocking on locked rows.", "_origin": "semantic"}], "edges": [], "hyperedges": []}

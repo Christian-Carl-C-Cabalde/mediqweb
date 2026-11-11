@@ -82,7 +82,7 @@ export class AdminAuditLogs {
           field.toLowerCase().includes(term),
         );
       })
-      .sort((a, b) => b.at.localeCompare(a.at));
+      .sort((a, b) => (b.at ?? '').localeCompare(a.at ?? ''));
   });
 
   protected readonly totalCount = computed(() => this.session.auditEntries().length);

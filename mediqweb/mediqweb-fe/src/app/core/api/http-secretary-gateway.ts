@@ -195,7 +195,7 @@ export class HttpSecretaryGateway {
     );
   }
 
-  getDoctor(): Observable<Doctor> {
+  getDoctor(): Observable<Doctor | null> {
     return from(this.supabase.getUser()).pipe(
       switchMap((result: any) => {
         if (result.error || !result.data?.user) {
@@ -217,11 +217,14 @@ export class HttpSecretaryGateway {
                 .from('doctors')
                 .select('*')
                 .eq('user_id', profileResult.data.user_id)
-                .single(),
+                .maybeSingle(),
             ).pipe(
               map((r: any) => {
-                if (r.error || !r.data) {
+                if (r.error) {
                   throw new Error(r.error?.message ?? 'Doctor not found');
+                }
+                if (!r.data) {
+                  return null;
                 }
                 return toDoctor(r.data);
               }),

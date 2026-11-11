@@ -52,7 +52,7 @@ This summary reflects the live repository state (commits, file layout, code, and
   - Notifications: list/read/read-all
   - Admin: accounts/specializations/create staff/update status/doctors
   - Secretary: appointments/confirm/cancel/patients/messages
-- **MCP**: `mcp/McpServer.kt` registers MCP streamable HTTP endpoint `POST /mcp` (JSON-RPC 2.0) protected by bearer auth with tools `mediq_message` and `mediq_db_query` (stubs).
+- **MCP**: `mcp/McpServer.kt` registers MCP streamable HTTP endpoint `POST /mcp` (JSON-RPC 2.0) protected by bearer auth with tools `mediq_message` and `mediq_db_query` (stubs). JSON deserialization is strict (`ignoreUnknownKeys=false`, `isLenient=false`) so malformed JSON-RPC input fails fast instead of being silently accepted.
 - **Data**: Flyway migrations present (`resources/db/migration/V1__initial_schema.sql`); `Database.createDataSource` runs migrations at startup. H2 is the dev default; Postgres (incl. Supabase) configurable via `db.url`. Supabase schema mirrored in `supabase/migrations/20261024013521_initial_schema.sql`.
 - **Build**: Standalone Gradle project in `server/`. Background build started earlier (`gradlew.bat build`). Tests configured with JUnit5.
 - **Notes**: Server is the primary API for Android app (base URL 127.0.0.1:8099). Demo account mentioned in AGENTS: `demo_patient` / `demo12345`.

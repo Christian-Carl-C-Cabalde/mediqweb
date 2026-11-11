@@ -36,13 +36,13 @@ WHERE NOT EXISTS (SELECT 1 FROM specializations);
 -- -------------------------------------------------------
 INSERT INTO users (id, username, full_name, email, mobile_number, date_of_birth, role, status, doctor_id, assigned_doctor_id, created_at, updated_at)
 SELECT * FROM (VALUES
-  ('doc-1', 'dr.smith', 'Dr. Sarah Smith', 'dr.smith@mediq.app', '+639171234567', '1980-05-15', 'DOCTOR', 'ACTIVE', 'doc-1', NULL, NOW(), NOW()),
-  ('doc-2', 'dr.chen', 'Dr. Michael Chen', 'dr.chen@mediq.app', '+639172345678', '1975-11-22', 'DOCTOR', 'ACTIVE', 'doc-2', NULL, NOW(), NOW()),
-  ('sec-1', 'sec.jones', 'Secretary Jane Jones', 'sec.jones@mediq.app', '+639173456789', '1990-03-10', 'SECRETARY', 'ACTIVE', NULL, 'doc-1', NOW(), NOW()),
-  ('admin-1', 'admin', 'Admin User', 'admin@mediq.app', '+639170000000', '1985-01-01', 'ADMIN', 'ACTIVE', NULL, NULL, NOW(), NOW()),
-  ('doc-3', 'dr.garcia', 'Dr. Maria Garcia', 'dr.garcia@mediq.app', '+639173456789', '1982-08-30', 'DOCTOR', 'ACTIVE', 'doc-3', NULL, NOW(), NOW()),
-  ('pat-1', 'demo_patient', 'Demo Patient', 'demo@patient.com', '+639181111111', '1995-07-20', 'PATIENT', 'ACTIVE', NULL, NULL, NOW(), NOW()),
-  ('pat-2', 'demo_patient2', 'Maria Santos', 'maria@patient.com', '+639182222222', '1988-12-05', 'PATIENT', 'ACTIVE', NULL, NULL, NOW(), NOW())
+  ('doc-1', 'dr.smith', 'Dr. Sarah Smith', 'dr.smith@mediq.local', '+639171234567', '1980-05-15', 'DOCTOR', 'ACTIVE', 'doc-1', NULL, NOW(), NOW()),
+  ('doc-2', 'dr.chen', 'Dr. Michael Chen', 'dr.chen@mediq.local', '+639172345678', '1975-11-22', 'DOCTOR', 'ACTIVE', 'doc-2', NULL, NOW(), NOW()),
+  ('sec-1', 'sec.jones', 'Secretary Jane Jones', 'sec.jones@mediq.local', '+639173456789', '1990-03-10', 'SECRETARY', 'ACTIVE', NULL, 'doc-1', NOW(), NOW()),
+  ('admin-1', 'admin', 'Admin User', 'admin@mediq.local', '+639170000000', '1985-01-01', 'ADMIN', 'ACTIVE', NULL, NULL, NOW(), NOW()),
+  ('doc-3', 'dr.garcia', 'Dr. Maria Garcia', 'dr.garcia@mediq.local', '+639173456789', '1982-08-30', 'DOCTOR', 'ACTIVE', 'doc-3', NULL, NOW(), NOW()),
+  ('pat-1', 'demo_patient', 'Demo Patient', 'demo@mediq.local', '+639181111111', '1995-07-20', 'PATIENT', 'ACTIVE', NULL, NULL, NOW(), NOW()),
+  ('pat-2', 'demo_patient2', 'Maria Santos', 'maria@mediq.local', '+639182222222', '1988-12-05', 'PATIENT', 'ACTIVE', NULL, NULL, NOW(), NOW())
 ) AS v(id, username, full_name, email, mobile_number, date_of_birth, role, status, doctor_id, assigned_doctor_id, created_at, updated_at)
 WHERE NOT EXISTS (SELECT 1 FROM users);
 

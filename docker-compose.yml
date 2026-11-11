@@ -4,11 +4,11 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: mediq
-      POSTGRES_USER: mediq
-      POSTGRES_PASSWORD: mediq_dev_password
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     ports:
-      - "5432:5432"
+      - "54322:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

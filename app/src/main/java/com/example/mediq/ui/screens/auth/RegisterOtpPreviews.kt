@@ -17,7 +17,7 @@ private fun OtpSentPreview() {
     MediQTheme {
         RegisterOtpContent(
             state = AuthSamples.otpSent,
-            contact = AuthSamples.PHONE_NUMBER,
+            otpCode = "123456",
             resendSecondsLeft = AuthValidation.OTP_RESEND_SECONDS,
             actions = sampleActions
         )
@@ -30,7 +30,7 @@ private fun OtpResendReadyPreview() {
     MediQTheme {
         RegisterOtpContent(
             state = AuthSamples.otpSent,
-            contact = AuthSamples.PHONE_NUMBER,
+            otpCode = "123456",
             resendSecondsLeft = 0,
             actions = sampleActions
         )
@@ -43,10 +43,9 @@ private fun OtpIncompletePreview() {
     MediQTheme {
         RegisterOtpContent(
             state = AuthSamples.otpSent,
-            contact = AuthSamples.PHONE_NUMBER,
+            otpCode = "123456",
             resendSecondsLeft = 0,
-            actions = sampleActions,
-            initialCodeError = AuthSamples.otpIncomplete
+            actions = sampleActions
         )
     }
 }
@@ -57,7 +56,7 @@ private fun OtpExpiredPreview() {
     MediQTheme {
         RegisterOtpContent(
             state = AuthSamples.otpExpired,
-            contact = AuthSamples.PHONE_NUMBER,
+            otpCode = "123456",
             resendSecondsLeft = AuthValidation.OTP_RESEND_SECONDS,
             actions = sampleActions
         )
@@ -70,7 +69,7 @@ private fun OtpVerifyingPreview() {
     MediQTheme {
         RegisterOtpContent(
             state = AuthSamples.otpVerifying,
-            contact = AuthSamples.PHONE_NUMBER,
+            otpCode = "123456",
             resendSecondsLeft = 0,
             actions = sampleActions
         )
@@ -83,7 +82,7 @@ private fun OtpRejectedPreview() {
     MediQTheme {
         RegisterOtpContent(
             state = AuthSamples.otpRejected,
-            contact = AuthSamples.PHONE_NUMBER,
+            otpCode = "123456",
             resendSecondsLeft = 0,
             actions = sampleActions
         )

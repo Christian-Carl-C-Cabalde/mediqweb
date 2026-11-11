@@ -40,6 +40,7 @@ Response: UserProfile
 
 ### GET /doctors
 Query: `?specializationId=&search=&status=&limit=&offset=`
+- `limit` clamped to 1–100 (default 20); `offset` floored at 0 (default 0).
 Response: Paged<Doctor>
 
 ### GET /doctors/{id}
@@ -91,7 +92,7 @@ Query: `?status=&from=&to=&limit=&offset=`
 Response: Paged<Appointment>
 
 ### POST /appointments
-Request: BookingRequest
+Request: BookingRequest (`doctorId`, `startsAt`, `durationMinutes`, `reason` — no `patientId`; the server assigns the authenticated patient's `userId`)
 Response: Appointment (patient only)
 
 ### GET /appointments/{id}
@@ -142,6 +143,12 @@ Response: UserProfile
 
 ### GET /admin/doctors
 Response: Doctor[]
+
+### GET /admin/appointments
+Query: `?doctorId=&patientId=&status=&from=&to=&limit=&offset=`
+- `limit` clamped to 1–500 (default 50); `offset` floored at 0 (default 0).
+- `status` must be one of: booked, confirmed, completed, cancelled, no_show (case-insensitive); invalid value returns 400 VALIDATION_ERROR.
+Response: Paged<Appointment> (admin only)
 
 ## Secretary
 

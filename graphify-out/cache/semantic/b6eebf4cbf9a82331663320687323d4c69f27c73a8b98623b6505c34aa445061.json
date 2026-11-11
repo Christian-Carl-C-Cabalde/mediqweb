@@ -1,0 +1,1 @@
+{"nodes": [{"id": "data_batch_inserts_bulk", "label": "Batch INSERT Statements for Bulk Data", "file_type": "document", "source_file": "agent/skills/supabase-postgres-best-practices/references/data-batch-inserts.md", "rationale": "Reduces overhead and round trips for bulk data operations.", "_origin": "semantic"}], "edges": [], "hyperedges": []}

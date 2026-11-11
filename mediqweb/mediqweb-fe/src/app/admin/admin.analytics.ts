@@ -62,7 +62,8 @@ export function reportWindow(now: Date): ReportWindow {
 }
 
 /** Whether a zone-less timestamp falls in the window, by calendar day. */
-export function withinWindow(startsAt: string, window: ReportWindow): boolean {
+export function withinWindow(startsAt: string | null | undefined, window: ReportWindow): boolean {
+  if (!startsAt) return false;
   const day = startsAt.slice(0, 10);
   return day >= dayKey(window.from) && day <= dayKey(window.to);
 }
@@ -77,7 +78,8 @@ export function withinWindow(startsAt: string, window: ReportWindow): boolean {
 function charted(appointments: readonly Appointment[], window: ReportWindow): Appointment[] {
   return appointments.filter(
     (appointment) =>
-      CHARTED_STATUSES.includes(appointment.status) && withinWindow(appointment.startsAt, window),
+      CHARTED_STATUSES.includes(appointment.status?.toLowerCase() as AppointmentStatus) &&
+      withinWindow(appointment.startsAt, window),
   );
 }
 
@@ -132,7 +134,8 @@ export function appointmentTrendSeries(
   const window = reportWindow(now);
   const counts = new Map<string, number>();
   for (const appointment of charted(appointments, window)) {
-    const key = appointment.startsAt.slice(0, 10);
+    const key = appointment.startsAt?.slice(0, 10);
+    if (!key) continue;
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
 
@@ -165,8 +168,8 @@ export function clinicHeatmap(appointments: readonly Appointment[], now: Date): 
   const window = reportWindow(now);
 
   const dated = charted(appointments, window)
-    .map((appointment) => new Date(appointment.startsAt))
-    .filter((date) => !Number.isNaN(date.getTime()));
+    .map((appointment) => appointment.startsAt ? new Date(appointment.startsAt) : null)
+    .filter((date): date is Date => date !== null && !Number.isNaN(date.getTime()));
 
   if (dated.length === 0) {
     return { days: WEEKDAYS, slots: [], cells: [], total: 0 };
@@ -239,7 +242,7 @@ export function doctorWorkload(
 
   const counts = new Map<string, number>();
   for (const appointment of appointments) {
-    if (appointment.status !== 'completed' || !withinWindow(appointment.startsAt, window)) continue;
+    if (appointment.status?.toLowerCase() !== 'completed' || !withinWindow(appointment.startsAt, window)) continue;
     counts.set(appointment.doctorId, (counts.get(appointment.doctorId) ?? 0) + 1);
   }
 
@@ -249,5 +252,5 @@ export function doctorWorkload(
       label: doctor.name,
       value: counts.get(doctor.id) ?? 0,
     }))
-    .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label));
+    .sort((a, b) => b.value - a.value || (a.label ?? '').localeCompare(b.label ?? ''));
 }

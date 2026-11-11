@@ -606,8 +606,8 @@ export class SecretarySession {
         id: p.id,
         name: p.fullName,
         email: p.email ?? '',
-        phone: p.mobileNumber,
-        joinedOn: '',
+        phone: p.mobileNumber ?? '',
+        joinedOn: p.joinedOn ?? '',
         assignedDoctorId: p.assignedDoctorId ?? null,
       });
     }
@@ -666,6 +666,9 @@ export class SecretarySession {
     // identifies the doctor, and the schedule endpoint publishes their hours.
     this.gateway.getDoctor().subscribe({
       next: (doctor) => {
+        if (!doctor) {
+          return;
+        }
         this.doctorState.set([
           {
             id: doctor.id,

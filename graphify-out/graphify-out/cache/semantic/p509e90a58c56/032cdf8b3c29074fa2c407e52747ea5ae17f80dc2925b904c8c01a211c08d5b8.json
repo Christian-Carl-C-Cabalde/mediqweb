@@ -1,0 +1,1 @@
+{"nodes": [{"id": "mediqwebfe_src_index", "label": "Index HTML", "file_type": "code", "source_file": "mediqweb-fe/src/index.html"}], "edges": [{"source": "mediqwebfe_src_index", "target": "mediqwebfe_src_app_app", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "mediqweb-fe/src/index.html"}], "hyperedges": []}

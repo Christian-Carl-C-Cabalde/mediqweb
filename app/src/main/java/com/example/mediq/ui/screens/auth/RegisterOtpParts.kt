@@ -9,9 +9,9 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.HourglassEmpty
-import androidx.compose.material.icons.outlined.SmsFailed
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -58,7 +58,7 @@ internal fun OtpBadge(modifier: Modifier = Modifier) {
 internal fun OtpNotice(state: OtpState, modifier: Modifier = Modifier) {
     val icon = when (state) {
         OtpState.Expired -> Icons.Outlined.HourglassEmpty
-        is OtpState.Error -> Icons.Outlined.SmsFailed
+        is OtpState.Error -> Icons.Filled.Error
         OtpState.Sent, OtpState.Verifying -> return
     }
 

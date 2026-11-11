@@ -1,0 +1,1 @@
+{"nodes": [{"id": "lock_advisory_locks", "label": "Use Advisory Locks for Application-Level Locking", "file_type": "document", "source_file": "agent/skills/supabase-postgres-best-practices/references/lock-advisory.md", "rationale": "Efficient coordination without row-level lock overhead."}], "edges": [], "hyperedges": []}

@@ -11,6 +11,7 @@ import {
   startOfDay,
   usableBlocks,
 } from './doctor.dates';
+import { switchMap, map } from 'rxjs';
 import type {
   Appointment,
   AppointmentStatus,
@@ -424,19 +425,41 @@ export class DoctorSession {
   // ---------------------------------------------------------------------------
   constructor() {
     // Profile first — everything else needs the doctor id.
-    this.gateway.getProfile().subscribe({
-      next: (profile) => {
+    this.gateway.getProfile().pipe(
+      switchMap((profile) =>
+        this.gateway.getDoctor(profile.id).pipe(
+          map((doctor) => ({ profile, doctor })),
+        ),
+      ),
+    ).subscribe({
+      next: ({ profile, doctor }) => {
         this.profileState.set({
           id: profile.id,
           name: profile.fullName,
           email: profile.email ?? '',
-          specialization: '',
-          licenseNumber: '',
-          joinedOn: profile.dateOfBirth,
-          bio: '',
+          specialization: doctor.specialty,
+          licenseNumber: doctor.licenseNumber,
+          joinedOn: profile.joinedOn ?? '',
+          bio: doctor.bio,
         });
       },
-      error: () => {},
+      error: () => {
+        // Doctor record may not exist yet; fall back to profile-only data.
+        this.gateway.getProfile().subscribe({
+          next: (profile) => {
+            this.profileState.set({
+              id: profile.id,
+              name: profile.fullName,
+              email: profile.email ?? '',
+              specialization: '',
+              licenseNumber: '',
+              joinedOn: profile.joinedOn ?? '',
+              bio: '',
+            });
+          },
+          error: () => {},
+        });
+      },
     });
 
     // Appointments for this doctor — filtered server-side by doctorId.

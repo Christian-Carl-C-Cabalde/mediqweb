@@ -1,0 +1,1 @@
+{"nodes": [{"id": "lock_short_transactions_contention", "label": "Keep Transactions Short to Reduce Lock Contention", "file_type": "document", "source_file": "agent/skills/supabase-postgres-best-practices/references/lock-short-transactions.md", "rationale": "Improves throughput by minimizing the duration locks are held."}], "edges": [], "hyperedges": []}

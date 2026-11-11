@@ -1,0 +1,1 @@
+{"nodes": [{"id": "data_pagination_cursor", "label": "Use Cursor-Based Pagination Instead of OFFSET", "file_type": "document", "source_file": "agent/skills/supabase-postgres-best-practices/references/data-pagination.md", "rationale": "Ensures O(1) performance for deep pagination compared to O(N) for OFFSET."}], "edges": [], "hyperedges": []}

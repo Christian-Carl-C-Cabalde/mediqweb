@@ -63,6 +63,24 @@ fun SignInScreen(
         }
     }
 
+    // Auto-login as the demo patient so you don't have to type credentials
+    // every time you open the app during development.
+    LaunchedEffect(Unit) {
+        if (sessionUser == null) {
+            scope.launch {
+                val profile = viewModel.signIn("dr.smith@mediq.app", "demo12345") ?: return@launch
+                MediQSession.signIn(
+                    SignedInUser(
+                        username = profile.username,
+                        fullName = profile.fullName,
+                        email = profile.email,
+                        phoneNumber = profile.mobileNumber
+                    )
+                )
+            }
+        }
+    }
+
     SignInContent(
         state = signInState,
         actions = SignInActions(

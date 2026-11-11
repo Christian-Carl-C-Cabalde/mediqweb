@@ -252,7 +252,23 @@ class SupabaseApiService {
         val userId = getCurrentUserId(session)
         val profile = getProfileByUserId(userId)
             ?: throw RuntimeException("Profile not found for user $userId")
-        return@withContext profile
+        // If doctor, also fetch specialization and license number from doctors table
+        val updatedProfile = if (profile.role == UserRole.DOCTOR) {
+            try {
+                val doctorBody = fetchJson("${SupabaseClient.restUrl}/doctors?select=specialty,license_number&user_id=eq.$userId", session)
+                val doctorArr = JSONArray(doctorBody)
+                if (doctorArr.length() > 0) {
+                    val doctorObj = doctorArr.getJSONObject(0)
+                    profile.copy(
+                        specialization = doctorObj.optString("specialty", ""),
+                        licenseNumber = doctorObj.optString("license_number", ""),
+                    )
+                } else profile
+            } catch (e: Exception) {
+                profile
+            }
+        } else profile
+        return@withContext updatedProfile
     }
 
     suspend fun updateProfile(draft: ProfileDraft): UserProfile = withContext(Dispatchers.Default) {
@@ -370,6 +386,7 @@ class SupabaseApiService {
             ?: throw RuntimeException("Not authenticated")
         val body = httpRequest("POST", "${SupabaseClient.restUrl}/rpc/book_appointment", auth = true,
             body = jsonBody(
+                "p_patient_id" to request.patientId,
                 "p_doctor_id" to request.doctorId,
                 "p_starts_at" to request.startsAt,
                 "p_duration_minutes" to request.durationMinutes,
@@ -655,14 +672,17 @@ class SupabaseApiService {
             assignedDoctorId = obj.optString("assigned_doctor_id", null),
             createdAt = obj.optString("created_at", ""),
             updatedAt = obj.optString("updated_at", ""),
+            specialization = obj.optString("specialty", ""),
+            licenseNumber = obj.optString("license_number", ""),
+            joinedOn = obj.optString("created_at", ""),
         )
     }
 
     private fun parseDoctor(obj: JSONObject): Doctor {
         return Doctor(
             id = obj.getString("id"),
-            userId = obj.getString("user_id"),
-            fullName = obj.getString("full_name"),
+            userId = obj.optString("user_id", ""),
+            fullName = obj.optString("full_name", "").ifEmpty { "Doctor" },
             specialty = obj.optString("specialty", ""),
             specializationId = obj.optString("specialization_id", ""),
             licenseNumber = obj.optString("license_number", ""),
@@ -711,7 +731,13 @@ class SupabaseApiService {
             createdAt = obj.optString("created_at", ""),
             updatedAt = obj.optString("updated_at", ""),
             completedAt = obj.optString("completed_at", null),
-            outcome = obj.optString("outcome", null)?.let { VisitOutcome.valueOf(it) },
+            outcome = obj.optString("outcome", null)?.let {
+                when (it) {
+                    "completed" -> VisitOutcome.COMPLETED
+                    "no_show" -> VisitOutcome.NO_SHOW
+                    else -> null
+                }
+            },
         )
     }
 

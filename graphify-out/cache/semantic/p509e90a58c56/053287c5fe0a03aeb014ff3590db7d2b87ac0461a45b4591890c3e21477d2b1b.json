@@ -1,0 +1,1 @@
+{"nodes": [{"id": "query_covering_indexes_include", "label": "Use Covering Indexes to Avoid Table Lookups", "file_type": "document", "source_file": "agent/skills/supabase-postgres-best-practices/references/query-covering-indexes.md", "rationale": "Enables index-only scans by including non-searchable columns."}], "edges": [], "hyperedges": []}

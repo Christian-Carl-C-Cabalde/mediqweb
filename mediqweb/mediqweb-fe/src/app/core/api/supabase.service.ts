@@ -20,36 +20,10 @@ export class SupabaseService {
     const key = environment.supabaseAnonKey;
     if (!url || !key) {
       throw new Error(
-        'Supabase URL and Anon Key must be configured via window.__env.SUPABASE_URL and SUPABASE_ANON_KEY',
+        'Supabase URL and Anon Key must be configured in environment'
       );
     }
     this.supabase = createClient(url, key);
-
-    const serviceRoleKey = environment.supabaseServiceRoleKey;
-    if (url && serviceRoleKey) {
-      this.admin = createClient(url, serviceRoleKey, {
-        auth: { autoRefreshToken: false, persistSession: false },
-      });
-    }
-  }
-
-  private admin?: SupabaseClient;
-
-  async createUser(email: string, password: string) {
-    if (!this.admin) {
-      throw new Error(
-        'SUPABASE_SERVICE_ROLE_KEY is not configured; cannot create admin users without email confirmation.',
-      );
-    }
-    const { data, error } = await this.admin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-    });
-    if (error) {
-      throw error;
-    }
-    return data;
   }
 
   get client(): SupabaseClient {
@@ -62,6 +36,10 @@ export class SupabaseService {
 
   rpc(functionName: string, params?: any) {
     return this.supabase.rpc(functionName, params);
+  }
+
+  async signUp(email: string, password: string) {
+    return this.supabase.auth.signUp({ email, password });
   }
 
   async signIn(email: string, password: string) {

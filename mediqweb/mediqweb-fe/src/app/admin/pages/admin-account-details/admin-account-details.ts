@@ -38,20 +38,14 @@ export class AdminAccountDetails {
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
 
-  readonly name = signal('Jessa Mae Tolentino');
-  readonly role = signal('Super Admin');
+  readonly name = signal('Administrator');
+  readonly role = signal('Admin');
   readonly status = signal('Active');
 
-  readonly contacts = signal<readonly ContactRow[]>([
-    { label: 'Email', value: 'jessa.tolentino@mediq.ph' },
-    { label: 'Phone', value: '+63 917 555 0100' },
-    { label: 'Username', value: 'jtolentino' },
-  ]);
+  readonly contacts = signal<readonly ContactRow[]>([]);
 
   readonly activities = signal<readonly ActivityRow[]>([
-    { text: 'Signed in from Quezon City', time: '2h ago' },
-    { text: 'Password changed', time: '1d ago' },
-    { text: 'Profile updated', time: '3d ago' },
+    { text: 'Signed in', time: 'Just now' },
   ]);
 
   constructor() {
@@ -74,6 +68,7 @@ export class AdminAccountDetails {
     if (profile.email) rows.push({ label: 'Email', value: profile.email });
     if (profile.mobileNumber) rows.push({ label: 'Phone', value: profile.mobileNumber });
     rows.push({ label: 'Username', value: profile.username });
+    if (profile.joinedOn) rows.push({ label: 'Joined MediQ', value: new Date(profile.joinedOn).toLocaleDateString() });
     this.contacts.set(rows);
 
     this.loading.set(false);

@@ -73,7 +73,10 @@ export class AuthSignup {
     this.loading.set(true);
     try {
       const { email, password } = this.form.getRawValue();
-      await this.supabase.createUser(email, password);
+      const { data, error } = await this.supabase.signUp(email, password);
+      if (error) {
+        throw error;
+      }
       this.createdEmail.set(email);
     } catch (err) {
       this.error.set(

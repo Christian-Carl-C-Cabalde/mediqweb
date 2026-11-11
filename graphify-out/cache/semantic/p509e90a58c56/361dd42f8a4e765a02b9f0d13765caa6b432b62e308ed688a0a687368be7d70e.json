@@ -1,0 +1,1 @@
+{"nodes": [{"id": "data_upsert_on_conflict", "label": "Use UPSERT for Insert-or-Update Operations", "file_type": "document", "source_file": "agent/skills/supabase-postgres-best-practices/references/data-upsert.md", "rationale": "Eliminates race conditions in check-then-insert patterns."}], "edges": [], "hyperedges": []}

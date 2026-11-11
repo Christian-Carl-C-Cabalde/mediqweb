@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -12,20 +13,18 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.example.mediq.data.model.OtpPurpose
 import com.example.mediq.ui.components.MediQPageHeader
 import com.example.mediq.ui.navigation.Screen
+import com.example.mediq.ui.session.MediQSession
 import com.example.mediq.ui.theme.MediQBackground
 import com.example.mediq.ui.theme.MediQSpacing
 import com.example.mediq.ui.theme.MediQTextPrimary
@@ -34,103 +33,66 @@ import com.example.mediq.ui.viewmodel.AuthViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-/** The saved-state key the details step leaves the email under. */
-internal const val OTP_EMAIL_KEY = "register_email_address"
-
-/** The saved-state key the details step leaves the number under. */
-internal const val OTP_PHONE_KEY = "register_phone_number"
-
 /** How often the resend countdown ticks. */
 private const val OTP_TICK_MILLIS = 1_000L
 
 /**
- * Registration step 2: prove the number belongs to the patient.
+ * Registration step 2: prove the contact with a locally shown code.
  *
- * Job: check the one-time code. Primary action: verify.
+ * Job: show a 6-digit code on this device and check what the patient types.
+ * Primary action: verify. No email or SMS is involved.
  */
 @Composable
 fun RegisterOtpScreen(
     navController: NavController,
     viewModel: AuthViewModel = viewModel()
 ) {
-    var secondsLeft by rememberSaveable {
-        mutableIntStateOf(AuthValidation.OTP_RESEND_SECONDS)
+    val secondsLeft = rememberSaveable {
+        mutableStateOf(AuthValidation.OTP_RESEND_SECONDS)
     }
-    var state by remember { mutableStateOf<OtpState>(OtpState.Sent) }
-    var email by rememberSaveable { mutableStateOf("") }
-    var phoneNumber by rememberSaveable { mutableStateOf("") }
+    val state = remember { mutableStateOf<OtpState>(OtpState.Sent) }
+    val codeError = remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
     /*
+     * The locally generated code lives in MediQSession. Read it here so it can
+     * be displayed on screen for the patient to read and type back.
+     */
+    val otpCode = MediQSession.currentOtpCode
+
+    /*
      * One ticker for as long as the screen is open. It only writes state while
-     * a countdown is running, and a resend just puts the count back up.
+     * a countdown is running.
      */
     LaunchedEffect(Unit) {
         while (true) {
             delay(OTP_TICK_MILLIS)
-            if (secondsLeft > 0) secondsLeft--
-        }
-    }
-
-    /*
-     * The contact the details step collected is the one the code went to, so
-     * the code step can say where the code went rather than repeating a
-     * contact the patient may not have typed. Email is preferred when present.
-     */
-    val savedEmail = navController.previousBackStackEntry
-        ?.savedStateHandle
-        ?.get<String>(OTP_EMAIL_KEY)
-    val savedPhone = navController.previousBackStackEntry
-        ?.savedStateHandle
-        ?.get<String>(OTP_PHONE_KEY)
-    if (savedEmail != null && savedEmail != email) {
-        email = savedEmail
-    }
-    if (savedPhone != null && savedPhone != phoneNumber) {
-        phoneNumber = savedPhone
-    }
-
-    val contact = if (email.isNotBlank()) email else phoneNumber
-
-    /*
-     * A code is asked for as soon as the step opens, and again whenever the
-     * patient asks for a new one.
-     */
-    LaunchedEffect(contact) {
-        if (contact.isNotBlank() && viewModel.requestOtp(contact, OtpPurpose.REGISTER)) {
-            state = OtpState.Sent
-        } else {
-            state = OtpState.Error("We could not send the code. Check your connection and try again.")
+            if (secondsLeft.value > 0) secondsLeft.value--
         }
     }
 
     RegisterOtpContent(
-        state = state,
-        contact = contact,
-        resendSecondsLeft = secondsLeft,
+        state = state.value,
+        otpCode = otpCode,
+        resendSecondsLeft = secondsLeft.value,
         actions = RegisterActions(
             onBack = { navController.popBackStack() },
-            onOtpResend = {
-                secondsLeft = AuthValidation.OTP_RESEND_SECONDS
+            onOtpVerify = { typed ->
                 scope.launch {
-                    state = if (contact.isNotBlank() && viewModel.requestOtp(contact, OtpPurpose.REGISTER)) {
-                        OtpState.Sent
+                    state.value = OtpState.Verifying
+                    codeError.value = null
+                    if (viewModel.verifyLocalOtp(typed)) {
+                        navController.navigate(Screen.RegisterCredentials.route)
                     } else {
-                        OtpState.Error("We could not send the code. Check your connection and try again.")
+                        state.value = OtpState.Error("That code is not right. Check the six digits and try again.")
                     }
                 }
             },
-            onOtpVerify = { code ->
-                scope.launch {
-                    state = OtpState.Verifying
-                    val session = viewModel.verifyOtp(contact, code, OtpPurpose.REGISTER)
-                    if (session != null) {
-                        navController.navigate(Screen.RegisterCredentials.route)
-                    } else {
-                        state = OtpState.Error("That code is not right. Check the six digits and try again.")
-                    }
-                }
-            }
+            onOtpResend = {
+                secondsLeft.value = AuthValidation.OTP_RESEND_SECONDS
+                viewModel.generateLocalOtp()
+                // code is re-read from MediQSession on recomposition
+            },
         )
     )
 }
@@ -138,22 +100,19 @@ fun RegisterOtpScreen(
 /**
  * The code form.
  *
- * [resendSecondsLeft] is handed in rather than counted here, so the countdown
- * lives with the state owner and every state stays renderable from a preview.
- * [initialCodeError] is the same restore seam the other auth forms have.
+ * [otpCode] is the locally generated 6-digit code, displayed prominently so the
+ * patient can read it from this device rather than waiting for email or SMS.
  */
 @Composable
 fun RegisterOtpContent(
     state: OtpState,
-    contact: String,
+    otpCode: String?,
     resendSecondsLeft: Int,
     actions: RegisterActions,
-    initialCodeError: String? = null,
     modifier: Modifier = Modifier
 ) {
-    var code by rememberSaveable { mutableStateOf("") }
-    var codeError by remember { mutableStateOf(initialCodeError) }
-
+    val code = rememberSaveable { mutableStateOf("") }
+    val codeError = remember { mutableStateOf<String?>(null) }
     val verifying = state == OtpState.Verifying
     val resendLocked = resendSecondsLeft > 0 && state != OtpState.Expired
 
@@ -181,7 +140,7 @@ fun RegisterOtpContent(
             Spacer(Modifier.height(MediQSpacing.lg))
 
             Text(
-                text = "Verify your contact",
+                text = "Verify your registration",
                 style = MaterialTheme.typography.titleLarge,
                 color = MediQTextPrimary
             )
@@ -189,24 +148,51 @@ fun RegisterOtpContent(
             Spacer(Modifier.height(MediQSpacing.xs))
 
             Text(
-                text = "We sent a ${AuthValidation.OTP_LENGTH}-digit code to $contact.",
+                text = "Enter the code shown below to continue.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MediQTextSecondary
             )
+
+            Spacer(Modifier.height(MediQSpacing.xxl))
+
+            // The locally generated code, displayed in large digits.
+            otpCode?.let { displayed ->
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = MediQSpacing.gutter)
+                        .align(Alignment.CenterHorizontally)
+                ) {
+                    Text(
+                        text = displayed.chunked(2).joinToString(" "),
+                        style = MaterialTheme.typography.displayMedium,
+                        color = MediQTextPrimary,
+                        modifier = Modifier
+                            .padding(vertical = MediQSpacing.lg)
+                            .background(
+                                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                shape = MaterialTheme.shapes.medium
+                            )
+                            .padding(horizontal = MediQSpacing.xl)
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(MediQSpacing.xxl))
 
             OtpNotice(state = state)
 
             Spacer(Modifier.height(MediQSpacing.xxl))
 
             AuthField(
-                value = code,
+                value = code.value,
                 onValueChange = { typed ->
-                    code = typed.filter { it.isDigit() }.take(AuthValidation.OTP_LENGTH)
-                    codeError = null
+                    code.value = typed.filter { it.isDigit() }.take(AuthValidation.OTP_LENGTH)
+                    codeError.value = null
                 },
                 label = "One-time code",
                 placeholder = "123456",
-                error = codeError,
+                error = codeError.value,
                 enabled = !verifying,
                 keyboardType = KeyboardType.Number
             )
@@ -222,11 +208,11 @@ fun RegisterOtpContent(
 
             AuthPrimaryButton(
                 label = if (verifying) "Verifying..." else "Verify",
-                enabled = !verifying,
+                enabled = !verifying && code.value.length == AuthValidation.OTP_LENGTH,
                 onClick = {
-                    val checked = AuthValidation.validateOtp(code)
-                    codeError = checked
-                    if (checked == null) actions.onOtpVerify(code)
+                    val checked = AuthValidation.validateOtp(code.value)
+                    codeError.value = checked
+                    if (checked == null) actions.onOtpVerify(code.value)
                 }
             )
 

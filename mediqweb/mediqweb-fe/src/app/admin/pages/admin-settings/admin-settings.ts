@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Button, Card, Dropdown, FormField, type DropdownItem } from '../../../shared/components';
 import { ToastService } from '../../../core/services/toast.service';
+import { HttpAdminGateway } from '../../../core/api/http-admin-gateway';
 
 /** A configurable clinic preference. */
 interface Choice {
@@ -26,16 +27,8 @@ const RETENTION_PERIODS: Choice[] = [
 /**
  * Clinic-wide settings.
  *
- * Every control is a real form control with real validation, so the page can be
- * reviewed as a genuine form. Saving deliberately reports that nothing was
- * persisted — there is nowhere to persist it yet, and a settings page that
- * silently forgets your changes is worse than one that says so.
- *
- * Preferences are all enumerations or text. Nothing here is a boolean toggle:
- * the design system has no switch component, and inventing one on this page
- * would leave a page-local widget that later pages would duplicate. A
- * `ui-switch` belongs in the shared library when the first page genuinely needs
- * one.
+ * Reads from and writes to the `clinic_settings` table in Supabase via the
+ * admin gateway. Saving persists changes to the cloud database.
  */
 @Component({
   selector: 'app-admin-settings',
@@ -47,6 +40,7 @@ const RETENTION_PERIODS: Choice[] = [
 export class AdminSettings {
   private readonly fb = inject(FormBuilder);
   private readonly toasts = inject(ToastService);
+  private readonly gateway = inject(HttpAdminGateway);
 
   protected readonly sessionTimeouts = SESSION_TIMEOUTS;
   protected readonly retentionPeriods = RETENTION_PERIODS;
@@ -59,6 +53,26 @@ export class AdminSettings {
     sessionTimeout: ['30'],
     retentionPeriod: ['1095'],
   });
+
+  protected saving$ = false;
+
+  constructor() {
+    this.gateway.getSettings().subscribe({
+      next: (settings) => {
+        this.form.patchValue({
+          clinicName: settings.clinic_name ?? 'MediQ Clinic',
+          address: settings.address ?? '',
+          contactEmail: settings.contact_email ?? '',
+          contactNumber: settings.contact_number ?? '',
+          sessionTimeout: String(settings.session_timeout_minutes ?? 30),
+          retentionPeriod: String(settings.retention_period_days ?? 1095),
+        });
+      },
+      error: () => {
+        // Leave defaults; toast will appear on save attempt.
+      },
+    });
+  }
 
   protected errorFor(
     control: 'clinicName' | 'address' | 'contactEmail' | 'contactNumber',
@@ -83,19 +97,38 @@ export class AdminSettings {
   protected save(): void {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
-      // A warning: nothing was attempted, the form was incomplete. The field
-      // messages say which fields.
       this.toasts.warning('Nothing saved', 'Fix the highlighted fields, then save again.');
       return;
     }
 
-    // There is no service to call, so there is nothing to have succeeded. An
-    // error rather than a warning, and never a success: the one unforgivable
-    // mistake here is telling an administrator their clinic settings are saved
-    // when they are not.
-    this.toasts.error(
-      'Nothing was saved',
-      'Settings are not connected yet. This form cannot write anywhere until the API lands.',
-    );
+    this.saving$ = true;
+    const {
+      clinicName,
+      address,
+      contactEmail,
+      contactNumber,
+      sessionTimeout,
+      retentionPeriod,
+    } = this.form.getRawValue();
+
+    this.gateway
+      .updateSettings({
+        clinic_name: clinicName,
+        address: address,
+        contact_email: contactEmail,
+        contact_number: contactNumber,
+        session_timeout_minutes: Number(sessionTimeout),
+        retention_period_days: Number(retentionPeriod),
+      })
+      .subscribe({
+        next: () => {
+          this.saving$ = false;
+          this.toasts.success('Settings saved', 'Clinic settings have been updated.');
+        },
+        error: (err) => {
+          this.saving$ = false;
+          this.toasts.error('Save failed', err.message ?? 'Could not save settings.');
+        },
+      });
   }
 }

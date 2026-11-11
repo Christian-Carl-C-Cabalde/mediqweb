@@ -5,11 +5,11 @@
  * in sync when routes are added or renamed.
  */
 export const API_ROUTES = {
-  // ---- Auth (proxied via BFF on bffBaseUrl) ----
+  // ---- Auth (direct to Ktor) ----
   AUTH: {
     SIGN_IN: '/auth/sign-in',
     REFRESH: '/auth/refresh',
-    ME: '/me',
+    ME: '/profile',
   } as const,
 
   // ---- Admin ----
@@ -69,23 +69,17 @@ export const API_ROUTES = {
 } as const;
 
 /**
- * Base URL resolver. Prefers `apiBaseUrl` for Ktor-facing calls;
- * falls back to `bffBaseUrl` for auth-proxied calls.
+ * Base URL resolver for Ktor-facing calls.
  */
-export function apiBaseUrl(useBff = false): string {
+export function apiBaseUrl(): string {
   const env = (window as unknown as { __env?: Record<string, string> }).__env;
-  if (useBff) return env?.['BFF_BASE_URL'] ?? 'http://localhost:3000';
   return env?.['API_BASE_URL'] ?? 'http://localhost:8099';
 }
 
 /**
  * Builds a full URL from a route path template and optional params.
  */
-export function buildUrl(
-  route: string | ((id?: string) => string),
-  id?: string,
-  useBff = false,
-): string {
+export function buildUrl(route: string | ((id?: string) => string), id?: string): string {
   const path = typeof route === 'function' ? route(id) : route;
-  return `${apiBaseUrl(useBff)}${path}`;
+  return `${apiBaseUrl()}${path}`;
 }

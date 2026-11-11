@@ -21,7 +21,7 @@ function mapProfile(row: any): UserProfile {
     email: row.email ?? '',
     mobileNumber: row.email ?? '',
     dateOfBirth: '',
-    role: (row.role ?? 'patient') as UserProfile['role'],
+    role: ((row.role ?? 'patient') as string).toLowerCase() as UserProfile['role'],
     status: row.status ?? 'ACTIVE',
     assignedDoctorId: undefined,
   };
@@ -32,8 +32,8 @@ export class AuthService {
   private supabase = inject(SupabaseService);
   private authState = inject(AuthState);
 
-  private profile$ = new BehaviorSubject<UserProfile | null>(null);
-  private accessToken$ = new BehaviorSubject<string | null>(null);
+  public profile$ = new BehaviorSubject<UserProfile | null>(null);
+  public accessToken$ = new BehaviorSubject<string | null>(null);
 
   constructor() {
     // Restore session/profile on startup.

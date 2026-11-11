@@ -1,0 +1,1 @@
+{"nodes": [{"id": "security_privileges_least_privilege", "label": "Apply Principle of Least Privilege", "file_type": "document", "source_file": "agent/skills/supabase-postgres-best-practices/references/security-privileges.md", "rationale": "Reduces attack surface by granting minimal specific permissions.", "_origin": "semantic"}], "edges": [], "hyperedges": []}

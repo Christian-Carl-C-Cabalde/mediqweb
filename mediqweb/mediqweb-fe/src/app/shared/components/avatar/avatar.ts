@@ -11,7 +11,8 @@ const STATUS_TOKEN: Record<AvatarStatus, string | null> = {
 };
 
 /** Up to two uppercase initials derived from a display name. */
-function toInitials(name: string): string {
+function toInitials(name: string | null | undefined): string {
+  if (!name) return '?';
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return '?';
   if (parts.length === 1) return (parts[0].charAt(0) || '?').toUpperCase();
@@ -43,7 +44,7 @@ export class Avatar {
   readonly imageError = output<string>();
 
   protected readonly broken = signal(false);
-  protected readonly initialsText = computed(() => this.initials() ?? toInitials(this.name()));
+  protected readonly initialsText = computed(() => this.initials() ?? toInitials(this.name() ?? ''));
   protected readonly showImage = computed(() => !!this.src() && !this.broken());
   protected readonly statusToken = computed(() => STATUS_TOKEN[this.status()]);
 

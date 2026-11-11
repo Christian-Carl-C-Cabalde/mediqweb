@@ -49,24 +49,17 @@ fun RegisterDetailsScreen(
             onBack = { navController.popBackStack() },
             onDetailsContinue = { fullName, email, phoneNumber ->
                 /*
-                 * Hand the contact forward through the back-stack entry so the
-                 * code step can say where the code went, rather than repeating
-                 * a contact the patient may not have typed.
-                 */
-                navController.currentBackStackEntry
-                    ?.savedStateHandle
-                    ?.set(OTP_EMAIL_KEY, email)
-
-                navController.currentBackStackEntry
-                    ?.savedStateHandle
-                    ?.set(OTP_PHONE_KEY, phoneNumber)
-
-                /*
                  * The details step is the only place a full name is ever asked
                  * for, so it is kept here for the account the credentials step
                  * is about to create.
                  */
                 MediQSession.beginRegistration(fullName, email, phoneNumber)
+
+                /*
+                 * Generate a local 6-digit OTP code on this device. No email
+                 * or SMS is involved — the code is shown on the next screen.
+                 */
+                MediQSession.generateLocalOtp()
 
                 navController.navigate(Screen.RegisterOTP.route)
             }
