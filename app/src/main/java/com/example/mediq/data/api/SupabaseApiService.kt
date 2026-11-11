@@ -40,6 +40,15 @@ fun <T> JSONArray.map(transform: (JSONObject) -> T): List<T> {
 class SupabaseApiService {
     private val sb = SupabaseClient.client
 
+    // Application-level cache shared across all ViewModels to prevent redundant API calls
+    companion object {
+        private val doctorsCache = mutableMapOf<String, Pair<Long, List<Doctor>>>()
+        private val specializationsCache = mutableMapOf<String, Pair<Long, List<Specialty>>>()
+        private val appointmentsCache = mutableMapOf<String, Pair<Long, Paged<Appointment>>>()
+        private val DOCTORS_CACHE_TTL_MS = java.util.concurrent.TimeUnit.MINUTES.toMillis(5)
+        private val APPOINTMENTS_CACHE_TTL_MS = java.util.concurrent.TimeUnit.MINUTES.toMillis(2)
+    }
+
     private suspend fun httpRequest(
         method: String,
         url: String,
@@ -312,6 +321,14 @@ class SupabaseApiService {
         limit: Int = 20,
         offset: Int = 0,
     ): Paged<Doctor> = withContext(Dispatchers.Default) {
+        val cacheKey = "doctors:$specializationId:$search:$status:$limit:$offset"
+        val now = System.currentTimeMillis()
+
+        val cached = Companion.doctorsCache[cacheKey]
+        if (cached != null && now - cached.first < DOCTORS_CACHE_TTL_MS) {
+            return@withContext Paged(items = cached.second, total = cached.second.size.toLong(), limit = limit, offset = offset)
+        }
+
         val session = SupabaseClient.accessToken
             ?: throw RuntimeException("Not authenticated")
         var url = "${SupabaseClient.restUrl}/doctors?select=*,specializations(*)&limit=$limit&offset=$offset"
@@ -322,7 +339,10 @@ class SupabaseApiService {
         val total = extractTotalCount(url, session)
         val arr = JSONArray(body)
         val items = arr.map { parseDoctor(it) }
-        return@withContext Paged(items = items, total = total.toLong(), limit = limit, offset = offset)
+        val result = Paged(items = items, total = total.toLong(), limit = limit, offset = offset)
+
+        Companion.doctorsCache[cacheKey] = Pair(System.currentTimeMillis(), result.items)
+        return@withContext result
     }
 
     suspend fun getDoctor(id: String): Doctor = withContext(Dispatchers.Default) {
@@ -366,11 +386,22 @@ class SupabaseApiService {
     // ========================================================================
 
     suspend fun getSpecializations(): List<Specialty> = withContext(Dispatchers.Default) {
+        val cacheKey = "specializations"
+        val now = System.currentTimeMillis()
+
+        val cached = Companion.specializationsCache[cacheKey]
+        if (cached != null && now - cached.first < DOCTORS_CACHE_TTL_MS) {
+            return@withContext cached.second
+        }
+
         val session = SupabaseClient.accessToken
             ?: throw RuntimeException("Not authenticated")
         val body = fetchJson("${SupabaseClient.restUrl}/specializations?select=*", session)
         val arr = JSONArray(body)
-        return@withContext arr.map { parseSpecialty(it) }
+        val result = arr.map { parseSpecialty(it) }
+
+        Companion.specializationsCache[cacheKey] = Pair(System.currentTimeMillis(), result)
+        return@withContext result
     }
 
     // ========================================================================
@@ -384,6 +415,14 @@ class SupabaseApiService {
         limit: Int = 50,
         offset: Int = 0,
     ): Paged<Appointment> = withContext(Dispatchers.Default) {
+        val cacheKey = "appointments:$status:$from:$to:$limit:$offset"
+        val now = System.currentTimeMillis()
+
+        val cached = Companion.appointmentsCache[cacheKey]
+        if (cached != null && now - cached.first < APPOINTMENTS_CACHE_TTL_MS) {
+            return@withContext cached.second
+        }
+
         val session = SupabaseClient.accessToken
             ?: throw RuntimeException("Not authenticated")
         var url = "${SupabaseClient.restUrl}/appointments?select=*&limit=$limit&offset=$offset"
@@ -394,7 +433,10 @@ class SupabaseApiService {
         val total = extractTotalCount(url, session)
         val arr = JSONArray(body)
         val items = arr.map { parseAppointment(it) }
-        return@withContext Paged(items = items, total = total.toLong(), limit = limit, offset = offset)
+        val result = Paged(items = items, total = total.toLong(), limit = limit, offset = offset)
+
+        Companion.appointmentsCache[cacheKey] = Pair(System.currentTimeMillis(), result)
+        return@withContext result
     }
 
     suspend fun createAppointment(request: BookingRequest): Appointment = withContext(Dispatchers.Default) {
