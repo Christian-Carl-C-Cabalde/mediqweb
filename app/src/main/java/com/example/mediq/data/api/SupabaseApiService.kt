@@ -85,6 +85,44 @@ class SupabaseApiService {
         }
         val response = sb.newCall(requestBuilder.build()).execute()
         val responseBody = response.body?.string() ?: ""
+
+        // On 401, try refreshing the access token once and retrying
+        if (response.code == 401 && auth && SupabaseClient.refreshToken != null) {
+            val refreshBody = jsonBody(
+                "grant_type" to "refresh_token",
+                "refresh_token" to SupabaseClient.refreshToken
+            )
+            val refreshReq = Request.Builder()
+                .url("${SupabaseClient.authUrl}/token?grant_type=refresh_token")
+                .header("apikey", SupabaseClient.anonKey)
+                .header("Content-Type", "application/json")
+                .method("POST", RequestBody.create(JSON_MEDIA_TYPE, refreshBody))
+                .build()
+            val refreshResp = sb.newCall(refreshReq).execute()
+            val refreshBodyStr = refreshResp.body?.string() ?: ""
+            if (refreshResp.isSuccessful) {
+                val refreshObj = JSONObject(refreshBodyStr)
+                val newAccessToken = refreshObj.getString("access_token")
+                val newRefreshToken = refreshObj.optString("refresh_token", SupabaseClient.refreshToken)
+                SupabaseClient.accessToken = newAccessToken
+                SupabaseClient.refreshToken = newRefreshToken
+                // Retry the original request with the new token
+                requestBuilder
+                    .header("Authorization", "Bearer $newAccessToken")
+                val retryResp = sb.newCall(requestBuilder.build()).execute()
+                val retryBody = retryResp.body?.string() ?: ""
+                if (!retryResp.isSuccessful) {
+                    throw RuntimeException("HTTP ${retryResp.code}: $retryBody")
+                }
+                return@withContext retryBody
+            } else {
+                // Refresh failed - clear tokens and throw original error
+                SupabaseClient.accessToken = null
+                SupabaseClient.refreshToken = null
+                throw RuntimeException("HTTP ${response.code}: $responseBody")
+            }
+        }
+
         if (!response.isSuccessful) {
             throw RuntimeException("HTTP ${response.code}: $responseBody")
         }
