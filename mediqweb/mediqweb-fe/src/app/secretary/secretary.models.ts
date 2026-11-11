@@ -95,6 +95,7 @@ export interface PatientSummary {
 
 export interface Doctor {
   readonly id: string;
+  readonly userId: string;
   readonly name: string;
   readonly email: string;
   readonly phone: string;

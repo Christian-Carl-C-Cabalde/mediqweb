@@ -30,7 +30,7 @@ class AuthViewModel : ViewModel() {
         return try {
             val session = api.signIn(SignInRequest(username, password))
             currentUser = session.profile
-            MediQSession.setTokens(session.accessToken, session.refreshToken)
+            MediQSession.setTokens(session.accessToken, session.refreshToken, SupabaseClient.authUserId)
             _uiState.value = AuthUiState.Success(session.profile)
             session.profile
         } catch (e: Exception) {

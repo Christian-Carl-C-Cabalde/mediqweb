@@ -53,4 +53,8 @@ object SupabaseClient {
     /** The refresh token from the last sign-in. */
     @Volatile
     var refreshToken: String? = null
+
+    /** The auth user ID from the last sign-in, used to look up the profile without relying on RLS. */
+    @Volatile
+    var authUserId: String? = null
 }

@@ -91,6 +91,9 @@ class SupabaseApiService {
 
         // Profile may not exist yet (RLS deny-all or trigger lag). Fall back to
         // a profile built from the auth user data so sign-in doesn't crash.
+        SupabaseClient.accessToken = accessToken
+        SupabaseClient.refreshToken = refreshToken
+        SupabaseClient.authUserId = userId
         val profile = getProfileByUserId(userId) ?: UserProfile(
             id = userId,
             username = userEmail?.substringBefore("@") ?: userId,
@@ -105,8 +108,6 @@ class SupabaseApiService {
             createdAt = "",
             updatedAt = "",
         )
-        SupabaseClient.accessToken = accessToken
-        SupabaseClient.refreshToken = refreshToken
         return@withContext AuthSession(
             accessToken = accessToken,
             expiresAt = (System.currentTimeMillis() + expiresIn * 1000).toString(),
@@ -169,6 +170,7 @@ class SupabaseApiService {
         )
         SupabaseClient.accessToken = accessToken
         SupabaseClient.refreshToken = refreshToken
+        SupabaseClient.authUserId = userId
         return@withContext AuthSession(
             accessToken = accessToken,
             expiresAt = (System.currentTimeMillis() + 3600000).toString(),
@@ -206,6 +208,7 @@ class SupabaseApiService {
         if (accessToken.isNotEmpty()) {
             SupabaseClient.accessToken = accessToken
             SupabaseClient.refreshToken = sessionObj.optString("refresh_token", "")
+            SupabaseClient.authUserId = userId
         }
 
         return@withContext AuthSession(
@@ -250,8 +253,20 @@ class SupabaseApiService {
         val session = SupabaseClient.accessToken
             ?: throw RuntimeException("Not authenticated")
         val userId = getCurrentUserId(session)
-        val profile = getProfileByUserId(userId)
-            ?: throw RuntimeException("Profile not found for user $userId")
+        val profile = getProfileByUserId(userId) ?: UserProfile(
+            id = userId,
+            username = SupabaseClient.authUserId ?: userId,
+            fullName = SupabaseClient.authUserId ?: userId,
+            email = null,
+            mobileNumber = "",
+            dateOfBirth = "",
+            role = UserRole.PATIENT,
+            status = AccountStatus.ACTIVE,
+            doctorId = null,
+            assignedDoctorId = null,
+            createdAt = "",
+            updatedAt = "",
+        )
         // If doctor, also fetch specialization and license number from doctors table
         val updatedProfile = if (profile.role == UserRole.DOCTOR) {
             try {
@@ -279,6 +294,7 @@ class SupabaseApiService {
             body = jsonBody(
                 "full_name" to (draft.name ?: ""),
                 "email" to (draft.email ?: ""),
+                "mobile_number" to (draft.mobileNumber ?: ""),
             ))
         val arr = JSONArray(body)
         val first = arr.getJSONObject(0)
@@ -650,10 +666,8 @@ class SupabaseApiService {
     }
 
     private suspend fun getCurrentUserId(session: String): String {
-        val body = fetchJson("${SupabaseClient.restUrl}/profiles?select=user_id", session)
-        val arr = JSONArray(body)
-        val first = arr.getJSONObject(0)
-        return first.getString("user_id")
+        return SupabaseClient.authUserId
+            ?: throw RuntimeException("Not authenticated")
     }
 
     // --- Model parsers ---
@@ -666,8 +680,8 @@ class SupabaseApiService {
             email = obj.optString("email", null),
             mobileNumber = obj.optString("mobile_number", ""),
             dateOfBirth = obj.optString("date_of_birth", ""),
-            role = UserRole.valueOf(obj.optString("role", "PATIENT")),
-            status = AccountStatus.valueOf(obj.optString("status", "ACTIVE")),
+            role = UserRole.valueOf(obj.optString("role", "PATIENT").uppercase()),
+            status = AccountStatus.valueOf(obj.optString("status", "ACTIVE").uppercase()),
             doctorId = obj.optString("doctor_id", null),
             assignedDoctorId = obj.optString("assigned_doctor_id", null),
             createdAt = obj.optString("created_at", ""),
@@ -695,7 +709,7 @@ class SupabaseApiService {
                 room = obj.optString("room", ""),
             ),
             languages = emptyList(),
-            status = DoctorStatus.valueOf(obj.optString("status", "ACTIVE")),
+            status = DoctorStatus.valueOf(obj.optString("status", "ACTIVE").uppercase()),
             createdAt = obj.optString("created_at", ""),
             updatedAt = obj.optString("updated_at", ""),
         )

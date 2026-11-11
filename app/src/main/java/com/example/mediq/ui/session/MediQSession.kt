@@ -40,6 +40,7 @@ object MediQSession {
 
     private const val KEY_ACCESS_TOKEN = "access_token"
     private const val KEY_REFRESH_TOKEN = "refresh_token"
+    private const val KEY_AUTH_USER_ID = "auth_user_id"
 
     private var prefs: SharedPreferences? = null
     private var filesDir: File? = null
@@ -54,6 +55,9 @@ object MediQSession {
 
     /** The refresh token from the last sign-in, persisted to SharedPreferences. */
     val refreshToken: String? get() = prefs?.getString(KEY_REFRESH_TOKEN, null) ?: SupabaseClient.refreshToken
+
+    /** The auth user ID from the last sign-in, persisted to SharedPreferences. */
+    val authUserId: String? get() = prefs?.getString(KEY_AUTH_USER_ID, null) ?: SupabaseClient.authUserId
 
     /**
      * Accounts created on this device, keyed by username.
@@ -281,12 +285,14 @@ object MediQSession {
     }
 
     /** Store the tokens issued at sign-in. */
-    fun setTokens(accessToken: String?, refreshToken: String?) {
+    fun setTokens(accessToken: String?, refreshToken: String?, authUserId: String? = null) {
         SupabaseClient.accessToken = accessToken
         SupabaseClient.refreshToken = refreshToken
+        SupabaseClient.authUserId = authUserId
         val editor = prefs?.edit() ?: return
         accessToken?.let { editor.putString(KEY_ACCESS_TOKEN, it) } ?: editor.remove(KEY_ACCESS_TOKEN)
         refreshToken?.let { editor.putString(KEY_REFRESH_TOKEN, it) } ?: editor.remove(KEY_REFRESH_TOKEN)
+        authUserId?.let { editor.putString(KEY_AUTH_USER_ID, it) } ?: editor.remove(KEY_AUTH_USER_ID)
         editor.commit()
     }
 
@@ -295,6 +301,7 @@ object MediQSession {
         _user.value = null
         SupabaseClient.accessToken = null
         SupabaseClient.refreshToken = null
+        SupabaseClient.authUserId = null
         persistClear()
     }
 

@@ -444,10 +444,11 @@ export class SecretarySession {
   }
 
   /**
-   * A doctor by id, unscoped.
+   * A doctor by id, unscoped. Matches by doctors.id or by auth user_id, since
+   * appointment rows store the latter in doctor_id.
    */
   doctorById(id: string): Doctor | null {
-    return this.doctorState().find((doctor) => doctor.id === id) ?? null;
+    return this.doctorState().find((doctor) => doctor.id === id || doctor.userId === id) ?? null;
   }
 
   /**
@@ -672,6 +673,7 @@ export class SecretarySession {
         this.doctorState.set([
           {
             id: doctor.id,
+            userId: doctor.userId,
             name: doctor.fullName,
             email: '',
             phone: '',
