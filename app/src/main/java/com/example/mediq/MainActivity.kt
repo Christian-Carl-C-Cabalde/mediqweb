@@ -38,11 +38,7 @@ class MainActivity : FragmentActivity() {
             android.widget.Toast.LENGTH_LONG
         ).show()
 
-        val startDestination = if (MediQSession.user.value != null) {
-            Screen.BiometricUnlock.route
-        } else {
-            Screen.SignIn.route
-        }
+        val startDestination = Screen.SignIn.route
 
         // Every screen here has light chrome behind the system bars, so the
         // default auto-detected system bar style is correct. MediQTheme sets the
