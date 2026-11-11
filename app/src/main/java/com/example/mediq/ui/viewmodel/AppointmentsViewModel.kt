@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.util.concurrent.TimeUnit
 
 class AppointmentsViewModel : ViewModel() {
     private val api = SupabaseApiService()
@@ -31,6 +32,20 @@ class AppointmentsViewModel : ViewModel() {
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
+    // Doctors cache to avoid redundant Supabase queries on every screen open
+    private var _cachedDoctors: List<Doctor>? = null
+    private var _doctorsCacheTime: Long = 0
+    private val DOCTORS_CACHE_TTL_MS = TimeUnit.MINUTES.toMillis(5)
+
+    private suspend fun loadDoctors(): List<Doctor> {
+        val now = System.currentTimeMillis()
+        if (_cachedDoctors == null || now - _doctorsCacheTime > DOCTORS_CACHE_TTL_MS) {
+            _cachedDoctors = api.getDoctors().items
+            _doctorsCacheTime = now
+        }
+        return _cachedDoctors ?: emptyList()
+    }
+
     /** Loads the patient's real bookings from the API, never sample data. */
     fun loadAppointments() {
         viewModelScope.launch {
@@ -38,7 +53,7 @@ class AppointmentsViewModel : ViewModel() {
             _error.value = null
             try {
                 val result = api.getAppointments()
-                val doctors = api.getDoctors().items
+                val doctors = loadDoctors()
                 val conversations = api.getConversations()
                 _appointments.value = result.items.map { toBooking(it, doctors, conversations) }
             } catch (e: Exception) {
@@ -56,7 +71,7 @@ class AppointmentsViewModel : ViewModel() {
             _error.value = null
             try {
                 val appt = api.getAppointment(id)
-                val doctors = api.getDoctors().items
+                val doctors = loadDoctors()
                 val conversations = api.getConversations()
                 _appointmentDetail.value = toBooking(appt, doctors, conversations)
             } catch (e: Exception) {

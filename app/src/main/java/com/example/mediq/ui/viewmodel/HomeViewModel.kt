@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.time.Clock
 import java.time.Instant
+import java.util.concurrent.TimeUnit
 
 /**
  * Home screen data loader.
@@ -36,6 +37,20 @@ class HomeViewModel : ViewModel() {
     private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
+    // Doctors cache to avoid redundant Supabase queries on every screen open
+    private var _cachedDoctors: List<Doctor>? = null
+    private var _doctorsCacheTime: Long = 0
+    private val DOCTORS_CACHE_TTL_MS = TimeUnit.MINUTES.toMillis(5)
+
+    private suspend fun loadDoctors(): List<Doctor> {
+        val now = System.currentTimeMillis()
+        if (_cachedDoctors == null || now - _doctorsCacheTime > DOCTORS_CACHE_TTL_MS) {
+            _cachedDoctors = api.getDoctors().items
+            _doctorsCacheTime = now
+        }
+        return _cachedDoctors ?: emptyList()
+    }
+
     init {
         viewModelScope.launch {
             loadHome()
@@ -49,7 +64,7 @@ class HomeViewModel : ViewModel() {
             val profile = api.getProfile()
             val specialties = api.getSpecializations()
             val appointments = api.getAppointments()
-            val doctors = api.getDoctors()
+            val doctors = loadDoctors()
 
             val patient = PatientSummary(
                 firstName = DisplayName.firstName(profile.fullName),
@@ -58,9 +73,9 @@ class HomeViewModel : ViewModel() {
 
             val specialtyNames = specialties.map { it.name }
 
-            val nextAppointment = nextAppointment(appointments.items, doctors.items)
+            val nextAppointment = nextAppointment(appointments.items, doctors)
 
-            val openSlots = doctors.items.map { doctor ->
+            val openSlots = doctors.map { doctor ->
                 DoctorAvailability(
                     doctorId = doctor.id,
                     name = doctor.fullName,
