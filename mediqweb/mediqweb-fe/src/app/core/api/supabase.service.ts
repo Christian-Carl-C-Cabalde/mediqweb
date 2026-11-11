@@ -15,6 +15,10 @@ export interface SupabaseProfile {
 export class SupabaseService {
   private supabase: SupabaseClient;
 
+  // Profile cache to avoid repeated Supabase queries for the same user
+  private profileCache = new Map<string, { data: any; expiresAt: number }>();
+  private readonly PROFILE_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
   constructor() {
     const url = environment.supabaseUrl;
     const key = environment.supabaseAnonKey;
@@ -47,6 +51,7 @@ export class SupabaseService {
   }
 
   async signOut() {
+    this.profileCache.clear();
     return this.supabase.auth.signOut();
   }
 
@@ -59,7 +64,23 @@ export class SupabaseService {
   }
 
   async getProfile(userId: string) {
-    return (this.supabase as any).from('profiles').select('*').eq('user_id', userId).single();
+    const now = Date.now();
+    const cached = this.profileCache.get(userId);
+    if (cached && now < cached.expiresAt) {
+      return cached.data;
+    }
+
+    const result = await (this.supabase as any)
+      .from('profiles')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
+
+    this.profileCache.set(userId, {
+      data: result,
+      expiresAt: now + this.PROFILE_CACHE_TTL_MS,
+    });
+    return result;
   }
 
   async getAccessToken(): Promise<string | null> {
