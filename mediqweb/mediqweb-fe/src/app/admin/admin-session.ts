@@ -131,6 +131,13 @@ export class AdminSession {
     return this.specializationsState().find((s) => s.id === id)?.name ?? 'Unknown';
   }
 
+  /** A doctor's full name, looked up by their user_id. Used to show which doctor
+   * a secretary is assigned to. */
+  doctorName(userId: string | null): string | null {
+    if (!userId) return null;
+    return this.doctorsState().find((d) => d.id === userId)?.name ?? null;
+  }
+
   /** Options for the create-account form's specialization field. */
   specializationOptions(): { id: string; label: string }[] {
     return this.specializationsState().map((s) => ({ id: s.id, label: s.name }));
@@ -159,6 +166,7 @@ export class AdminSession {
       specializationId: kind === 'doctor' ? (draft.specializationId ?? null) : null,
       licenseNumber: kind === 'doctor' ? draft.licenseNumber?.trim() || null : null,
       assignedDoctorId: kind === 'secretary' ? draft.assignedDoctorId?.trim() || null : null,
+      assignedDoctorName: null,
       joinedOn: new Date().toISOString().slice(0, 10),
       lastActiveOn: null,
     };
@@ -384,6 +392,7 @@ function toStaffAccount(
     specializationId,
     licenseNumber,
     assignedDoctorId: api.role === 'secretary' ? (api.assignedDoctorId ?? null) : null,
+    assignedDoctorName: null,
     joinedOn: api.createdAt,
     lastActiveOn: null,
   };

@@ -20,7 +20,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.mediq.ui.navigation.Screen
@@ -221,6 +223,16 @@ fun SignInContent(
                 label = "Create Account / Register",
                 enabled = !submitting,
                 onClick = actions.onRegister
+            )
+
+            Spacer(Modifier.height(MediQSpacing.md))
+
+            Text(
+                text = "By signing in, you agree to our Terms of Service and Privacy Policy.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MediQTextSecondary,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = MediQSpacing.gutter),
             )
 
             Spacer(Modifier.height(MediQSpacing.xxl))

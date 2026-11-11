@@ -98,6 +98,8 @@ export class StaffDirectory {
         { key: 'specialization', header: 'Specialization', hideBelow: 'md' },
         { key: 'licenseNumber', header: 'License', hideBelow: 'lg' },
       );
+    } else if (this.kind() === 'secretary') {
+      base.push({ key: 'assignedDoctorId', header: 'Assigned doctor', hideBelow: 'md' });
     }
     base.push(
       { key: 'status', header: 'Status', sortable: true },
@@ -126,6 +128,11 @@ export class StaffDirectory {
         ...account,
         // Denormalised for the table so the default cell renderer can read them.
         specialization: this.session.specializationName(account.specializationId),
+        // Secretaries: show the assigned doctor's name, not just the UUID.
+        assignedDoctorName:
+          this.kind() === 'secretary' && account.assignedDoctorId
+            ? this.session.doctorName(account.assignedDoctorId)
+            : null,
       }));
   });
 

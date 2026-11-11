@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { from, map, Observable, switchMap } from 'rxjs';
+import { from, forkJoin, map, Observable, switchMap } from 'rxjs';
 import type { StaffAccount, StaffDraft, AuditEntry, AuditSeverity } from '../../admin/admin.models';
 import type { PatientAccount } from '../../admin/admin.models';
 import type { AccountStatus } from '../../shared/domain/account-status';
@@ -10,6 +10,7 @@ function toStaffAccount(
   row: any,
   specializationId: string | null = null,
   licenseNumber: string | null = null,
+  doctorNames: Map<string, string> | null = null,
 ): StaffAccount {
   return {
     id: row.user_id,
@@ -21,6 +22,10 @@ function toStaffAccount(
     specializationId,
     licenseNumber,
     assignedDoctorId: row.assigned_doctor_id ?? null,
+    assignedDoctorName:
+      row.assigned_doctor_id && doctorNames
+        ? doctorNames.get(row.assigned_doctor_id) ?? null
+        : null,
     joinedOn: row.created_at ?? '',
     lastActiveOn: null,
   };
@@ -92,16 +97,32 @@ export class HttpAdminGateway {
             if (!adminResult.data) {
               throw new Error('Admin only');
             }
-            return from((this.supabase as any).from('profiles').select('*')).pipe(
-              map((r: any) => {
-                if (r.error) {
-                  throw new Error(r.error?.message ?? 'Failed to load accounts');
+            // Fetch all profiles and all doctors in parallel so we can map
+            // doctor_id → full_name for secretary rows.
+            return forkJoin({
+              profiles: (this.supabase as any).from('profiles').select('*'),
+              doctors: (this.supabase as any).from('doctors').select('id, user_id, full_name'),
+            }).pipe(
+              map((result: any) => {
+                if (result.profiles.error) {
+                  throw new Error(result.profiles.error?.message ?? 'Failed to load accounts');
                 }
-                const rows = r.data ?? [];
+                const rows = result.profiles.data ?? [];
+                // Build a lookup: doctors.user_id → full_name, so secretaries can
+                // show who they are assigned to.
+                const doctorNames = new Map<string, string>(
+                  (result.doctors.data ?? []).map((d: any) => [d.user_id, d.full_name]),
+                );
                 return {
-                  patients: rows.filter((x: any) => x.role === 'PATIENT').map(toStaffAccount),
-                  doctors: rows.filter((x: any) => x.role === 'DOCTOR').map(toStaffAccount),
-                  secretaries: rows.filter((x: any) => x.role === 'SECRETARY').map(toStaffAccount),
+                  patients: rows.filter((x: any) => x.role === 'PATIENT').map((r: any) =>
+                    toStaffAccount(r, null, null, doctorNames),
+                  ),
+                  doctors: rows.filter((x: any) => x.role === 'DOCTOR').map((r: any) =>
+                    toStaffAccount(r, null, null, doctorNames),
+                  ),
+                  secretaries: rows.filter((x: any) => x.role === 'SECRETARY').map((r: any) =>
+                    toStaffAccount(r, null, null, doctorNames),
+                  ),
                 };
               }),
             );

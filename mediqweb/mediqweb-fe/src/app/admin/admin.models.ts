@@ -48,6 +48,8 @@ export interface StaffAccount {
    * screens that would show it need to be able to say so rather than guess.
    */
   readonly assignedDoctorId: string | null;
+  /** The assigned doctor's full name, shown in the staff directory. */
+  readonly assignedDoctorName: string | null;
   /** ISO date, e.g. `2026-04-18`. */
   readonly joinedOn: string;
   /** ISO date, or null when the account has never signed in. */

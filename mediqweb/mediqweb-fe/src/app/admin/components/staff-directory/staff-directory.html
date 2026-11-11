@@ -57,6 +57,12 @@
       {{ row.specialization }}
     </ng-template>
 
+    @if (kind() === 'secretary') {
+      <ng-template uiTableCell="assignedDoctorId" let-row>
+        {{ row.assignedDoctorName ?? '—' }}
+      </ng-template>
+    }
+
     <ng-template uiTableCell="actions" let-row>
       @if (row.status === 'active') {
         <ui-button variant="ghost" size="sm" (click)="requestDisable(row)">Disable</ui-button>
